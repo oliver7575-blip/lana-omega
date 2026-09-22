@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import SignOutButton from '@/components/SignOutButton'
 
 export default async function Home() {
   const supabase = await createClient()
@@ -39,6 +40,10 @@ export default async function Home() {
           <p>
             Tenant: <strong>{tenant?.name ?? '—'}</strong> — status: {tenant?.status ?? '—'}
           </p>
+          <p>
+            <a href="/integrations">Integrations</a>
+          </p>
+          <SignOutButton />
         </>
       ) : (
         <p>Signed in, but no tenant record found for this account.</p>
