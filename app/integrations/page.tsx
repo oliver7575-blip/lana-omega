@@ -43,10 +43,21 @@ export default function IntegrationsPage() {
   async function handleConnect(type: IntegrationType) {
     setSaving(true)
     setMessage(null)
+
+    const def = INTEGRATIONS.find((d) => d.type === type)!
+    const credentials: Record<string, string> = {}
+    const config: Record<string, string> = {}
+    for (const field of def.credentialFields) {
+      if (formValues[field.key]) credentials[field.key] = formValues[field.key]
+    }
+    for (const field of def.configFields) {
+      if (formValues[field.key]) config[field.key] = formValues[field.key]
+    }
+
     const res = await fetch('/api/integrations/connect', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ integrationType: type, credentials: formValues }),
+      body: JSON.stringify({ integrationType: type, credentials, config }),
     })
     const json = await res.json()
     setSaving(false)
@@ -116,7 +127,7 @@ export default function IntegrationsPage() {
 
             {openForm === def.type && (
               <div style={{ marginTop: 16 }}>
-                {def.credentialFields.map((field) => (
+                {[...def.configFields, ...def.credentialFields].map((field) => (
                   <div key={field.key} style={{ marginBottom: 8 }}>
                     <label>{field.label}</label>
                     <br />
