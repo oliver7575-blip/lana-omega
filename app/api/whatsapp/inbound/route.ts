@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { generateReply } from '@/lib/anthropic'
 import { sendWhatsAppMessage } from '@/lib/whatsapp-send'
+import { verifyMetaSignature } from '@/lib/verify-webhook'
 
 interface InboundPayload {
   phoneNumberId: string
@@ -10,7 +11,18 @@ interface InboundPayload {
 }
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as Partial<InboundPayload>
+  const rawBody = await request.text()
+  const signature = request.headers.get('x-hub-signature-256')
+  const appSecret = process.env.META_APP_SECRET
+
+  if (!appSecret) {
+    return NextResponse.json({ error: 'META_APP_SECRET not configured' }, { status: 500 })
+  }
+  if (!verifyMetaSignature(rawBody, signature, appSecret)) {
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+  }
+
+  const body = JSON.parse(rawBody) as Partial<InboundPayload>
   const { phoneNumberId, from, text } = body
 
   if (!phoneNumberId || !from || !text) {
