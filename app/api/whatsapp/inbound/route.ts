@@ -3,6 +3,8 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { generateReply } from '@/lib/anthropic'
 import { sendWhatsAppMessage } from '@/lib/whatsapp-send'
 import { verifyMetaSignature } from '@/lib/verify-webhook'
+import { decryptCredentials } from '@/lib/crypto'
+import { lookupReservation } from '@/lib/cloudbeds'
 
 interface InboundPayload {
   phoneNumberId: string
@@ -64,6 +66,30 @@ export async function POST(request: Request) {
     .select('ai_persona_prompt')
     .eq('id', tenantId)
     .single()
+
+  const { data: cloudbedsIntegration } = await supabase
+    .from('tenant_integrations')
+    .select('status, credentials, config')
+    .eq('tenant_id', tenantId)
+    .eq('integration_type', 'pms_cloudbeds')
+    .maybeSingle()
+
+  const reservationTool =
+    cloudbedsIntegration?.status === 'connected'
+      ? {
+          lookupReservation: async (confirmationNumber: string) => {
+            const { api_key } = decryptCredentials<{ api_key: string }>(
+              cloudbedsIntegration.credentials
+            )
+            const propertyId = (cloudbedsIntegration.config as { property_id?: string })
+              ?.property_id
+            if (!propertyId) {
+              return { found: false, error: 'No property_id configured for this tenant' }
+            }
+            return lookupReservation(api_key, propertyId, confirmationNumber)
+          },
+        }
+      : undefined
 
   const { data: guest, error: guestError } = await supabase
     .from('guests')
@@ -152,7 +178,7 @@ export async function POST(request: Request) {
 
   let replyText: string
   try {
-    replyText = await generateReply(systemPrompt, claudeMessages)
+    replyText = await generateReply(systemPrompt, claudeMessages, reservationTool)
   } catch (err) {
     return NextResponse.json({
       tenantId,
