@@ -14,9 +14,19 @@ export default async function Home() {
 
   const { data: staffRow } = await supabase
     .from('staff_users')
-    .select('role, tenants(name, status)')
+    .select('role, tenant_id')
     .eq('auth_uid', user.id)
     .single()
+
+  let tenant: { name: string; status: string } | null = null
+  if (staffRow?.tenant_id) {
+    const { data: tenantRow } = await supabase
+      .from('tenants')
+      .select('name, status')
+      .eq('id', staffRow.tenant_id)
+      .single()
+    tenant = tenantRow
+  }
 
   return (
     <main style={{ maxWidth: 480, margin: '80px auto', fontFamily: 'sans-serif' }}>
@@ -27,7 +37,7 @@ export default async function Home() {
             Signed in as <strong>{user.email}</strong> ({staffRow.role})
           </p>
           <p>
-            Tenant: <strong>{staffRow.tenants?.[0]?.name}</strong> — status: {staffRow.tenants?.[0]?.status}
+            Tenant: <strong>{tenant?.name ?? '—'}</strong> — status: {tenant?.status ?? '—'}
           </p>
         </>
       ) : (
