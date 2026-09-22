@@ -27,7 +27,7 @@ export default async function Home() {
             Signed in as <strong>{user.email}</strong> ({staffRow.role})
           </p>
           <p>
-            Tenant: <strong>{staffRow.tenants?.name}</strong> — status: {staffRow.tenants?.status}
+            Tenant: <strong>{staffRow.tenants?.[0]?.name}</strong> — status: {staffRow.tenants?.[0]?.status}
           </p>
         </>
       ) : (
