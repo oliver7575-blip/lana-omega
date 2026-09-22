@@ -1,11 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { generateReply } from '@/lib/anthropic'
+import { sendWhatsAppMessage } from '@/lib/whatsapp-send'
 
-// Meta's actual webhook shape is deeply nested; this handles the common
-// single-message case. Meta's request signature (x-hub-signature-256)
-// verification is NOT implemented yet — this route is safe to test with
-// curl but must NOT be pointed at a real Meta webhook until that's added,
-// since anyone who finds this URL could currently inject fake messages.
 interface InboundPayload {
   phoneNumberId: string
   from: string
@@ -25,13 +22,9 @@ export async function POST(request: Request) {
 
   const supabase = createServiceClient()
 
-  // Resolve which tenant this WhatsApp number belongs to. This is the
-  // core of multi-tenant inbound routing: the phone_number_id in the
-  // webhook payload is matched against each tenant's own stored config,
-  // never assumed or hardcoded.
   const { data: integration, error: integrationError } = await supabase
     .from('tenant_integrations')
-    .select('tenant_id, status')
+    .select('tenant_id, status, credentials')
     .eq('integration_type', 'whatsapp')
     .eq('config->>phone_number_id', phoneNumberId)
     .maybeSingle()
@@ -47,14 +40,19 @@ export async function POST(request: Request) {
   }
   if (integration.status !== 'connected') {
     return NextResponse.json(
-      { error: 'This tenant\'s WhatsApp integration is not currently connected' },
+      { error: "This tenant's WhatsApp integration is not currently connected" },
       { status: 409 }
     )
   }
 
   const tenantId = integration.tenant_id
 
-  // Find or create the guest by phone, scoped to this tenant.
+  const { data: tenant } = await supabase
+    .from('tenants')
+    .select('ai_persona_prompt')
+    .eq('id', tenantId)
+    .single()
+
   const { data: guest, error: guestError } = await supabase
     .from('guests')
     .upsert({ tenant_id: tenantId, phone: from }, { onConflict: 'tenant_id,phone' })
@@ -68,7 +66,6 @@ export async function POST(request: Request) {
     )
   }
 
-  // Find an existing active WhatsApp conversation for this guest, or start one.
   const { data: existingConversation } = await supabase
     .from('conversations')
     .select('id')
@@ -107,7 +104,7 @@ export async function POST(request: Request) {
       .eq('id', conversationId)
   }
 
-  const { data: message, error: messageError } = await supabase
+  const { data: guestMessage, error: messageError } = await supabase
     .from('messages')
     .insert({
       tenant_id: tenantId,
@@ -118,17 +115,67 @@ export async function POST(request: Request) {
     .select()
     .single()
 
-  if (messageError || !message) {
+  if (messageError || !guestMessage) {
     return NextResponse.json(
       { error: `Failed to log message: ${messageError?.message}` },
       { status: 500 }
     )
   }
 
+  const { data: history } = await supabase
+    .from('messages')
+    .select('sender_type, content')
+    .eq('conversation_id', conversationId)
+    .in('sender_type', ['guest', 'lana'])
+    .order('created_at', { ascending: true })
+
+  const claudeMessages = (history ?? []).map((m) => ({
+    role: m.sender_type === 'guest' ? ('user' as const) : ('assistant' as const),
+    content: m.content,
+  }))
+
+  const systemPrompt =
+    tenant?.ai_persona_prompt ??
+    'You are a helpful, warm hotel concierge assistant. Answer guest questions clearly and concisely.'
+
+  let replyText: string
+  try {
+    replyText = await generateReply(systemPrompt, claudeMessages)
+  } catch (err) {
+    return NextResponse.json({
+      tenantId,
+      guestId: guest.id,
+      conversationId,
+      messageId: guestMessage.id,
+      aiError: err instanceof Error ? err.message : 'AI generation failed',
+    })
+  }
+
+  const { data: aiMessage } = await supabase
+    .from('messages')
+    .insert({
+      tenant_id: tenantId,
+      conversation_id: conversationId,
+      sender_type: 'lana',
+      content: replyText,
+    })
+    .select()
+    .single()
+
+  const sendResult = await sendWhatsAppMessage(
+    phoneNumberId,
+    integration.credentials,
+    from,
+    replyText
+  )
+
   return NextResponse.json({
     tenantId,
     guestId: guest.id,
     conversationId,
-    messageId: message.id,
+    messageId: guestMessage.id,
+    aiReplyMessageId: aiMessage?.id ?? null,
+    aiReplyText: replyText,
+    whatsappSendResult: sendResult,
   })
 }
