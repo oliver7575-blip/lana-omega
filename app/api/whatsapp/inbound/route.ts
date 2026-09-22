@@ -6,10 +6,62 @@ import { verifyMetaSignature } from '@/lib/verify-webhook'
 import { decryptCredentials } from '@/lib/crypto'
 import { lookupReservation } from '@/lib/cloudbeds'
 
-interface InboundPayload {
+// Meta calls this once when you register the webhook, to confirm you
+// control this endpoint before it starts sending real traffic.
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const mode = searchParams.get('hub.mode')
+  const token = searchParams.get('hub.verify_token')
+  const challenge = searchParams.get('hub.challenge')
+
+  if (mode === 'subscribe' && token === process.env.META_VERIFY_TOKEN) {
+    return new Response(challenge, { status: 200 })
+  }
+  return new Response('Forbidden', { status: 403 })
+}
+
+interface ExtractedMessage {
   phoneNumberId: string
   from: string
   text: string
+}
+
+// Meta's real webhook payload is deeply nested and can carry non-message
+// events too (delivery receipts, status updates). Our own curl tests use a
+// flat shape for convenience. Support both; return null for anything that
+// isn't an inbound text message (Meta expects a 200 either way, not an error).
+function extractMessage(body: Record<string, unknown>): ExtractedMessage | null {
+  if (body.entry) {
+    const entry = (body.entry as unknown[])?.[0] as Record<string, unknown> | undefined
+    const changes = entry?.changes as unknown[] | undefined
+    const value = (changes?.[0] as Record<string, unknown> | undefined)?.value as
+      | Record<string, unknown>
+      | undefined
+    const metadata = value?.metadata as Record<string, unknown> | undefined
+    const messages = value?.messages as Record<string, unknown>[] | undefined
+    const message = messages?.[0]
+    const phoneNumberId = metadata?.phone_number_id as string | undefined
+
+    if (message && phoneNumberId && message.type === 'text') {
+      const textObj = message.text as { body?: string } | undefined
+      return {
+        phoneNumberId,
+        from: message.from as string,
+        text: textObj?.body ?? '',
+      }
+    }
+    return null
+  }
+
+  if (body.phoneNumberId && body.from && body.text) {
+    return {
+      phoneNumberId: body.phoneNumberId as string,
+      from: body.from as string,
+      text: body.text as string,
+    }
+  }
+
+  return null
 }
 
 export async function POST(request: Request) {
@@ -24,15 +76,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
 
-  const body = JSON.parse(rawBody) as Partial<InboundPayload>
-  const { phoneNumberId, from, text } = body
+  const parsedBody = JSON.parse(rawBody) as Record<string, unknown>
+  const extracted = extractMessage(parsedBody)
 
-  if (!phoneNumberId || !from || !text) {
-    return NextResponse.json(
-      { error: 'phoneNumberId, from, and text are required' },
-      { status: 400 }
-    )
+  if (!extracted) {
+    // Not an inbound text message (could be a status/delivery event, or a
+    // non-text message type we don't handle yet). Acknowledge with 200 so
+    // Meta doesn't keep retrying.
+    return NextResponse.json({ ignored: true })
   }
+
+  const { phoneNumberId, from, text } = extracted
 
   const supabase = createServiceClient()
 
