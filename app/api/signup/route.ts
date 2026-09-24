@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { createServiceClient } from '@/lib/supabase/service'
 
 interface SignupRequest {
@@ -27,9 +28,9 @@ export async function POST(request: Request) {
     )
   }
 
-  const supabase = createServiceClient()
+  const serviceClient = createServiceClient()
 
-  const { data: existingTenant } = await supabase
+  const { data: existingTenant } = await serviceClient
     .from('tenants')
     .select('id')
     .eq('slug', slug)
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
     )
   }
 
-  const { data: tenant, error: tenantError } = await supabase
+  const { data: tenant, error: tenantError } = await serviceClient
     .from('tenants')
     .insert({ name: hotelName, slug, timezone, status: 'onboarding' })
     .select()
@@ -55,32 +56,37 @@ export async function POST(request: Request) {
     )
   }
 
-  // Real signup: do NOT auto-confirm the email. Supabase will send a real
-  // confirmation email, and the owner must verify before they can sign in.
-  const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+  // Use the regular anon-key client's signUp() here, NOT the admin API —
+  // this is the path that actually triggers Supabase's built-in confirmation
+  // email. admin.createUser() creates the account silently with no email at all.
+  const anonClient = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+
+  const { data: authData, error: authError } = await anonClient.auth.signUp({
     email: ownerEmail,
     password: ownerPassword,
-    email_confirm: false,
   })
 
-  if (authError || !authUser?.user) {
-    await supabase.from('tenants').delete().eq('id', tenant.id)
+  if (authError || !authData?.user) {
+    await serviceClient.from('tenants').delete().eq('id', tenant.id)
     return NextResponse.json(
       { error: `Failed to create account: ${authError?.message}` },
       { status: 500 }
     )
   }
 
-  const { error: staffError } = await supabase.from('staff_users').insert({
+  const { error: staffError } = await serviceClient.from('staff_users').insert({
     tenant_id: tenant.id,
-    auth_uid: authUser.user.id,
+    auth_uid: authData.user.id,
     email: ownerEmail,
     role: 'owner',
   })
 
   if (staffError) {
-    await supabase.auth.admin.deleteUser(authUser.user.id)
-    await supabase.from('tenants').delete().eq('id', tenant.id)
+    await serviceClient.auth.admin.deleteUser(authData.user.id)
+    await serviceClient.from('tenants').delete().eq('id', tenant.id)
     return NextResponse.json(
       { error: `Failed to link owner to tenant: ${staffError.message}` },
       { status: 500 }
@@ -89,7 +95,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     tenantId: tenant.id,
-    ownerAuthId: authUser.user.id,
+    ownerAuthId: authData.user.id,
     message: 'Account created — check your email to confirm before signing in.',
   })
 }
