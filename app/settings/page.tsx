@@ -1,9 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 export default function SettingsPage() {
+  const router = useRouter()
   const [name, setName] = useState('')
   const [prompt, setPrompt] = useState('')
   const [status, setStatus] = useState('')
@@ -11,6 +13,10 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [showDeleteForm, setShowDeleteForm] = useState(false)
+  const [confirmName, setConfirmName] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/tenant')
@@ -43,11 +49,29 @@ export default function SettingsPage() {
     setMessage('Saved.')
   }
 
+  async function handleDelete() {
+    setDeleting(true)
+    setDeleteError(null)
+    const res = await fetch('/api/tenant', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirmName }),
+    })
+    const json = await res.json()
+    setDeleting(false)
+    if (!res.ok) {
+      setDeleteError(json.error)
+      return
+    }
+    router.push('/login')
+  }
+
   if (loading) {
     return <main style={{ maxWidth: 640, margin: '80px auto' }}>Loading...</main>
   }
 
   const canEdit = role === 'owner' || role === 'admin'
+  const canDelete = role === 'owner'
 
   return (
     <main style={{ maxWidth: 640, margin: '80px auto', fontFamily: 'sans-serif' }}>
@@ -102,6 +126,43 @@ export default function SettingsPage() {
         </button>
       )}
       {message && <p>{message}</p>}
+
+      {canDelete && (
+        <div style={{ marginTop: 48, borderTop: '1px solid #f0c0c0', paddingTop: 16 }}>
+          <h2 style={{ color: '#b91c1c' }}>Danger zone</h2>
+          {!showDeleteForm ? (
+            <button onClick={() => setShowDeleteForm(true)} style={{ color: '#b91c1c' }}>
+              Delete this hotel account
+            </button>
+          ) : (
+            <div>
+              <p>
+                This permanently deletes <strong>{name}</strong>, every staff account, every
+                integration, and every guest conversation. This cannot be undone.
+              </p>
+              <p>
+                Type <strong>{name}</strong> to confirm:
+              </p>
+              <input
+                value={confirmName}
+                onChange={(e) => setConfirmName(e.target.value)}
+                style={{ width: '100%', padding: 8, marginBottom: 8 }}
+              />
+              {deleteError && <p style={{ color: 'red' }}>{deleteError}</p>}
+              <button
+                onClick={handleDelete}
+                disabled={deleting || confirmName !== name}
+                style={{ color: '#b91c1c' }}
+              >
+                {deleting ? 'Deleting...' : 'Permanently delete'}
+              </button>
+              <button onClick={() => setShowDeleteForm(false)} style={{ marginLeft: 8 }}>
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </main>
   )
 }
