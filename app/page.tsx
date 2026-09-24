@@ -46,6 +46,8 @@ export default async function Home() {
             <a href="/conversations">Conversations</a>
             {' · '}
             <a href="/settings">Settings</a>
+            {' · '}
+            <a href="/staff">Staff</a>
           </p>
           <SignOutButton />
         </>
