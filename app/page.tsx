@@ -44,6 +44,8 @@ export default async function Home() {
             <a href="/integrations">Integrations</a>
             {' · '}
             <a href="/conversations">Conversations</a>
+            {' · '}
+            <a href="/settings">Settings</a>
           </p>
           <SignOutButton />
         </>
