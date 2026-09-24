@@ -57,6 +57,23 @@ export default function StaffPage() {
     loadStaff()
   }
 
+  async function handleRemove(staffId: string, staffEmail: string) {
+    if (!confirm(`Remove ${staffEmail}? This deletes their account entirely.`)) return
+    setMessage(null)
+    const res = await fetch('/api/staff', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ staffId }),
+    })
+    const json = await res.json()
+    if (!res.ok) {
+      setMessage(`Error: ${json.error}`)
+      return
+    }
+    setMessage(`Removed ${staffEmail}.`)
+    loadStaff()
+  }
+
   if (loading) {
     return <main style={{ maxWidth: 640, margin: '80px auto' }}>Loading...</main>
   }
@@ -72,11 +89,22 @@ export default function StaffPage() {
       {staff.map((s) => (
         <div
           key={s.id}
-          style={{ border: '1px solid #ccc', borderRadius: 8, padding: 12, marginBottom: 8 }}
+          style={{
+            border: '1px solid #ccc',
+            borderRadius: 8,
+            padding: 12,
+            marginBottom: 8,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
         >
-          <strong>{s.full_name || s.email}</strong> — {s.role}
-          <br />
-          <span style={{ color: '#888', fontSize: 13 }}>{s.email}</span>
+          <div>
+            <strong>{s.full_name || s.email}</strong> — {s.role}
+            <br />
+            <span style={{ color: '#888', fontSize: 13 }}>{s.email}</span>
+          </div>
+          <button onClick={() => handleRemove(s.id, s.email)}>Remove</button>
         </div>
       ))}
 
