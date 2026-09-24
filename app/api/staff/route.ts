@@ -61,9 +61,6 @@ export async function POST(request: Request) {
 
   const finalRole = role && ['owner', 'admin', 'staff'].includes(role) ? role : 'staff'
 
-  // tenant_id comes from the CALLER's own resolved tenant (server-side, via
-  // their authenticated session) — never taken from client input, so there's
-  // no way for a request to add staff to a different tenant than the caller's own.
   const serviceClient = createServiceClient()
 
   const { data: newAuthUser, error: authError } = await serviceClient.auth.admin.createUser({
@@ -100,4 +97,88 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ staff: newStaffRow })
+}
+
+export async function DELETE(request: Request) {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const { data: callerRow } = await supabase
+    .from('staff_users')
+    .select('id, role, tenant_id')
+    .eq('auth_uid', user.id)
+    .single()
+
+  if (!callerRow || !['owner', 'admin'].includes(callerRow.role)) {
+    return NextResponse.json(
+      { error: 'Only owners or admins can remove staff' },
+      { status: 403 }
+    )
+  }
+
+  const { staffId } = (await request.json()) as { staffId?: string }
+  if (!staffId) {
+    return NextResponse.json({ error: 'staffId is required' }, { status: 400 })
+  }
+
+  if (staffId === callerRow.id) {
+    return NextResponse.json({ error: 'You cannot remove your own account' }, { status: 400 })
+  }
+
+  const serviceClient = createServiceClient()
+
+  // Fetch the target row first — need auth_uid to clean up auth.users too,
+  // and need to confirm it's actually in the caller's own tenant before
+  // touching anything (defense in depth, even though RLS would also block
+  // a cross-tenant delete on staff_users itself).
+  const { data: targetRow, error: fetchError } = await serviceClient
+    .from('staff_users')
+    .select('id, auth_uid, role, tenant_id')
+    .eq('id', staffId)
+    .single()
+
+  if (fetchError || !targetRow) {
+    return NextResponse.json({ error: 'Staff member not found' }, { status: 404 })
+  }
+
+  if (targetRow.tenant_id !== callerRow.tenant_id) {
+    return NextResponse.json({ error: 'Staff member not found' }, { status: 404 })
+  }
+
+  if (targetRow.role === 'owner') {
+    const { count } = await serviceClient
+      .from('staff_users')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', callerRow.tenant_id)
+      .eq('role', 'owner')
+
+    if ((count ?? 0) <= 1) {
+      return NextResponse.json(
+        { error: 'Cannot remove the last owner of a tenant' },
+        { status: 400 }
+      )
+    }
+  }
+
+  const { error: deleteError } = await serviceClient
+    .from('staff_users')
+    .delete()
+    .eq('id', staffId)
+
+  if (deleteError) {
+    return NextResponse.json({ error: deleteError.message }, { status: 500 })
+  }
+
+  // Clean up the orphaned auth account too — the earlier tenant-deletion
+  // gap (cascade only covers staff_users, never auth.users) doesn't happen
+  // here, since we handle it explicitly.
+  await serviceClient.auth.admin.deleteUser(targetRow.auth_uid)
+
+  return NextResponse.json({ success: true })
 }
