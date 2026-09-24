@@ -43,6 +43,24 @@ export async function POST(request: Request) {
     )
   }
 
+  // Check for an existing account with this email BEFORE creating anything.
+  // Supabase's signUp() returns a fake "success" response for an
+  // already-registered email (anti-enumeration protection) rather than a
+  // clean error, which would otherwise surface as a confusing foreign-key
+  // failure later. Checking staff_users directly sidesteps that entirely.
+  const { data: existingStaff } = await serviceClient
+    .from('staff_users')
+    .select('id')
+    .eq('email', ownerEmail)
+    .maybeSingle()
+
+  if (existingStaff) {
+    return NextResponse.json(
+      { error: 'An account with this email already exists — try signing in instead' },
+      { status: 409 }
+    )
+  }
+
   const { data: tenant, error: tenantError } = await serviceClient
     .from('tenants')
     .insert({ name: hotelName, slug, timezone, status: 'onboarding' })
@@ -56,9 +74,6 @@ export async function POST(request: Request) {
     )
   }
 
-  // Use the regular anon-key client's signUp() here, NOT the admin API —
-  // this is the path that actually triggers Supabase's built-in confirmation
-  // email. admin.createUser() creates the account silently with no email at all.
   const anonClient = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -69,11 +84,21 @@ export async function POST(request: Request) {
     password: ownerPassword,
   })
 
-  if (authError || !authData?.user) {
+  // Belt-and-suspenders: even with the pre-check above, also detect
+  // Supabase's documented "already registered" signal directly — a
+  // returned user with an empty identities array means no new account was
+  // actually created.
+  const alreadyRegistered = authData?.user && authData.user.identities?.length === 0
+
+  if (authError || !authData?.user || alreadyRegistered) {
     await serviceClient.from('tenants').delete().eq('id', tenant.id)
     return NextResponse.json(
-      { error: `Failed to create account: ${authError?.message}` },
-      { status: 500 }
+      {
+        error: alreadyRegistered
+          ? 'An account with this email already exists — try signing in instead'
+          : `Failed to create account: ${authError?.message}`,
+      },
+      { status: alreadyRegistered ? 409 : 500 }
     )
   }
 
