@@ -4,8 +4,9 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'next/navigation'
 
 interface ChatMessage {
-  role: 'guest' | 'lana'
+  sender_type: 'guest' | 'lana' | 'staff'
   content: string
+  created_at: string
 }
 
 export default function WidgetTestPage() {
@@ -14,7 +15,7 @@ export default function WidgetTestPage() {
   const [visitorId, setVisitorId] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -28,6 +29,25 @@ export default function WidgetTestPage() {
     setVisitorId(id)
   }, [slug])
 
+  async function fetchHistory(id: string) {
+    const res = await fetch(`/api/widget/${slug}/chat?visitorId=${id}`)
+    const json = await res.json()
+    if (res.ok) {
+      setMessages(json.messages ?? [])
+    }
+  }
+
+  // Load real history on mount (fixes losing the conversation on refresh),
+  // then poll every 4 seconds to pick up anything added from elsewhere —
+  // most importantly, a staff reply sent from the dashboard during human
+  // takeover, which otherwise never reaches this page at all.
+  useEffect(() => {
+    if (!visitorId) return
+    fetchHistory(visitorId)
+    const interval = setInterval(() => fetchHistory(visitorId), 4000)
+    return () => clearInterval(interval)
+  }, [visitorId, slug])
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
@@ -37,9 +57,8 @@ export default function WidgetTestPage() {
     if (!input.trim() || !visitorId) return
 
     const userMessage = input.trim()
-    setMessages((prev) => [...prev, { role: 'guest', content: userMessage }])
     setInput('')
-    setLoading(true)
+    setSending(true)
     setError(null)
 
     const res = await fetch(`/api/widget/${slug}/chat`, {
@@ -48,13 +67,17 @@ export default function WidgetTestPage() {
       body: JSON.stringify({ visitorId, message: userMessage }),
     })
     const json = await res.json()
-    setLoading(false)
+    setSending(false)
 
     if (!res.ok) {
       setError(json.error)
       return
     }
-    setMessages((prev) => [...prev, { role: 'lana', content: json.reply }])
+
+    // Refetch full history right away rather than hand-appending just this
+    // one exchange — keeps this view and the polling path using the exact
+    // same source of truth instead of two slightly different code paths.
+    fetchHistory(visitorId)
   }
 
   return (
@@ -71,23 +94,34 @@ export default function WidgetTestPage() {
         }}
       >
         {messages.map((m, i) => (
-          <div key={i} style={{ marginBottom: 10, textAlign: m.role === 'guest' ? 'right' : 'left' }}>
+          <div
+            key={i}
+            style={{ marginBottom: 10, textAlign: m.sender_type === 'guest' ? 'right' : 'left' }}
+          >
             <div
               style={{
                 display: 'inline-block',
                 padding: '8px 12px',
                 borderRadius: 8,
                 maxWidth: '80%',
-                background: m.role === 'guest' ? '#dbeafe' : '#f0f0f0',
+                background:
+                  m.sender_type === 'guest'
+                    ? '#dbeafe'
+                    : m.sender_type === 'staff'
+                      ? '#dcfce7'
+                      : '#f0f0f0',
                 whiteSpace: 'pre-wrap',
                 textAlign: 'left',
               }}
             >
+              {m.sender_type === 'staff' && (
+                <div style={{ fontSize: 11, color: '#666', marginBottom: 2 }}>Staff</div>
+              )}
               {m.content}
             </div>
           </div>
         ))}
-        {loading && <p style={{ color: '#888' }}>Typing...</p>}
+        {sending && <p style={{ color: '#888' }}>Sending...</p>}
         <div ref={bottomRef} />
       </div>
       {error && <p style={{ color: 'red' }}>{error}</p>}
@@ -98,7 +132,7 @@ export default function WidgetTestPage() {
           placeholder="Type a message..."
           style={{ flex: 1, padding: 8 }}
         />
-        <button type="submit" disabled={loading}>
+        <button type="submit" disabled={sending}>
           Send
         </button>
       </form>
