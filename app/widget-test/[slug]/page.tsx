@@ -37,10 +37,6 @@ export default function WidgetTestPage() {
     }
   }
 
-  // Load real history on mount (fixes losing the conversation on refresh),
-  // then poll every 4 seconds to pick up anything added from elsewhere —
-  // most importantly, a staff reply sent from the dashboard during human
-  // takeover, which otherwise never reaches this page at all.
   useEffect(() => {
     if (!visitorId) return
     fetchHistory(visitorId)
@@ -70,13 +66,10 @@ export default function WidgetTestPage() {
     setSending(false)
 
     if (!res.ok) {
-      setError(json.error)
+      setError(res.status === 429 ? json.error : json.error ?? 'Something went wrong.')
       return
     }
 
-    // Refetch full history right away rather than hand-appending just this
-    // one exchange — keeps this view and the polling path using the exact
-    // same source of truth instead of two slightly different code paths.
     fetchHistory(visitorId)
   }
 
