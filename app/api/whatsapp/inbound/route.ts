@@ -6,8 +6,6 @@ import { verifyMetaSignature } from '@/lib/verify-webhook'
 import { decryptCredentials } from '@/lib/crypto'
 import { lookupReservation } from '@/lib/cloudbeds'
 
-// Meta calls this once when you register the webhook, to confirm you
-// control this endpoint before it starts sending real traffic.
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const mode = searchParams.get('hub.mode')
@@ -26,10 +24,6 @@ interface ExtractedMessage {
   text: string
 }
 
-// Meta's real webhook payload is deeply nested and can carry non-message
-// events too (delivery receipts, status updates). Our own curl tests use a
-// flat shape for convenience. Support both; return null for anything that
-// isn't an inbound text message (Meta expects a 200 either way, not an error).
 function extractMessage(body: Record<string, unknown>): ExtractedMessage | null {
   if (body.entry) {
     const entry = (body.entry as unknown[])?.[0] as Record<string, unknown> | undefined
@@ -80,9 +74,6 @@ export async function POST(request: Request) {
   const extracted = extractMessage(parsedBody)
 
   if (!extracted) {
-    // Not an inbound text message (could be a status/delivery event, or a
-    // non-text message type we don't handle yet). Acknowledge with 200 so
-    // Meta doesn't keep retrying.
     return NextResponse.json({ ignored: true })
   }
 
@@ -160,7 +151,7 @@ export async function POST(request: Request) {
 
   const { data: existingConversation } = await supabase
     .from('conversations')
-    .select('id')
+    .select('id, status')
     .eq('tenant_id', tenantId)
     .eq('guest_id', guest.id)
     .eq('channel', 'whatsapp')
@@ -168,6 +159,7 @@ export async function POST(request: Request) {
     .maybeSingle()
 
   let conversationId = existingConversation?.id
+  let conversationStatus = existingConversation?.status
 
   if (!conversationId) {
     const { data: newConversation, error: conversationError } = await supabase
@@ -189,6 +181,7 @@ export async function POST(request: Request) {
       )
     }
     conversationId = newConversation.id
+    conversationStatus = newConversation.status
   } else {
     await supabase
       .from('conversations')
@@ -212,6 +205,18 @@ export async function POST(request: Request) {
       { error: `Failed to log message: ${messageError?.message}` },
       { status: 500 }
     )
+  }
+
+  // A human has taken over this conversation — log the guest's message for
+  // staff to see and respond to directly, but don't let the AI auto-reply.
+  if (conversationStatus === 'human_takeover') {
+    return NextResponse.json({
+      tenantId,
+      guestId: guest.id,
+      conversationId,
+      messageId: guestMessage.id,
+      humanTakeover: true,
+    })
   }
 
   const { data: history } = await supabase
