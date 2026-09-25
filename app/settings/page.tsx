@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -17,6 +18,12 @@ export default function SettingsPage() {
   const [confirmName, setConfirmName] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [changingPassword, setChangingPassword] = useState(false)
+  const [passwordMessage, setPasswordMessage] = useState<string | null>(null)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/tenant')
@@ -47,6 +54,35 @@ export default function SettingsPage() {
       return
     }
     setMessage('Saved.')
+  }
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault()
+    setPasswordError(null)
+    setPasswordMessage(null)
+
+    if (newPassword.length < 8) {
+      setPasswordError('Password must be at least 8 characters')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Passwords do not match')
+      return
+    }
+
+    setChangingPassword(true)
+    const supabase = createClient()
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    setChangingPassword(false)
+
+    if (error) {
+      setPasswordError(error.message)
+      return
+    }
+
+    setPasswordMessage('Password updated.')
+    setNewPassword('')
+    setConfirmPassword('')
   }
 
   async function handleDelete() {
@@ -126,6 +162,37 @@ export default function SettingsPage() {
         </button>
       )}
       {message && <p>{message}</p>}
+
+      <div style={{ marginTop: 48, borderTop: '1px solid #eee', paddingTop: 16 }}>
+        <h2>Your account</h2>
+        <form onSubmit={handleChangePassword}>
+          <div style={{ marginBottom: 8 }}>
+            <label>New password (min 8 characters)</label>
+            <br />
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              style={{ width: '100%', padding: 8 }}
+            />
+          </div>
+          <div style={{ marginBottom: 8 }}>
+            <label>Confirm new password</label>
+            <br />
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              style={{ width: '100%', padding: 8 }}
+            />
+          </div>
+          {passwordError && <p style={{ color: 'red' }}>{passwordError}</p>}
+          {passwordMessage && <p style={{ color: 'green' }}>{passwordMessage}</p>}
+          <button type="submit" disabled={changingPassword}>
+            {changingPassword ? 'Updating...' : 'Change password'}
+          </button>
+        </form>
+      </div>
 
       {canDelete && (
         <div style={{ marginTop: 48, borderTop: '1px solid #f0c0c0', paddingTop: 16 }}>
