@@ -56,12 +56,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
         }
       : undefined
 
-  // Widget visitors have no phone number — reuse the guests table's phone
-  // column (a plain text field, not actually validated as a real phone
-  // number anywhere) with a synthetic "web:<visitorId>" identifier instead.
-  // This keeps guests/conversations/messages generic across every channel,
-  // as the schema was already designed for (conversations.channel already
-  // allows 'widget' as a valid value).
   const syntheticPhone = `web:${visitorId}`
 
   const { data: guest, error: guestError } = await supabase
@@ -79,7 +73,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
 
   const { data: existingConversation } = await supabase
     .from('conversations')
-    .select('id')
+    .select('id, status')
     .eq('tenant_id', tenantId)
     .eq('guest_id', guest.id)
     .eq('channel', 'widget')
@@ -87,6 +81,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     .maybeSingle()
 
   let conversationId = existingConversation?.id
+  let conversationStatus = existingConversation?.status
 
   if (!conversationId) {
     const { data: newConversation, error: conversationError } = await supabase
@@ -108,6 +103,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       )
     }
     conversationId = newConversation.id
+    conversationStatus = newConversation.status
   } else {
     await supabase
       .from('conversations')
@@ -131,6 +127,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       { error: `Failed to log message: ${messageError?.message}` },
       { status: 500 }
     )
+  }
+
+  if (conversationStatus === 'human_takeover') {
+    return NextResponse.json({
+      conversationId,
+      reply: "A member of our team is handling your conversation directly and will reply shortly.",
+      humanTakeover: true,
+    })
   }
 
   const { data: history } = await supabase
