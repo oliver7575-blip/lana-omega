@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 export default function ResetPasswordPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [ready, setReady] = useState(false)
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -13,22 +14,25 @@ export default function ResetPasswordPage() {
   const [success, setSuccess] = useState(false)
 
   useEffect(() => {
-    // The recovery link's tokens arrive in the URL hash; the Supabase
-    // browser client picks these up automatically and fires this event once
-    // the temporary recovery session is established.
+    const code = searchParams.get('code')
     const supabase = createClient()
-    const { data: listener } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setReady(true)
-      }
-    })
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setReady(true)
-    })
-    return () => {
-      listener.subscription.unsubscribe()
+
+    if (code) {
+      // Supabase's PKCE-style recovery link — exchange the code for a real session.
+      supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+        if (error) {
+          setError(error.message)
+        } else {
+          setReady(true)
+        }
+      })
+    } else {
+      // Fallback for the older hash-token style, in case that's ever used instead.
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session) setReady(true)
+      })
     }
-  }, [])
+  }, [searchParams])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -61,7 +65,7 @@ export default function ResetPasswordPage() {
     return (
       <main style={{ maxWidth: 360, margin: '80px auto', fontFamily: 'sans-serif' }}>
         <h1>Reset your password</h1>
-        <p>Verifying your reset link...</p>
+        {error ? <p style={{ color: 'red' }}>{error}</p> : <p>Verifying your reset link...</p>}
       </main>
     )
   }
