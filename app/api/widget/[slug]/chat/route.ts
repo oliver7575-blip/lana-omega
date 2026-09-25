@@ -7,20 +7,40 @@ import { lookupReservation } from '@/lib/cloudbeds'
 const RATE_LIMIT_WINDOW_MINUTES = 10
 const RATE_LIMIT_MAX_MESSAGES = 15
 
+// This endpoint is meant to be called from a tenant's own external website
+// (e.g. soiree.mx), which is a different origin from where this API is
+// hosted — without these headers, every browser request from an embedded
+// widget would be silently blocked by CORS before it even reaches this
+// code. Allowing any origin is acceptable here since the endpoint is
+// already rate-limited and exposes nothing beyond what the tenant has
+// already made public in their own persona/knowledge base.
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: CORS_HEADERS })
+}
+
 export async function GET(request: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const { searchParams } = new URL(request.url)
   const visitorId = searchParams.get('visitorId')
 
   if (!visitorId) {
-    return NextResponse.json({ error: 'visitorId is required' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'visitorId is required' },
+      { status: 400, headers: CORS_HEADERS }
+    )
   }
 
   const supabase = createServiceClient()
 
   const { data: tenant } = await supabase.from('tenants').select('id').eq('slug', slug).maybeSingle()
   if (!tenant) {
-    return NextResponse.json({ error: 'Hotel not found' }, { status: 404 })
+    return NextResponse.json({ error: 'Hotel not found' }, { status: 404, headers: CORS_HEADERS })
   }
 
   const syntheticPhone = `web:${visitorId}`
@@ -33,7 +53,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
     .maybeSingle()
 
   if (!guest) {
-    return NextResponse.json({ conversationId: null, messages: [] })
+    return NextResponse.json({ conversationId: null, messages: [] }, { headers: CORS_HEADERS })
   }
 
   const { data: conversation } = await supabase
@@ -46,7 +66,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
     .maybeSingle()
 
   if (!conversation) {
-    return NextResponse.json({ conversationId: null, messages: [] })
+    return NextResponse.json({ conversationId: null, messages: [] }, { headers: CORS_HEADERS })
   }
 
   const { data: messages } = await supabase
@@ -55,7 +75,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
     .eq('conversation_id', conversation.id)
     .order('created_at', { ascending: true })
 
-  return NextResponse.json({ conversationId: conversation.id, messages: messages ?? [] })
+  return NextResponse.json(
+    { conversationId: conversation.id, messages: messages ?? [] },
+    { headers: CORS_HEADERS }
+  )
 }
 
 interface WidgetChatRequest {
@@ -69,11 +92,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   const { visitorId, message } = body
 
   if (!visitorId || !message) {
-    return NextResponse.json({ error: 'visitorId and message are required' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'visitorId and message are required' },
+      { status: 400, headers: CORS_HEADERS }
+    )
   }
 
   if (message.length > 2000) {
-    return NextResponse.json({ error: 'Message is too long' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Message is too long' },
+      { status: 400, headers: CORS_HEADERS }
+    )
   }
 
   const supabase = createServiceClient()
@@ -85,19 +114,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     .maybeSingle()
 
   if (tenantError || !tenant) {
-    return NextResponse.json({ error: 'Hotel not found' }, { status: 404 })
+    return NextResponse.json({ error: 'Hotel not found' }, { status: 404, headers: CORS_HEADERS })
   }
 
   const tenantId = tenant.id
   const syntheticPhone = `web:${visitorId}`
 
-  // Rate limit BEFORE creating anything or calling the AI — this is a fully
-  // public, unauthenticated endpoint that triggers a real paid Anthropic API
-  // call per message, so it needs abuse protection independent of everything
-  // else. Counts this visitor's own guest messages across ALL their widget
-  // conversations for this tenant in the trailing window, via a join rather
-  // than trusting a single conversation ID (which the caller could omit or
-  // spoof around otherwise).
   const { data: existingGuestForLimit } = await supabase
     .from('guests')
     .select('id')
@@ -130,7 +152,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       if ((count ?? 0) >= RATE_LIMIT_MAX_MESSAGES) {
         return NextResponse.json(
           { error: "You're sending messages too quickly — please wait a few minutes and try again." },
-          { status: 429 }
+          { status: 429, headers: CORS_HEADERS }
         )
       }
     }
@@ -169,7 +191,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   if (guestError || !guest) {
     return NextResponse.json(
       { error: `Failed to upsert guest: ${guestError?.message}` },
-      { status: 500 }
+      { status: 500, headers: CORS_HEADERS }
     )
   }
 
@@ -201,7 +223,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     if (conversationError || !newConversation) {
       return NextResponse.json(
         { error: `Failed to create conversation: ${conversationError?.message}` },
-        { status: 500 }
+        { status: 500, headers: CORS_HEADERS }
       )
     }
     conversationId = newConversation.id
@@ -227,16 +249,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   if (messageError || !guestMessage) {
     return NextResponse.json(
       { error: `Failed to log message: ${messageError?.message}` },
-      { status: 500 }
+      { status: 500, headers: CORS_HEADERS }
     )
   }
 
   if (conversationStatus === 'human_takeover') {
-    return NextResponse.json({
-      conversationId,
-      reply: "A member of our team is handling your conversation directly and will reply shortly.",
-      humanTakeover: true,
-    })
+    return NextResponse.json(
+      {
+        conversationId,
+        reply: "A member of our team is handling your conversation directly and will reply shortly.",
+        humanTakeover: true,
+      },
+      { headers: CORS_HEADERS }
+    )
   }
 
   const { data: history } = await supabase
@@ -261,7 +286,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'AI generation failed' },
-      { status: 500 }
+      { status: 500, headers: CORS_HEADERS }
     )
   }
 
@@ -272,5 +297,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     content: replyText,
   })
 
-  return NextResponse.json({ conversationId, reply: replyText })
+  return NextResponse.json({ conversationId, reply: replyText }, { headers: CORS_HEADERS })
 }
