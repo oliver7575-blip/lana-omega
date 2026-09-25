@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import ConversationControls from '@/components/ConversationControls'
 
 export default async function ConversationDetailPage({
   params,
@@ -88,6 +89,8 @@ export default async function ConversationDetailPage({
           </div>
         ))}
       </div>
+
+      <ConversationControls conversationId={conversation.id} initialStatus={conversation.status} />
     </main>
   )
 }
