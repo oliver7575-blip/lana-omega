@@ -31,9 +31,11 @@ export async function middleware(request: NextRequest) {
   const isSignupPage = request.nextUrl.pathname.startsWith('/signup')
   const isForgotPasswordPage = request.nextUrl.pathname.startsWith('/forgot-password')
   const isResetPasswordPage = request.nextUrl.pathname.startsWith('/reset-password')
+  const isWidgetTestPage = request.nextUrl.pathname.startsWith('/widget-test')
   const isApiRoute = request.nextUrl.pathname.startsWith('/api')
 
-  const isPublicPage = isLoginPage || isSignupPage || isForgotPasswordPage || isResetPasswordPage
+  const isPublicPage =
+    isLoginPage || isSignupPage || isForgotPasswordPage || isResetPasswordPage || isWidgetTestPage
 
   if (!user && !isPublicPage && !isApiRoute) {
     const url = request.nextUrl.clone()
@@ -41,9 +43,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // reset-password is intentionally NOT included in this redirect-away check,
-  // even for an already-logged-in user — the recovery link establishes its
-  // own temporary session, and redirecting away would break the reset flow.
   if (user && (isLoginPage || isSignupPage || isForgotPasswordPage)) {
     const url = request.nextUrl.clone()
     url.pathname = '/'
