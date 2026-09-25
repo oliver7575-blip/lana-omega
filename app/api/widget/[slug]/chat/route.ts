@@ -4,6 +4,9 @@ import { generateReply } from '@/lib/anthropic'
 import { decryptCredentials } from '@/lib/crypto'
 import { lookupReservation } from '@/lib/cloudbeds'
 
+const RATE_LIMIT_WINDOW_MINUTES = 10
+const RATE_LIMIT_MAX_MESSAGES = 15
+
 export async function GET(request: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const { searchParams } = new URL(request.url)
@@ -30,7 +33,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
     .maybeSingle()
 
   if (!guest) {
-    // No conversation yet for this visitor — that's fine, not an error.
     return NextResponse.json({ conversationId: null, messages: [] })
   }
 
@@ -70,6 +72,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     return NextResponse.json({ error: 'visitorId and message are required' }, { status: 400 })
   }
 
+  if (message.length > 2000) {
+    return NextResponse.json({ error: 'Message is too long' }, { status: 400 })
+  }
+
   const supabase = createServiceClient()
 
   const { data: tenant, error: tenantError } = await supabase
@@ -83,6 +89,52 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   }
 
   const tenantId = tenant.id
+  const syntheticPhone = `web:${visitorId}`
+
+  // Rate limit BEFORE creating anything or calling the AI — this is a fully
+  // public, unauthenticated endpoint that triggers a real paid Anthropic API
+  // call per message, so it needs abuse protection independent of everything
+  // else. Counts this visitor's own guest messages across ALL their widget
+  // conversations for this tenant in the trailing window, via a join rather
+  // than trusting a single conversation ID (which the caller could omit or
+  // spoof around otherwise).
+  const { data: existingGuestForLimit } = await supabase
+    .from('guests')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .eq('phone', syntheticPhone)
+    .maybeSingle()
+
+  if (existingGuestForLimit) {
+    const windowStart = new Date(
+      Date.now() - RATE_LIMIT_WINDOW_MINUTES * 60 * 1000
+    ).toISOString()
+
+    const { data: recentConversations } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('guest_id', existingGuestForLimit.id)
+      .eq('channel', 'widget')
+
+    const conversationIds = (recentConversations ?? []).map((c) => c.id)
+
+    if (conversationIds.length > 0) {
+      const { count } = await supabase
+        .from('messages')
+        .select('id', { count: 'exact', head: true })
+        .in('conversation_id', conversationIds)
+        .eq('sender_type', 'guest')
+        .gte('created_at', windowStart)
+
+      if ((count ?? 0) >= RATE_LIMIT_MAX_MESSAGES) {
+        return NextResponse.json(
+          { error: "You're sending messages too quickly — please wait a few minutes and try again." },
+          { status: 429 }
+        )
+      }
+    }
+  }
 
   const { data: cloudbedsIntegration } = await supabase
     .from('tenant_integrations')
@@ -107,8 +159,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
           },
         }
       : undefined
-
-  const syntheticPhone = `web:${visitorId}`
 
   const { data: guest, error: guestError } = await supabase
     .from('guests')
