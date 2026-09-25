@@ -4,6 +4,58 @@ import { generateReply } from '@/lib/anthropic'
 import { decryptCredentials } from '@/lib/crypto'
 import { lookupReservation } from '@/lib/cloudbeds'
 
+export async function GET(request: Request, { params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
+  const { searchParams } = new URL(request.url)
+  const visitorId = searchParams.get('visitorId')
+
+  if (!visitorId) {
+    return NextResponse.json({ error: 'visitorId is required' }, { status: 400 })
+  }
+
+  const supabase = createServiceClient()
+
+  const { data: tenant } = await supabase.from('tenants').select('id').eq('slug', slug).maybeSingle()
+  if (!tenant) {
+    return NextResponse.json({ error: 'Hotel not found' }, { status: 404 })
+  }
+
+  const syntheticPhone = `web:${visitorId}`
+
+  const { data: guest } = await supabase
+    .from('guests')
+    .select('id')
+    .eq('tenant_id', tenant.id)
+    .eq('phone', syntheticPhone)
+    .maybeSingle()
+
+  if (!guest) {
+    // No conversation yet for this visitor — that's fine, not an error.
+    return NextResponse.json({ conversationId: null, messages: [] })
+  }
+
+  const { data: conversation } = await supabase
+    .from('conversations')
+    .select('id')
+    .eq('tenant_id', tenant.id)
+    .eq('guest_id', guest.id)
+    .eq('channel', 'widget')
+    .neq('status', 'closed')
+    .maybeSingle()
+
+  if (!conversation) {
+    return NextResponse.json({ conversationId: null, messages: [] })
+  }
+
+  const { data: messages } = await supabase
+    .from('messages')
+    .select('sender_type, content, created_at')
+    .eq('conversation_id', conversation.id)
+    .order('created_at', { ascending: true })
+
+  return NextResponse.json({ conversationId: conversation.id, messages: messages ?? [] })
+}
+
 interface WidgetChatRequest {
   visitorId: string
   message: string
