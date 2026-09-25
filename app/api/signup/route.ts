@@ -10,6 +10,9 @@ interface SignupRequest {
   ownerPassword: string
 }
 
+const RATE_LIMIT_WINDOW_MINUTES = 60
+const RATE_LIMIT_MAX_ATTEMPTS = 5
+
 export async function POST(request: Request) {
   const body = (await request.json()) as Partial<SignupRequest>
   const { hotelName, slug, timezone, ownerEmail, ownerPassword } = body
@@ -30,6 +33,31 @@ export async function POST(request: Request) {
 
   const serviceClient = createServiceClient()
 
+  // Rate limit BEFORE creating anything — this endpoint is fully public with
+  // no platform-level wall in front of it (Vercel Deployment Protection was
+  // disabled project-wide), so it needs its own abuse protection. Vercel
+  // sets x-forwarded-for automatically; take the first IP in that list (the
+  // original client, since the header can carry a chain through proxies).
+  const forwardedFor = request.headers.get('x-forwarded-for')
+  const clientIp = forwardedFor?.split(',')[0]?.trim() ?? 'unknown'
+
+  const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_MINUTES * 60 * 1000).toISOString()
+
+  const { count: recentAttempts } = await serviceClient
+    .from('signup_attempts')
+    .select('id', { count: 'exact', head: true })
+    .eq('ip', clientIp)
+    .gte('created_at', windowStart)
+
+  if ((recentAttempts ?? 0) >= RATE_LIMIT_MAX_ATTEMPTS) {
+    return NextResponse.json(
+      { error: 'Too many signup attempts — please wait a while and try again.' },
+      { status: 429 }
+    )
+  }
+
+  await serviceClient.from('signup_attempts').insert({ ip: clientIp })
+
   const { data: existingTenant } = await serviceClient
     .from('tenants')
     .select('id')
@@ -43,11 +71,6 @@ export async function POST(request: Request) {
     )
   }
 
-  // Check for an existing account with this email BEFORE creating anything.
-  // Supabase's signUp() returns a fake "success" response for an
-  // already-registered email (anti-enumeration protection) rather than a
-  // clean error, which would otherwise surface as a confusing foreign-key
-  // failure later. Checking staff_users directly sidesteps that entirely.
   const { data: existingStaff } = await serviceClient
     .from('staff_users')
     .select('id')
@@ -84,10 +107,6 @@ export async function POST(request: Request) {
     password: ownerPassword,
   })
 
-  // Belt-and-suspenders: even with the pre-check above, also detect
-  // Supabase's documented "already registered" signal directly — a
-  // returned user with an empty identities array means no new account was
-  // actually created.
   const alreadyRegistered = authData?.user && authData.user.identities?.length === 0
 
   if (authError || !authData?.user || alreadyRegistered) {
