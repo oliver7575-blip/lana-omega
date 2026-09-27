@@ -63,6 +63,22 @@ export async function POST(request: Request) {
 
   const serviceClient = createServiceClient()
 
+  // Same real gap as signup had: an email already registered anywhere on
+  // the platform (another tenant's owner, existing staff elsewhere) would
+  // otherwise surface Supabase's raw internal error instead of a clear one.
+  const { data: existingStaff } = await serviceClient
+    .from('staff_users')
+    .select('id')
+    .eq('email', email)
+    .maybeSingle()
+
+  if (existingStaff) {
+    return NextResponse.json(
+      { error: 'An account with this email already exists on the platform' },
+      { status: 409 }
+    )
+  }
+
   const { data: newAuthUser, error: authError } = await serviceClient.auth.admin.createUser({
     email,
     password,
@@ -133,10 +149,6 @@ export async function DELETE(request: Request) {
 
   const serviceClient = createServiceClient()
 
-  // Fetch the target row first — need auth_uid to clean up auth.users too,
-  // and need to confirm it's actually in the caller's own tenant before
-  // touching anything (defense in depth, even though RLS would also block
-  // a cross-tenant delete on staff_users itself).
   const { data: targetRow, error: fetchError } = await serviceClient
     .from('staff_users')
     .select('id, auth_uid, role, tenant_id')
@@ -175,9 +187,6 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: deleteError.message }, { status: 500 })
   }
 
-  // Clean up the orphaned auth account too — the earlier tenant-deletion
-  // gap (cascade only covers staff_users, never auth.users) doesn't happen
-  // here, since we handle it explicitly.
   await serviceClient.auth.admin.deleteUser(targetRow.auth_uid)
 
   return NextResponse.json({ success: true })
