@@ -6,15 +6,18 @@ import { useRouter } from 'next/navigation'
 export default function GuestNameEditor({
   guestId,
   initialName,
+  initialEmail,
   fallbackLabel,
 }: {
   guestId: string
   initialName: string | null
+  initialEmail?: string | null
   fallbackLabel: string
 }) {
   const router = useRouter()
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(initialName ?? '')
+  const [email, setEmail] = useState(initialEmail ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -26,7 +29,7 @@ export default function GuestNameEditor({
     const res = await fetch(`/api/guests/${guestId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, email }),
     })
     const json = await res.json()
     setSaving(false)
@@ -42,21 +45,30 @@ export default function GuestNameEditor({
 
   if (editing) {
     return (
-      <form onSubmit={handleSave} style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Guest name"
-          autoFocus
-          style={{ padding: 4, fontSize: 'inherit', fontWeight: 'inherit' }}
-        />
+      <form onSubmit={handleSave} style={{ display: 'inline-block' }}>
+        <div style={{ marginBottom: 6 }}>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Guest name"
+            autoFocus
+            style={{ padding: 4, fontSize: 'inherit', fontWeight: 'inherit', marginRight: 6 }}
+          />
+          <input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Email (optional)"
+            type="email"
+            style={{ padding: 4, fontSize: 14, fontWeight: 'normal' }}
+          />
+        </div>
         <button type="submit" disabled={saving} style={{ fontSize: 13 }}>
           {saving ? 'Saving...' : 'Save'}
         </button>
-        <button type="button" onClick={() => setEditing(false)} style={{ fontSize: 13 }}>
+        <button type="button" onClick={() => setEditing(false)} style={{ fontSize: 13, marginLeft: 6 }}>
           Cancel
         </button>
-        {error && <span style={{ color: 'red', fontSize: 13 }}>{error}</span>}
+        {error && <div style={{ color: 'red', fontSize: 13 }}>{error}</div>}
       </form>
     )
   }
@@ -70,6 +82,9 @@ export default function GuestNameEditor({
       >
         edit
       </button>
+      {initialEmail && (
+        <div style={{ fontSize: 13, color: '#888', fontWeight: 'normal' }}>{initialEmail}</div>
+      )}
     </span>
   )
 }
