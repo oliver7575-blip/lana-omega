@@ -31,11 +31,17 @@ export async function middleware(request: NextRequest) {
   const isSignupPage = request.nextUrl.pathname.startsWith('/signup')
   const isForgotPasswordPage = request.nextUrl.pathname.startsWith('/forgot-password')
   const isResetPasswordPage = request.nextUrl.pathname.startsWith('/reset-password')
+  const isResendConfirmationPage = request.nextUrl.pathname.startsWith('/resend-confirmation')
   const isWidgetTestPage = request.nextUrl.pathname.startsWith('/widget-test')
   const isApiRoute = request.nextUrl.pathname.startsWith('/api')
 
   const isPublicPage =
-    isLoginPage || isSignupPage || isForgotPasswordPage || isResetPasswordPage || isWidgetTestPage
+    isLoginPage ||
+    isSignupPage ||
+    isForgotPasswordPage ||
+    isResetPasswordPage ||
+    isResendConfirmationPage ||
+    isWidgetTestPage
 
   if (!user && !isPublicPage && !isApiRoute) {
     const url = request.nextUrl.clone()
@@ -43,7 +49,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  if (user && (isLoginPage || isSignupPage || isForgotPasswordPage)) {
+  if (user && (isLoginPage || isSignupPage || isForgotPasswordPage || isResendConfirmationPage)) {
     const url = request.nextUrl.clone()
     url.pathname = '/'
     return NextResponse.redirect(url)
