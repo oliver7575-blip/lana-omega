@@ -68,6 +68,9 @@ export default function LoginPage() {
         <Link href="/forgot-password">Forgot password?</Link>
       </p>
       <p style={{ marginTop: 4 }}>
+        <Link href="/resend-confirmation">Didn't receive a confirmation email?</Link>
+      </p>
+      <p style={{ marginTop: 4 }}>
         <Link href="/signup">Don&apos;t have an account? Sign up</Link>
       </p>
     </main>
