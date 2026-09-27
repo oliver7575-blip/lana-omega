@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import ConversationControls from '@/components/ConversationControls'
+import GuestNameEditor from '@/components/GuestNameEditor'
 
 export default async function ConversationDetailPage({
   params,
@@ -34,11 +35,11 @@ export default async function ConversationDetailPage({
     )
   }
 
-  let guest: { phone: string; name: string | null } | null = null
+  let guest: { id: string; phone: string; name: string | null } | null = null
   if (conversation.guest_id) {
     const { data: guestRow } = await supabase
       .from('guests')
-      .select('phone, name')
+      .select('id, phone, name')
       .eq('id', conversation.guest_id)
       .single()
     guest = guestRow
@@ -55,7 +56,13 @@ export default async function ConversationDetailPage({
       <p>
         <Link href="/conversations">← Back to conversations</Link>
       </p>
-      <h1>{guest?.name || guest?.phone || 'Unknown guest'}</h1>
+      <h1>
+        {guest ? (
+          <GuestNameEditor guestId={guest.id} initialName={guest.name} fallbackLabel={guest.phone} />
+        ) : (
+          'Unknown guest'
+        )}
+      </h1>
       <p style={{ color: '#888' }}>
         {conversation.channel} · {conversation.status}
       </p>
