@@ -55,7 +55,52 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'No tenant record found' }, { status: 404 })
   }
 
-  const body = (await request.json()) as { name?: string; ai_persona_prompt?: string }
+  const body = (await request.json()) as {
+    name?: string
+    ai_persona_prompt?: string
+    activate?: boolean
+  }
+
+  if (body.activate) {
+    // Activation has its own real prerequisite: at least one channel must
+    // actually be connected, so "active" means something rather than just
+    // being a label — use the service client here since checking another
+    // table (tenant_integrations) for this decision isn't something RLS
+    // needs to gate directly.
+    const serviceClient = createServiceClient()
+    const { count: connectedIntegrations } = await serviceClient
+      .from('tenant_integrations')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', staffRow.tenant_id)
+      .eq('status', 'connected')
+
+    if ((connectedIntegrations ?? 0) === 0) {
+      return NextResponse.json(
+        {
+          error:
+            'Connect at least one channel (WhatsApp, email, etc.) before activating — the widget channel is always available and does not need to be "connected" here.',
+        },
+        { status: 400 }
+      )
+    }
+
+    const { data: updated, error } = await supabase
+      .from('tenants')
+      .update({ status: 'active' })
+      .eq('id', staffRow.tenant_id)
+      .select()
+      .single()
+
+    if (error || !updated) {
+      return NextResponse.json(
+        { error: error?.message ?? 'Activation not permitted — owner or admin role required' },
+        { status: error ? 500 : 403 }
+      )
+    }
+
+    return NextResponse.json({ tenant: updated })
+  }
+
   const updates: { name?: string; ai_persona_prompt?: string } = {}
   if (typeof body.name === 'string' && body.name.trim()) updates.name = body.name.trim()
   if (typeof body.ai_persona_prompt === 'string' && body.ai_persona_prompt.trim()) {
@@ -102,8 +147,6 @@ export async function DELETE(request: Request) {
     .eq('auth_uid', user.id)
     .single()
 
-  // Owner only — deleting the whole tenant is more destructive than editing
-  // settings, so it's held to a stricter bar than the owner/admin settings edit.
   if (!callerRow || callerRow.role !== 'owner') {
     return NextResponse.json(
       { error: 'Only an owner can delete the tenant' },
@@ -132,10 +175,6 @@ export async function DELETE(request: Request) {
     )
   }
 
-  // Collect every staff auth_uid BEFORE deleting the tenant, since the
-  // tenants -> staff_users cascade removes the staff_users rows (but never
-  // touches auth.users) — same orphan-risk pattern as staff removal, applied
-  // here for every staff member on the whole tenant at once.
   const { data: allStaff } = await serviceClient
     .from('staff_users')
     .select('auth_uid')
@@ -150,9 +189,6 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: deleteError.message }, { status: 500 })
   }
 
-  // Clean up every staff member's auth account now that the tenant and all
-  // its FK-cascaded rows (staff_users, tenant_integrations, guests,
-  // conversations, messages) are gone.
   for (const staff of allStaff ?? []) {
     await serviceClient.auth.admin.deleteUser(staff.auth_uid)
   }
