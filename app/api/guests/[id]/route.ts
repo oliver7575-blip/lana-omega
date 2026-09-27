@@ -12,14 +12,23 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = (await request.json()) as { name?: string }
-  const name = typeof body.name === 'string' ? body.name.trim() : ''
+  const body = (await request.json()) as { name?: string; email?: string }
+  const updates: { name?: string | null; email?: string | null } = {}
 
-  // RLS scopes this to the caller's own tenant automatically, same as
-  // everywhere else — no explicit tenant_id check needed here.
+  if (typeof body.name === 'string') {
+    updates.name = body.name.trim() || null
+  }
+  if (typeof body.email === 'string') {
+    updates.email = body.email.trim() || null
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
+  }
+
   const { data: updated, error } = await supabase
     .from('guests')
-    .update({ name: name || null })
+    .update(updates)
     .eq('id', id)
     .select()
     .single()
