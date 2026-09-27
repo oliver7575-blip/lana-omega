@@ -25,18 +25,23 @@ export default function SettingsPage() {
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null)
   const [passwordError, setPasswordError] = useState<string | null>(null)
 
+  const [activating, setActivating] = useState(false)
+  const [activateError, setActivateError] = useState<string | null>(null)
+
+  async function loadTenant() {
+    const res = await fetch('/api/tenant')
+    const json = await res.json()
+    if (json.tenant) {
+      setName(json.tenant.name)
+      setPrompt(json.tenant.ai_persona_prompt)
+      setStatus(json.tenant.status)
+      setRole(json.role)
+    }
+    setLoading(false)
+  }
+
   useEffect(() => {
-    fetch('/api/tenant')
-      .then((res) => res.json())
-      .then((json) => {
-        if (json.tenant) {
-          setName(json.tenant.name)
-          setPrompt(json.tenant.ai_persona_prompt)
-          setStatus(json.tenant.status)
-          setRole(json.role)
-        }
-        setLoading(false)
-      })
+    loadTenant()
   }, [])
 
   async function handleSave() {
@@ -54,6 +59,23 @@ export default function SettingsPage() {
       return
     }
     setMessage('Saved.')
+  }
+
+  async function handleActivate() {
+    setActivating(true)
+    setActivateError(null)
+    const res = await fetch('/api/tenant', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ activate: true }),
+    })
+    const json = await res.json()
+    setActivating(false)
+    if (!res.ok) {
+      setActivateError(json.error)
+      return
+    }
+    setStatus(json.tenant.status)
   }
 
   async function handleChangePassword(e: React.FormEvent) {
@@ -116,6 +138,27 @@ export default function SettingsPage() {
       </p>
       <h1>Settings</h1>
       <p style={{ color: '#888' }}>Status: {status}</p>
+
+      {status === 'onboarding' && canEdit && (
+        <div
+          style={{
+            background: '#eff6ff',
+            border: '1px solid #bfdbfe',
+            borderRadius: 8,
+            padding: 16,
+            marginBottom: 16,
+          }}
+        >
+          <p style={{ margin: 0, marginBottom: 8 }}>
+            This hotel is still in onboarding. Once you've connected a channel and set up your
+            persona, activate it.
+          </p>
+          <button onClick={handleActivate} disabled={activating}>
+            {activating ? 'Activating...' : 'Activate hotel'}
+          </button>
+          {activateError && <p style={{ color: 'red' }}>{activateError}</p>}
+        </div>
+      )}
 
       {!canEdit && (
         <p style={{ color: '#b45309' }}>
