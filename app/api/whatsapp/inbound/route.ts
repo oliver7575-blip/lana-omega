@@ -207,8 +207,6 @@ export async function POST(request: Request) {
     )
   }
 
-  // A human has taken over this conversation — log the guest's message for
-  // staff to see and respond to directly, but don't let the AI auto-reply.
   if (conversationStatus === 'human_takeover') {
     return NextResponse.json({
       tenantId,
@@ -239,12 +237,34 @@ export async function POST(request: Request) {
   try {
     replyText = await generateReply(systemPrompt, claudeMessages, reservationTool)
   } catch (err) {
+    // A real guest is waiting on the other end of an async channel — total
+    // silence here means they have no idea their message even arrived.
+    // Send a graceful fallback so they at least know it's been received,
+    // then let staff pick it up from the conversation view.
+    const fallbackText =
+      "Sorry, I'm having trouble responding right now — a member of our team will follow up with you shortly."
+
+    await supabase.from('messages').insert({
+      tenant_id: tenantId,
+      conversation_id: conversationId,
+      sender_type: 'lana',
+      content: fallbackText,
+    })
+
+    const fallbackSendResult = await sendWhatsAppMessage(
+      phoneNumberId,
+      integration.credentials,
+      from,
+      fallbackText
+    )
+
     return NextResponse.json({
       tenantId,
       guestId: guest.id,
       conversationId,
       messageId: guestMessage.id,
       aiError: err instanceof Error ? err.message : 'AI generation failed',
+      fallbackSendResult,
     })
   }
 
