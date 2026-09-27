@@ -35,11 +35,11 @@ export default async function ConversationDetailPage({
     )
   }
 
-  let guest: { id: string; phone: string; name: string | null } | null = null
+  let guest: { id: string; phone: string; name: string | null; email: string | null } | null = null
   if (conversation.guest_id) {
     const { data: guestRow } = await supabase
       .from('guests')
-      .select('id, phone, name')
+      .select('id, phone, name, email')
       .eq('id', conversation.guest_id)
       .single()
     guest = guestRow
@@ -58,7 +58,12 @@ export default async function ConversationDetailPage({
       </p>
       <h1>
         {guest ? (
-          <GuestNameEditor guestId={guest.id} initialName={guest.name} fallbackLabel={guest.phone} />
+          <GuestNameEditor
+            guestId={guest.id}
+            initialName={guest.name}
+            initialEmail={guest.email}
+            fallbackLabel={guest.phone}
+          />
         ) : (
           'Unknown guest'
         )}
