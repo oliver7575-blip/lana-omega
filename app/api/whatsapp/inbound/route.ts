@@ -6,6 +6,7 @@ import { verifyMetaSignature } from '@/lib/verify-webhook'
 import { decryptCredentials } from '@/lib/crypto'
 import { lookupReservation } from '@/lib/cloudbeds'
 import { notifyStaff } from '@/lib/escalation'
+import { buildBookingLinkInstruction } from '@/lib/booking-link'
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -109,7 +110,7 @@ export async function POST(request: Request) {
 
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('ai_persona_prompt, escalation_contacts')
+    .select('ai_persona_prompt, escalation_contacts, booking_config')
     .eq('id', tenantId)
     .single()
 
@@ -252,8 +253,9 @@ export async function POST(request: Request) {
   }))
 
   const systemPrompt =
-    tenant?.ai_persona_prompt ??
-    'You are a helpful, warm hotel concierge assistant. Answer guest questions clearly and concisely.'
+    (tenant?.ai_persona_prompt ??
+      'You are a helpful, warm hotel concierge assistant. Answer guest questions clearly and concisely.') +
+    buildBookingLinkInstruction(tenant?.booking_config as Record<string, unknown>)
 
   let replyText: string
   try {
