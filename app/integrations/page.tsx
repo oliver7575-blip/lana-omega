@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { INTEGRATIONS, type IntegrationType } from '@/lib/integrations'
 
 interface IntegrationStatus {
@@ -8,7 +9,12 @@ interface IntegrationStatus {
   status: 'disconnected' | 'connected' | 'error'
   config: Record<string, string> | null
   connected_at: string | null
+  last_checked_at: string | null
+  last_check_ok: boolean | null
+  last_error: string | null
 }
+
+const TESTABLE: IntegrationType[] = ['whatsapp', 'pms_cloudbeds']
 
 export default function IntegrationsPage() {
   const [statuses, setStatuses] = useState<Record<string, IntegrationStatus>>({})
@@ -16,10 +22,11 @@ export default function IntegrationsPage() {
   const [openForm, setOpenForm] = useState<IntegrationType | null>(null)
   const [formValues, setFormValues] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState<IntegrationType | null>(null)
+  const [testDetail, setTestDetail] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<string | null>(null)
 
   async function loadStatuses() {
-    setLoading(true)
     const res = await fetch('/api/integrations')
     const json = await res.json()
     const map: Record<string, IntegrationStatus> = {}
@@ -66,6 +73,7 @@ export default function IntegrationsPage() {
       return
     }
     setOpenForm(null)
+    setTestDetail((prev) => ({ ...prev, [type]: '' }))
     setMessage('Connected successfully.')
     loadStatuses()
   }
@@ -88,17 +96,41 @@ export default function IntegrationsPage() {
     loadStatuses()
   }
 
+  async function handleTest(type: IntegrationType) {
+    setTesting(type)
+    setMessage(null)
+    const res = await fetch('/api/integrations/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ integrationType: type }),
+    })
+    const json = await res.json()
+    setTesting(null)
+    if (!res.ok) {
+      setMessage(`Error: ${json.error}`)
+      return
+    }
+    setTestDetail((prev) => ({ ...prev, [type]: json.detail ?? '' }))
+    loadStatuses()
+  }
+
   if (loading) {
     return <main style={{ maxWidth: 640, margin: '80px auto' }}>Loading...</main>
   }
 
   return (
     <main style={{ maxWidth: 640, margin: '80px auto', fontFamily: 'sans-serif' }}>
+      <p>
+        <Link href="/">← Back home</Link>
+      </p>
       <h1>Integrations</h1>
       {message && <p>{message}</p>}
       {INTEGRATIONS.map((def) => {
         const status = statuses[def.type]
         const isConnected = status?.status === 'connected'
+        const canTest = isConnected && TESTABLE.includes(def.type)
+        const checked = status?.last_checked_at != null
+        const healthy = status?.last_check_ok === true
         return (
           <div
             key={def.type}
@@ -112,7 +144,12 @@ export default function IntegrationsPage() {
                   {isConnected ? 'Connected' : 'Not connected'}
                 </span>
               </div>
-              <div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {canTest && (
+                  <button disabled={testing !== null || saving} onClick={() => handleTest(def.type)}>
+                    {testing === def.type ? 'Testing...' : 'Test connection'}
+                  </button>
+                )}
                 {isConnected ? (
                   <button disabled={saving} onClick={() => handleDisconnect(def.type)}>
                     Disconnect
@@ -124,6 +161,29 @@ export default function IntegrationsPage() {
                 )}
               </div>
             </div>
+
+            {isConnected && checked && (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: 8,
+                  borderRadius: 6,
+                  fontSize: 13,
+                  background: healthy ? '#f0fdf4' : '#fef2f2',
+                  color: healthy ? '#166534' : '#991b1b',
+                }}
+              >
+                {healthy ? '✓ Last check passed' : '✗ Last check failed'} ·{' '}
+                {new Date(status.last_checked_at!).toLocaleString()}
+                {healthy && testDetail[def.type] && <div>{testDetail[def.type]}</div>}
+                {!healthy && status.last_error && (
+                  <div style={{ marginTop: 4, wordBreak: 'break-word' }}>{status.last_error}</div>
+                )}
+              </div>
+            )}
+            {canTest && !checked && (
+              <p style={{ fontSize: 12, color: '#888', marginBottom: 0 }}>Not tested yet.</p>
+            )}
 
             {openForm === def.type && (
               <div style={{ marginTop: 16 }}>
