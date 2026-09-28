@@ -26,12 +26,25 @@ interface ArrivalUpdateTool {
   updateArrivalTime: (input: ArrivalUpdateToolInput) => Promise<unknown>
 }
 
+interface WaitlistToolInput {
+  fullName: string
+  email: string
+  phone: string
+  dateRequested: string
+  notes?: string
+}
+
+interface WaitlistTool {
+  joinWaitlist: (input: WaitlistToolInput) => Promise<unknown>
+}
+
 export async function generateReply(
   systemPrompt: string,
   conversationHistory: ClaudeMessage[],
   reservationTool?: ReservationTool,
   escalationTool?: EscalationTool,
-  arrivalUpdateTool?: ArrivalUpdateTool
+  arrivalUpdateTool?: ArrivalUpdateTool,
+  waitlistTool?: WaitlistTool
 ): Promise<string> {
   const tools: Record<string, unknown>[] = []
 
@@ -102,6 +115,31 @@ export async function generateReply(
     })
   }
 
+  if (waitlistTool) {
+    tools.push({
+      name: 'join_waitlist',
+      description:
+        "Add a guest to the waitlist — for dates that are fully booked, or any case where the guest wants to be contacted if something opens up. This is a real, permanent record staff will follow up on, so do NOT call it until you have collected ALL of: the guest's full name, their email, AND their phone number, in addition to the dates they want. If any of those three are still missing, ask for them first — do not guess or leave them blank.",
+      input_schema: {
+        type: 'object',
+        properties: {
+          fullName: { type: 'string', description: "The guest's full name" },
+          email: { type: 'string', description: "The guest's email address" },
+          phone: { type: 'string', description: "The guest's phone number" },
+          dateRequested: {
+            type: 'string',
+            description: 'The dates or date range the guest wants, as they described it',
+          },
+          notes: {
+            type: 'string',
+            description: 'Any other relevant detail the guest mentioned, optional',
+          },
+        },
+        required: ['fullName', 'email', 'phone', 'dateRequested'],
+      },
+    })
+  }
+
   const messages: ClaudeMessage[] = [...conversationHistory]
 
   for (let i = 0; i < 3; i++) {
@@ -164,6 +202,19 @@ export async function generateReply(
       if (toolUseBlock?.name === 'update_arrival_time' && arrivalUpdateTool) {
         const result = await arrivalUpdateTool.updateArrivalTime(
           toolUseBlock.input as unknown as ArrivalUpdateToolInput
+        )
+        messages.push({
+          role: 'user',
+          content: [
+            { type: 'tool_result', tool_use_id: toolUseBlock.id, content: JSON.stringify(result) },
+          ],
+        })
+        continue
+      }
+
+      if (toolUseBlock?.name === 'join_waitlist' && waitlistTool) {
+        const result = await waitlistTool.joinWaitlist(
+          toolUseBlock.input as unknown as WaitlistToolInput
         )
         messages.push({
           role: 'user',
