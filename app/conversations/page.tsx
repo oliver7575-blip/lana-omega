@@ -5,9 +5,9 @@ import Link from 'next/link'
 export default async function ConversationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>
+  searchParams: Promise<{ status?: string; q?: string }>
 }) {
-  const { status: statusFilter } = await searchParams
+  const { status: statusFilter, q } = await searchParams
   const supabase = await createClient()
 
   const {
@@ -18,6 +18,15 @@ export default async function ConversationsPage({
     redirect('/login')
   }
 
+  let matchingGuestIds: string[] | null = null
+  if (q && q.trim()) {
+    const { data: matchingGuests } = await supabase
+      .from('guests')
+      .select('id')
+      .or(`name.ilike.%${q.trim()}%,phone.ilike.%${q.trim()}%,email.ilike.%${q.trim()}%`)
+    matchingGuestIds = (matchingGuests ?? []).map((g) => g.id)
+  }
+
   let query = supabase
     .from('conversations')
     .select('id, channel, status, guest_id, last_message_at, created_at')
@@ -26,10 +35,14 @@ export default async function ConversationsPage({
   if (statusFilter && ['active', 'human_takeover', 'closed'].includes(statusFilter)) {
     query = query.eq('status', statusFilter)
   } else {
-    // Default view: hide closed conversations unless explicitly asked for —
-    // otherwise every closed thread piles up here forever with no way to
-    // get them out of the way.
     query = query.neq('status', 'closed')
+  }
+
+  if (matchingGuestIds !== null) {
+    // No matches at all — pass an impossible value rather than skipping the
+    // filter, so the query correctly returns nothing instead of silently
+    // ignoring the search.
+    query = query.in('guest_id', matchingGuestIds.length > 0 ? matchingGuestIds : ['00000000-0000-0000-0000-000000000000'])
   }
 
   const { data: conversations } = await query
@@ -57,6 +70,14 @@ export default async function ConversationsPage({
     { label: 'Closed', value: 'closed' },
   ]
 
+  function buildHref(newStatus: string | undefined, newQ: string | undefined) {
+    const params = new URLSearchParams()
+    if (newStatus) params.set('status', newStatus)
+    if (newQ) params.set('q', newQ)
+    const qs = params.toString()
+    return qs ? `/conversations?${qs}` : '/conversations'
+  }
+
   return (
     <main style={{ maxWidth: 640, margin: '80px auto', fontFamily: 'sans-serif' }}>
       <p>
@@ -64,14 +85,24 @@ export default async function ConversationsPage({
       </p>
       <h1>Conversations</h1>
 
+      <form method="get" style={{ marginBottom: 16 }}>
+        {statusFilter && <input type="hidden" name="status" value={statusFilter} />}
+        <input
+          type="text"
+          name="q"
+          defaultValue={q ?? ''}
+          placeholder="Search by name, phone, or email..."
+          style={{ width: '100%', padding: 8 }}
+        />
+      </form>
+
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
         {filters.map((f) => {
           const isActive = (statusFilter ?? undefined) === f.value
-          const href = f.value ? `/conversations?status=${f.value}` : '/conversations'
           return (
             <Link
               key={f.label}
-              href={href}
+              href={buildHref(f.value, q)}
               style={{
                 padding: '6px 12px',
                 borderRadius: 6,
@@ -90,6 +121,15 @@ export default async function ConversationsPage({
           )
         })}
       </div>
+
+      {q && (
+        <p style={{ fontSize: 13, color: '#888' }}>
+          Searching for "{q}" —{' '}
+          <Link href={buildHref(statusFilter, undefined)} style={{ color: '#1e3a8a' }}>
+            clear
+          </Link>
+        </p>
+      )}
 
       {(conversations ?? []).length === 0 && <p style={{ color: '#888' }}>No conversations here.</p>}
       {(conversations ?? []).map((c) => {
