@@ -4,6 +4,7 @@ import { generateReply } from '@/lib/anthropic'
 import { decryptCredentials } from '@/lib/crypto'
 import { lookupReservation } from '@/lib/cloudbeds'
 import { notifyStaff } from '@/lib/escalation'
+import { buildBookingLinkInstruction } from '@/lib/booking-link'
 
 const RATE_LIMIT_WINDOW_MINUTES = 10
 const RATE_LIMIT_MAX_MESSAGES = 15
@@ -103,7 +104,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
 
   const { data: tenant, error: tenantError } = await supabase
     .from('tenants')
-    .select('id, ai_persona_prompt, status, escalation_contacts')
+    .select('id, ai_persona_prompt, status, escalation_contacts, booking_config')
     .eq('slug', slug)
     .maybeSingle()
 
@@ -311,8 +312,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   }))
 
   const systemPrompt =
-    tenant.ai_persona_prompt ??
-    'You are a helpful, warm hotel concierge assistant. Answer guest questions clearly and concisely.'
+    (tenant.ai_persona_prompt ??
+      'You are a helpful, warm hotel concierge assistant. Answer guest questions clearly and concisely.') +
+    buildBookingLinkInstruction(tenant.booking_config as Record<string, unknown>)
 
   let replyText: string
   try {
