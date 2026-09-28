@@ -67,6 +67,11 @@ export default function SettingsPage() {
   const [savingContacts, setSavingContacts] = useState(false)
   const [contactsMessage, setContactsMessage] = useState<string | null>(null)
 
+  const [bookingEngineCode, setBookingEngineCode] = useState('')
+  const [bookingCurrency, setBookingCurrency] = useState('')
+  const [savingBooking, setSavingBooking] = useState(false)
+  const [bookingMessage, setBookingMessage] = useState<string | null>(null)
+
   const [pgMessages, setPgMessages] = useState<PlaygroundMessage[]>([])
   const [pgInput, setPgInput] = useState('')
   const [pgLoading, setPgLoading] = useState(false)
@@ -84,6 +89,9 @@ export default function SettingsPage() {
       setMaintenanceContact(contacts.maintenance ?? '')
       setCleaningContact(contacts.cleaning ?? '')
       setBillingContact(contacts.billing ?? '')
+      const booking = json.tenant.booking_config ?? {}
+      setBookingEngineCode(booking.booking_engine_code ?? '')
+      setBookingCurrency(booking.currency ?? '')
     }
     setLoading(false)
   }
@@ -130,6 +138,28 @@ export default function SettingsPage() {
       return
     }
     setContactsMessage('Saved.')
+  }
+
+  async function handleSaveBooking() {
+    setSavingBooking(true)
+    setBookingMessage(null)
+    const res = await fetch('/api/tenant', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        booking_config: {
+          booking_engine_code: bookingEngineCode,
+          currency: bookingCurrency,
+        },
+      }),
+    })
+    const json = await res.json()
+    setSavingBooking(false)
+    if (!res.ok) {
+      setBookingMessage(`Error: ${json.error}`)
+      return
+    }
+    setBookingMessage('Saved.')
   }
 
   function handleUseTemplate() {
@@ -383,13 +413,47 @@ export default function SettingsPage() {
 
       {canEdit && (
         <div style={{ marginTop: 32, border: '1px solid #ddd', borderRadius: 8, padding: 16 }}>
+          <h2 style={{ marginTop: 0, fontSize: 18 }}>Booking link</h2>
+          <p style={{ fontSize: 13, color: '#888', marginTop: 0 }}>
+            Lets your AI concierge send guests a real link to check availability and book, using
+            your Cloudbeds booking engine. Find your booking engine code in Cloudbeds under
+            Booking Engine settings — it's the short code in your booking engine's own URL.
+          </p>
+          <div style={{ marginBottom: 8 }}>
+            <label>Booking engine code</label>
+            <br />
+            <input
+              value={bookingEngineCode}
+              onChange={(e) => setBookingEngineCode(e.target.value)}
+              placeholder="e.g. NadQ8y"
+              style={{ width: '100%', padding: 8 }}
+            />
+          </div>
+          <div style={{ marginBottom: 8 }}>
+            <label>Currency code</label>
+            <br />
+            <input
+              value={bookingCurrency}
+              onChange={(e) => setBookingCurrency(e.target.value)}
+              placeholder="e.g. mxn, usd"
+              style={{ width: '100%', padding: 8 }}
+            />
+          </div>
+          <button onClick={handleSaveBooking} disabled={savingBooking}>
+            {savingBooking ? 'Saving...' : 'Save booking link'}
+          </button>
+          {bookingMessage && <p>{bookingMessage}</p>}
+        </div>
+      )}
+
+      {canEdit && (
+        <div style={{ marginTop: 32, border: '1px solid #ddd', borderRadius: 8, padding: 16 }}>
           <h2 style={{ marginTop: 0, fontSize: 18 }}>Test your concierge</h2>
           <p style={{ fontSize: 13, color: '#888', marginTop: 0 }}>
             Chats using the text in the box above, even if you haven't saved it. Nothing here is
             stored, and reservation lookups aren't simulated. Each message is a real AI call. Note:
-            escalation is NOT simulated here either — if your persona is set up to escalate,
-            testing that specific behavior needs a real conversation (WhatsApp or the widget), not
-            this box.
+            escalation and the booking link are NOT simulated here either — testing those needs a
+            real conversation (WhatsApp or the widget), not this box.
           </p>
 
           <div
