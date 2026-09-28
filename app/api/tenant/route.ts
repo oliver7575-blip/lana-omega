@@ -24,7 +24,7 @@ export async function GET() {
 
   const { data: tenant, error } = await supabase
     .from('tenants')
-    .select('name, status, ai_persona_prompt, escalation_contacts')
+    .select('name, status, ai_persona_prompt, escalation_contacts, booking_config')
     .eq('id', staffRow.tenant_id)
     .single()
 
@@ -59,6 +59,7 @@ export async function PATCH(request: Request) {
     name?: string
     ai_persona_prompt?: string
     escalation_contacts?: Record<string, string>
+    booking_config?: { booking_engine_code?: string; currency?: string }
     activate?: boolean
   }
 
@@ -101,19 +102,26 @@ export async function PATCH(request: Request) {
     name?: string
     ai_persona_prompt?: string
     escalation_contacts?: Record<string, string>
+    booking_config?: { booking_engine_code?: string; currency?: string }
   } = {}
   if (typeof body.name === 'string' && body.name.trim()) updates.name = body.name.trim()
   if (typeof body.ai_persona_prompt === 'string' && body.ai_persona_prompt.trim()) {
     updates.ai_persona_prompt = body.ai_persona_prompt.trim()
   }
   if (body.escalation_contacts && typeof body.escalation_contacts === 'object') {
-    // Only keep non-empty values — an emptied field removes that contact
-    // rather than storing a blank string that would look "configured".
     const cleaned: Record<string, string> = {}
     for (const [key, value] of Object.entries(body.escalation_contacts)) {
       if (typeof value === 'string' && value.trim()) cleaned[key] = value.trim()
     }
     updates.escalation_contacts = cleaned
+  }
+  if (body.booking_config && typeof body.booking_config === 'object') {
+    const code = body.booking_config.booking_engine_code?.trim()
+    const currency = body.booking_config.currency?.trim()
+    updates.booking_config = {
+      ...(code ? { booking_engine_code: code } : {}),
+      ...(currency ? { currency: currency.toLowerCase() } : {}),
+    }
   }
 
   if (Object.keys(updates).length === 0) {
