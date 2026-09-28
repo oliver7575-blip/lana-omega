@@ -2,12 +2,14 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 
+const PAGE_SIZE = 20
+
 export default async function ConversationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string }>
+  searchParams: Promise<{ status?: string; q?: string; page?: string }>
 }) {
-  const { status: statusFilter, q } = await searchParams
+  const { status: statusFilter, q, page: pageParam } = await searchParams
   const supabase = await createClient()
 
   const {
@@ -17,6 +19,10 @@ export default async function ConversationsPage({
   if (!user) {
     redirect('/login')
   }
+
+  const page = Math.max(1, parseInt(pageParam ?? '1', 10) || 1)
+  const from = (page - 1) * PAGE_SIZE
+  const to = from + PAGE_SIZE - 1
 
   let matchingGuestIds: string[] | null = null
   if (q && q.trim()) {
@@ -29,7 +35,7 @@ export default async function ConversationsPage({
 
   let query = supabase
     .from('conversations')
-    .select('id, channel, status, guest_id, last_message_at, created_at')
+    .select('id, channel, status, guest_id, last_message_at, created_at', { count: 'exact' })
     .order('last_message_at', { ascending: false, nullsFirst: false })
 
   if (statusFilter && ['active', 'human_takeover', 'closed'].includes(statusFilter)) {
@@ -39,13 +45,13 @@ export default async function ConversationsPage({
   }
 
   if (matchingGuestIds !== null) {
-    // No matches at all — pass an impossible value rather than skipping the
-    // filter, so the query correctly returns nothing instead of silently
-    // ignoring the search.
-    query = query.in('guest_id', matchingGuestIds.length > 0 ? matchingGuestIds : ['00000000-0000-0000-0000-000000000000'])
+    query = query.in(
+      'guest_id',
+      matchingGuestIds.length > 0 ? matchingGuestIds : ['00000000-0000-0000-0000-000000000000']
+    )
   }
 
-  const { data: conversations } = await query
+  const { data: conversations, count: totalCount } = await query.range(from, to)
 
   const { count: takeoverCount } = await supabase
     .from('conversations')
@@ -70,13 +76,17 @@ export default async function ConversationsPage({
     { label: 'Closed', value: 'closed' },
   ]
 
-  function buildHref(newStatus: string | undefined, newQ: string | undefined) {
+  function buildHref(newStatus: string | undefined, newQ: string | undefined, newPage?: number) {
     const params = new URLSearchParams()
     if (newStatus) params.set('status', newStatus)
     if (newQ) params.set('q', newQ)
+    if (newPage && newPage > 1) params.set('page', String(newPage))
     const qs = params.toString()
     return qs ? `/conversations?${qs}` : '/conversations'
   }
+
+  const total = totalCount ?? 0
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   return (
     <main style={{ maxWidth: 640, margin: '80px auto', fontFamily: 'sans-serif' }}>
@@ -159,6 +169,24 @@ export default async function ConversationsPage({
           </Link>
         )
       })}
+
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
+          {page > 1 ? (
+            <Link href={buildHref(statusFilter, q, page - 1)}>← Previous</Link>
+          ) : (
+            <span />
+          )}
+          <span style={{ fontSize: 13, color: '#888' }}>
+            Page {page} of {totalPages} · {total} total
+          </span>
+          {page < totalPages ? (
+            <Link href={buildHref(statusFilter, q, page + 1)}>Next →</Link>
+          ) : (
+            <span />
+          )}
+        </div>
+      )}
     </main>
   )
 }
