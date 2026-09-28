@@ -1,5 +1,6 @@
 export interface ReservationLookupResult {
   found: boolean
+  reservationID?: string
   guestName?: string
   startDate?: string
   endDate?: string
@@ -41,6 +42,7 @@ export async function lookupReservation(
 
     return {
       found: true,
+      reservationID: match.reservationID,
       guestName: match.guestName,
       startDate: match.startDate,
       endDate: match.endDate,
@@ -49,5 +51,51 @@ export async function lookupReservation(
     }
   } catch (err) {
     return { found: false, error: err instanceof Error ? err.message : 'Unknown error' }
+  }
+}
+
+export interface UpdateArrivalResult {
+  success: boolean
+  error?: string
+}
+
+export async function updateArrivalTime(
+  apiKey: string,
+  propertyId: string,
+  confirmationNumber: string,
+  arrivalTime: string
+): Promise<UpdateArrivalResult> {
+  try {
+    const lookup = await lookupReservation(apiKey, propertyId, confirmationNumber)
+    if (!lookup.found || !lookup.reservationID) {
+      return { success: false, error: 'No reservation found for that confirmation number' }
+    }
+
+    const response = await fetch('https://api.cloudbeds.com/api/v1.3/putReservation', {
+      method: 'PUT',
+      headers: {
+        'x-api-key': apiKey,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        propertyID: propertyId,
+        reservationID: lookup.reservationID,
+        estimatedArrivalTime: arrivalTime,
+      }),
+    })
+
+    if (!response.ok) {
+      const errText = await response.text()
+      return { success: false, error: `Cloudbeds API error: ${response.status} ${errText}` }
+    }
+
+    const data = await response.json()
+    if (!data.success) {
+      return { success: false, error: data.message ?? 'Cloudbeds API returned success=false' }
+    }
+
+    return { success: true }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unknown error' }
   }
 }
