@@ -3,17 +3,11 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { generateReply } from '@/lib/anthropic'
 import { decryptCredentials } from '@/lib/crypto'
 import { lookupReservation } from '@/lib/cloudbeds'
+import { notifyStaff } from '@/lib/escalation'
 
 const RATE_LIMIT_WINDOW_MINUTES = 10
 const RATE_LIMIT_MAX_MESSAGES = 15
 
-// This endpoint is meant to be called from a tenant's own external website
-// (e.g. soiree.mx), which is a different origin from where this API is
-// hosted — without these headers, every browser request from an embedded
-// widget would be silently blocked by CORS before it even reaches this
-// code. Allowing any origin is acceptable here since the endpoint is
-// already rate-limited and exposes nothing beyond what the tenant has
-// already made public in their own persona/knowledge base.
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -109,7 +103,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
 
   const { data: tenant, error: tenantError } = await supabase
     .from('tenants')
-    .select('id, ai_persona_prompt, status')
+    .select('id, ai_persona_prompt, status, escalation_contacts')
     .eq('slug', slug)
     .maybeSingle()
 
@@ -178,6 +172,46 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
               return { found: false, error: 'No property_id configured for this tenant' }
             }
             return lookupReservation(api_key, propertyId, confirmationNumber)
+          },
+        }
+      : undefined
+
+  // A widget guest has no WhatsApp of their own — staff escalation still
+  // needs to reach them over WhatsApp, so the tenant's own connection is
+  // fetched here purely for that purpose, separate from the guest-facing
+  // reply (which is delivered over HTTP, not WhatsApp).
+  const { data: whatsappForEscalation } = await supabase
+    .from('tenant_integrations')
+    .select('status, credentials, config')
+    .eq('tenant_id', tenantId)
+    .eq('integration_type', 'whatsapp')
+    .maybeSingle()
+
+  const escalationContacts = (tenant.escalation_contacts as Record<string, string>) ?? {}
+  const escalationTool =
+    Object.keys(escalationContacts).length > 0 && whatsappForEscalation?.status === 'connected'
+      ? {
+          escalateToStaff: async (input: {
+            category: string
+            roomNumber?: string
+            summary: string
+          }) => {
+            const staffNumber = escalationContacts[input.category]
+            if (!staffNumber) {
+              return { success: false, error: `No ${input.category} contact configured` }
+            }
+            const phoneNumberId = (whatsappForEscalation.config as { phone_number_id?: string })
+              ?.phone_number_id
+            if (!phoneNumberId) {
+              return { success: false, error: 'No phone_number_id configured for WhatsApp' }
+            }
+            return notifyStaff(
+              phoneNumberId,
+              whatsappForEscalation.credentials,
+              staffNumber,
+              syntheticPhone,
+              input
+            )
           },
         }
       : undefined
@@ -282,7 +316,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
 
   let replyText: string
   try {
-    replyText = await generateReply(systemPrompt, claudeMessages, reservationTool)
+    replyText = await generateReply(systemPrompt, claudeMessages, reservationTool, escalationTool)
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'AI generation failed' },
