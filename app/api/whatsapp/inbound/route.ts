@@ -5,6 +5,7 @@ import { sendWhatsAppMessage } from '@/lib/whatsapp-send'
 import { verifyMetaSignature } from '@/lib/verify-webhook'
 import { decryptCredentials } from '@/lib/crypto'
 import { lookupReservation } from '@/lib/cloudbeds'
+import { notifyStaff } from '@/lib/escalation'
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -108,7 +109,7 @@ export async function POST(request: Request) {
 
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('ai_persona_prompt')
+    .select('ai_persona_prompt, escalation_contacts')
     .eq('id', tenantId)
     .single()
 
@@ -132,6 +133,27 @@ export async function POST(request: Request) {
               return { found: false, error: 'No property_id configured for this tenant' }
             }
             return lookupReservation(api_key, propertyId, confirmationNumber)
+          },
+        }
+      : undefined
+
+  const escalationContacts = (tenant?.escalation_contacts as Record<string, string>) ?? {}
+  const escalationTool =
+    Object.keys(escalationContacts).length > 0
+      ? {
+          escalateToStaff: async (input: {
+            category: string
+            roomNumber?: string
+            summary: string
+          }) => {
+            const staffNumber = escalationContacts[input.category]
+            if (!staffNumber) {
+              return { success: false, error: `No ${input.category} contact configured` }
+            }
+            // This guest's own channel is WhatsApp, so the same phoneNumberId
+            // and integration credentials the reply itself will be sent
+            // through are reused here to notify staff too.
+            return notifyStaff(phoneNumberId, integration.credentials, staffNumber, from, input)
           },
         }
       : undefined
@@ -235,12 +257,8 @@ export async function POST(request: Request) {
 
   let replyText: string
   try {
-    replyText = await generateReply(systemPrompt, claudeMessages, reservationTool)
+    replyText = await generateReply(systemPrompt, claudeMessages, reservationTool, escalationTool)
   } catch (err) {
-    // A real guest is waiting on the other end of an async channel — total
-    // silence here means they have no idea their message even arrived.
-    // Send a graceful fallback so they at least know it's been received,
-    // then let staff pick it up from the conversation view.
     const fallbackText =
       "Sorry, I'm having trouble responding right now — a member of our team will follow up with you shortly."
 
