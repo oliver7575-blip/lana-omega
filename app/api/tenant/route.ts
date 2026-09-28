@@ -24,7 +24,7 @@ export async function GET() {
 
   const { data: tenant, error } = await supabase
     .from('tenants')
-    .select('name, status, ai_persona_prompt')
+    .select('name, status, ai_persona_prompt, escalation_contacts')
     .eq('id', staffRow.tenant_id)
     .single()
 
@@ -58,15 +58,11 @@ export async function PATCH(request: Request) {
   const body = (await request.json()) as {
     name?: string
     ai_persona_prompt?: string
+    escalation_contacts?: Record<string, string>
     activate?: boolean
   }
 
   if (body.activate) {
-    // Activation has its own real prerequisite: at least one channel must
-    // actually be connected, so "active" means something rather than just
-    // being a label — use the service client here since checking another
-    // table (tenant_integrations) for this decision isn't something RLS
-    // needs to gate directly.
     const serviceClient = createServiceClient()
     const { count: connectedIntegrations } = await serviceClient
       .from('tenant_integrations')
@@ -101,10 +97,23 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ tenant: updated })
   }
 
-  const updates: { name?: string; ai_persona_prompt?: string } = {}
+  const updates: {
+    name?: string
+    ai_persona_prompt?: string
+    escalation_contacts?: Record<string, string>
+  } = {}
   if (typeof body.name === 'string' && body.name.trim()) updates.name = body.name.trim()
   if (typeof body.ai_persona_prompt === 'string' && body.ai_persona_prompt.trim()) {
     updates.ai_persona_prompt = body.ai_persona_prompt.trim()
+  }
+  if (body.escalation_contacts && typeof body.escalation_contacts === 'object') {
+    // Only keep non-empty values — an emptied field removes that contact
+    // rather than storing a blank string that would look "configured".
+    const cleaned: Record<string, string> = {}
+    for (const [key, value] of Object.entries(body.escalation_contacts)) {
+      if (typeof value === 'string' && value.trim()) cleaned[key] = value.trim()
+    }
+    updates.escalation_contacts = cleaned
   }
 
   if (Object.keys(updates).length === 0) {
