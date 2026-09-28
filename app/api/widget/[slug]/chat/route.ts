@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { generateReply } from '@/lib/anthropic'
 import { decryptCredentials } from '@/lib/crypto'
-import { lookupReservation } from '@/lib/cloudbeds'
+import { lookupReservation, updateArrivalTime } from '@/lib/cloudbeds'
 import { notifyStaff } from '@/lib/escalation'
 import { buildBookingLinkInstruction } from '@/lib/booking-link'
 
@@ -177,6 +177,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
         }
       : undefined
 
+  const arrivalUpdateTool =
+    cloudbedsIntegration?.status === 'connected'
+      ? {
+          updateArrivalTime: async (input: { confirmationNumber: string; arrivalTime: string }) => {
+            const { api_key } = decryptCredentials<{ api_key: string }>(
+              cloudbedsIntegration.credentials
+            )
+            const propertyId = (cloudbedsIntegration.config as { property_id?: string })
+              ?.property_id
+            if (!propertyId) {
+              return { success: false, error: 'No property_id configured for this tenant' }
+            }
+            return updateArrivalTime(api_key, propertyId, input.confirmationNumber, input.arrivalTime)
+          },
+        }
+      : undefined
+
   // A widget guest has no WhatsApp of their own — staff escalation still
   // needs to reach them over WhatsApp, so the tenant's own connection is
   // fetched here purely for that purpose, separate from the guest-facing
@@ -318,7 +335,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
 
   let replyText: string
   try {
-    replyText = await generateReply(systemPrompt, claudeMessages, reservationTool, escalationTool)
+    replyText = await generateReply(
+      systemPrompt,
+      claudeMessages,
+      reservationTool,
+      escalationTool,
+      arrivalUpdateTool
+    )
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'AI generation failed' },
