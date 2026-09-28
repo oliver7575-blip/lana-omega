@@ -15,7 +15,7 @@ export async function lookupReservation(
   confirmationNumber: string
 ): Promise<ReservationLookupResult> {
   try {
-    const url = `https://api.cloudbeds.com/api/v1.3/getReservations?propertyID=${encodeURIComponent(propertyId)}&pageSize=100`
+    const url = `https://api.cloudbeds.com/api/v1.3/getReservations?propertyID=${encodeURIComponent(propertyId)}&pageSize=100&includeGuestsDetails=true`
 
     const response = await fetch(url, {
       headers: { 'x-api-key': apiKey },
@@ -32,11 +32,6 @@ export async function lookupReservation(
     }
 
     const reservations = data.data ?? []
-    // Match on EITHER field, matching Beta's own proven working filter logic
-    // (Make scenario 5594046) — thirdPartyIdentifier is the OTA-source
-    // reference (Booking.com, Expedia, etc.), reservationID is Cloudbeds'
-    // own reservation number. Guests use whichever one they were actually
-    // given, so both must be checked.
     const match = reservations.find(
       (r: { thirdPartyIdentifier?: string; reservationID?: string }) =>
         r.thirdPartyIdentifier === confirmationNumber || r.reservationID === confirmationNumber
@@ -146,7 +141,7 @@ export async function getArrivalsInWindow(
   date: string
 ): Promise<GetArrivalsResult> {
   try {
-    const url = `https://api.cloudbeds.com/api/v1.3/getReservations?propertyID=${encodeURIComponent(propertyId)}&checkInFrom=${date}&checkInTo=${date}&pageSize=100`
+    const url = `https://api.cloudbeds.com/api/v1.3/getReservations?propertyID=${encodeURIComponent(propertyId)}&checkInFrom=${date}&checkInTo=${date}&pageSize=100&includeGuestsDetails=true`
 
     const response = await fetch(url, {
       headers: { 'x-api-key': apiKey },
