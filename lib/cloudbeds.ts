@@ -69,10 +69,6 @@ export async function updateArrivalTime(
     const lookup = await lookupReservation(apiKey, propertyId, confirmationNumber)
 
     if (!lookup.found) {
-      // lookup.error is only set when the lookup call itself failed (e.g. an
-      // invalid API key or a Cloudbeds outage) — a genuinely wrong
-      // confirmation number leaves it unset. These need different guidance:
-      // one is worth asking the guest to double-check, the other is not.
       if (lookup.error) {
         return {
           success: false,
@@ -112,5 +108,71 @@ export async function updateArrivalTime(
     return { success: true }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unknown error' }
+  }
+}
+
+export interface UpcomingArrival {
+  reservationID: string
+  guestName?: string
+  startDate?: string
+  roomTypeName?: string
+  phone?: string
+}
+
+export interface GetArrivalsResult {
+  success: boolean
+  arrivals: UpcomingArrival[]
+  error?: string
+}
+
+// NOTE: the exact field Cloudbeds uses for a guest's phone number on a
+// reservation has not been confirmed against real data yet (nothing built
+// before this needed it) — this tries the plausible candidates and leaves
+// phone undefined rather than guessing wrong if none are present. Confirm
+// and adjust this list once real Cloudbeds data is available.
+function extractPhone(reservation: Record<string, unknown>): string | undefined {
+  const candidates = ['phone', 'guestPhone', 'phone1', 'cellPhone']
+  for (const key of candidates) {
+    const value = reservation[key]
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  return undefined
+}
+
+export async function getArrivalsInWindow(
+  apiKey: string,
+  propertyId: string,
+  date: string
+): Promise<GetArrivalsResult> {
+  try {
+    const url = `https://api.cloudbeds.com/api/v1.3/getReservations?propertyID=${encodeURIComponent(propertyId)}&checkInFrom=${date}&checkInTo=${date}&pageSize=100`
+
+    const response = await fetch(url, {
+      headers: { 'x-api-key': apiKey },
+    })
+
+    if (!response.ok) {
+      const errText = await response.text()
+      return { success: false, arrivals: [], error: `Cloudbeds API error: ${response.status} ${errText}` }
+    }
+
+    const data = await response.json()
+    if (!data.success) {
+      return { success: false, arrivals: [], error: 'Cloudbeds API returned success=false' }
+    }
+
+    const reservations = (data.data ?? []) as Record<string, unknown>[]
+
+    const arrivals: UpcomingArrival[] = reservations.map((r) => ({
+      reservationID: r.reservationID as string,
+      guestName: r.guestName as string | undefined,
+      startDate: r.startDate as string | undefined,
+      roomTypeName: (r.assigned as { roomTypeName?: string }[] | undefined)?.[0]?.roomTypeName,
+      phone: extractPhone(r),
+    }))
+
+    return { success: true, arrivals }
+  } catch (err) {
+    return { success: false, arrivals: [], error: err instanceof Error ? err.message : 'Unknown error' }
   }
 }
