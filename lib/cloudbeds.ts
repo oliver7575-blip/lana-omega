@@ -67,8 +67,23 @@ export async function updateArrivalTime(
 ): Promise<UpdateArrivalResult> {
   try {
     const lookup = await lookupReservation(apiKey, propertyId, confirmationNumber)
-    if (!lookup.found || !lookup.reservationID) {
+
+    if (!lookup.found) {
+      // lookup.error is only set when the lookup call itself failed (e.g. an
+      // invalid API key or a Cloudbeds outage) — a genuinely wrong
+      // confirmation number leaves it unset. These need different guidance:
+      // one is worth asking the guest to double-check, the other is not.
+      if (lookup.error) {
+        return {
+          success: false,
+          error: `Could not reach the reservation system to verify this: ${lookup.error}. This is not necessarily a problem with the confirmation number.`,
+        }
+      }
       return { success: false, error: 'No reservation found for that confirmation number' }
+    }
+
+    if (!lookup.reservationID) {
+      return { success: false, error: 'Reservation found but has no reservationID' }
     }
 
     const response = await fetch('https://api.cloudbeds.com/api/v1.3/putReservation', {
