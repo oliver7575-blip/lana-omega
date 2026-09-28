@@ -4,7 +4,7 @@ import { generateReply } from '@/lib/anthropic'
 import { sendWhatsAppMessage } from '@/lib/whatsapp-send'
 import { verifyMetaSignature } from '@/lib/verify-webhook'
 import { decryptCredentials } from '@/lib/crypto'
-import { lookupReservation } from '@/lib/cloudbeds'
+import { lookupReservation, updateArrivalTime } from '@/lib/cloudbeds'
 import { notifyStaff } from '@/lib/escalation'
 import { buildBookingLinkInstruction } from '@/lib/booking-link'
 
@@ -138,6 +138,23 @@ export async function POST(request: Request) {
         }
       : undefined
 
+  const arrivalUpdateTool =
+    cloudbedsIntegration?.status === 'connected'
+      ? {
+          updateArrivalTime: async (input: { confirmationNumber: string; arrivalTime: string }) => {
+            const { api_key } = decryptCredentials<{ api_key: string }>(
+              cloudbedsIntegration.credentials
+            )
+            const propertyId = (cloudbedsIntegration.config as { property_id?: string })
+              ?.property_id
+            if (!propertyId) {
+              return { success: false, error: 'No property_id configured for this tenant' }
+            }
+            return updateArrivalTime(api_key, propertyId, input.confirmationNumber, input.arrivalTime)
+          },
+        }
+      : undefined
+
   const escalationContacts = (tenant?.escalation_contacts as Record<string, string>) ?? {}
   const escalationTool =
     Object.keys(escalationContacts).length > 0
@@ -259,7 +276,13 @@ export async function POST(request: Request) {
 
   let replyText: string
   try {
-    replyText = await generateReply(systemPrompt, claudeMessages, reservationTool, escalationTool)
+    replyText = await generateReply(
+      systemPrompt,
+      claudeMessages,
+      reservationTool,
+      escalationTool,
+      arrivalUpdateTool
+    )
   } catch (err) {
     const fallbackText =
       "Sorry, I'm having trouble responding right now — a member of our team will follow up with you shortly."
