@@ -153,6 +153,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     }
   }
 
+  const { data: guest, error: guestError } = await supabase
+    .from('guests')
+    .upsert({ tenant_id: tenantId, phone: syntheticPhone }, { onConflict: 'tenant_id,phone' })
+    .select()
+    .single()
+
+  if (guestError || !guest) {
+    return NextResponse.json(
+      { error: `Failed to upsert guest: ${guestError?.message}` },
+      { status: 500, headers: CORS_HEADERS }
+    )
+  }
+
   const { data: cloudbedsIntegration } = await supabase
     .from('tenant_integrations')
     .select('status, credentials, config')
@@ -194,10 +207,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
         }
       : undefined
 
-  // A widget guest has no WhatsApp of their own — staff escalation still
-  // needs to reach them over WhatsApp, so the tenant's own connection is
-  // fetched here purely for that purpose, separate from the guest-facing
-  // reply (which is delivered over HTTP, not WhatsApp).
+  // A widget guest has no WhatsApp of their own — staff escalation and
+  // waitlist notifications still need to reach staff over WhatsApp, so the
+  // tenant's own connection is fetched here purely for that purpose.
   const { data: whatsappForEscalation } = await supabase
     .from('tenant_integrations')
     .select('status, credentials, config')
@@ -234,17 +246,49 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
         }
       : undefined
 
-  const { data: guest, error: guestError } = await supabase
-    .from('guests')
-    .upsert({ tenant_id: tenantId, phone: syntheticPhone }, { onConflict: 'tenant_id,phone' })
-    .select()
-    .single()
+  const waitlistTool = {
+    joinWaitlist: async (input: {
+      fullName: string
+      email: string
+      phone: string
+      dateRequested: string
+      notes?: string
+    }) => {
+      const { error: insertError } = await supabase.from('waitlist_entries').insert({
+        tenant_id: tenantId,
+        guest_id: guest.id,
+        full_name: input.fullName,
+        email: input.email,
+        phone: input.phone,
+        date_requested: input.dateRequested,
+        notes: input.notes ?? null,
+      })
 
-  if (guestError || !guest) {
-    return NextResponse.json(
-      { error: `Failed to upsert guest: ${guestError?.message}` },
-      { status: 500, headers: CORS_HEADERS }
-    )
+      if (insertError) {
+        return { success: false, error: insertError.message }
+      }
+
+      // Notification is best-effort — the entry above is saved regardless.
+      const reservationsContact = escalationContacts.reservations
+      if (reservationsContact && whatsappForEscalation?.status === 'connected') {
+        const phoneNumberId = (whatsappForEscalation.config as { phone_number_id?: string })
+          ?.phone_number_id
+        if (phoneNumberId) {
+          await notifyStaff(
+            phoneNumberId,
+            whatsappForEscalation.credentials,
+            reservationsContact,
+            syntheticPhone,
+            {
+              category: 'reservations',
+              summary: `Waitlist request: ${input.fullName}, wants ${input.dateRequested}. Contact: ${input.email} / ${input.phone}${input.notes ? `. Notes: ${input.notes}` : ''}`,
+            }
+          )
+        }
+      }
+
+      return { success: true }
+    },
   }
 
   const { data: existingConversation } = await supabase
@@ -340,7 +384,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       claudeMessages,
       reservationTool,
       escalationTool,
-      arrivalUpdateTool
+      arrivalUpdateTool,
+      waitlistTool
     )
   } catch (err) {
     return NextResponse.json(
