@@ -52,6 +52,10 @@ export async function POST(request: Request) {
       config: config ?? {},
       connected_at: new Date().toISOString(),
       connected_by: staffRow?.id ?? null,
+      // New credentials invalidate any previous health result.
+      last_checked_at: null,
+      last_check_ok: null,
+      last_error: null,
     },
     { onConflict: 'tenant_id,integration_type' }
   )
