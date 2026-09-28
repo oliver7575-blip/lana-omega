@@ -64,6 +64,7 @@ export default function SettingsPage() {
   const [maintenanceContact, setMaintenanceContact] = useState('')
   const [cleaningContact, setCleaningContact] = useState('')
   const [billingContact, setBillingContact] = useState('')
+  const [reservationsContact, setReservationsContact] = useState('')
   const [savingContacts, setSavingContacts] = useState(false)
   const [contactsMessage, setContactsMessage] = useState<string | null>(null)
 
@@ -89,6 +90,7 @@ export default function SettingsPage() {
       setMaintenanceContact(contacts.maintenance ?? '')
       setCleaningContact(contacts.cleaning ?? '')
       setBillingContact(contacts.billing ?? '')
+      setReservationsContact(contacts.reservations ?? '')
       const booking = json.tenant.booking_config ?? {}
       setBookingEngineCode(booking.booking_engine_code ?? '')
       setBookingCurrency(booking.currency ?? '')
@@ -128,6 +130,7 @@ export default function SettingsPage() {
           maintenance: maintenanceContact,
           cleaning: cleaningContact,
           billing: billingContact,
+          reservations: reservationsContact,
         },
       }),
     })
@@ -404,6 +407,16 @@ export default function SettingsPage() {
               style={{ width: '100%', padding: 8 }}
             />
           </div>
+          <div style={{ marginBottom: 8 }}>
+            <label>Reservations / Waitlist</label>
+            <br />
+            <input
+              value={reservationsContact}
+              onChange={(e) => setReservationsContact(e.target.value)}
+              placeholder="+52 ..."
+              style={{ width: '100%', padding: 8 }}
+            />
+          </div>
           <button onClick={handleSaveContacts} disabled={savingContacts}>
             {savingContacts ? 'Saving...' : 'Save contacts'}
           </button>
@@ -452,8 +465,8 @@ export default function SettingsPage() {
           <p style={{ fontSize: 13, color: '#888', marginTop: 0 }}>
             Chats using the text in the box above, even if you haven't saved it. Nothing here is
             stored, and reservation lookups aren't simulated. Each message is a real AI call. Note:
-            escalation and the booking link are NOT simulated here either — testing those needs a
-            real conversation (WhatsApp or the widget), not this box.
+            escalation, the waitlist, and the booking link are NOT simulated here either — testing
+            those needs a real conversation (WhatsApp or the widget), not this box.
           </p>
 
           <div
