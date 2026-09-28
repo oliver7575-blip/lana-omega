@@ -84,7 +84,7 @@ export async function generateReply(
     tools.push({
       name: 'update_arrival_time',
       description:
-        "Update a guest's estimated arrival time on their EXISTING reservation via the property management system. Use this when a guest with a confirmation number tells you what time they expect to arrive. This is a real write to their reservation, not just a note — only call it once you have both a confirmation number and a specific time.",
+        "Update a guest's estimated arrival time on their EXISTING reservation via the property management system. Use this when a guest with a confirmation number tells you what time they expect to arrive. This is a real write to their reservation, not just a note — only call it once you have both a confirmation number and a specific time. If the tool result's error mentions the reservation system itself (unreachable, an API problem, etc.), that is NOT the guest's fault — apologize and say the system is temporarily unavailable, do not ask them to double-check their confirmation number. Only ask the guest to double-check the number if the error says no matching reservation was found.",
       input_schema: {
         type: 'object',
         properties: {
