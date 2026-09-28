@@ -32,8 +32,14 @@ export async function lookupReservation(
     }
 
     const reservations = data.data ?? []
+    // Match on EITHER field, matching Beta's own proven working filter logic
+    // (Make scenario 5594046) — thirdPartyIdentifier is the OTA-source
+    // reference (Booking.com, Expedia, etc.), reservationID is Cloudbeds'
+    // own reservation number. Guests use whichever one they were actually
+    // given, so both must be checked.
     const match = reservations.find(
-      (r: { thirdPartyIdentifier?: string }) => r.thirdPartyIdentifier === confirmationNumber
+      (r: { thirdPartyIdentifier?: string; reservationID?: string }) =>
+        r.thirdPartyIdentifier === confirmationNumber || r.reservationID === confirmationNumber
     )
 
     if (!match) {
@@ -125,11 +131,6 @@ export interface GetArrivalsResult {
   error?: string
 }
 
-// NOTE: the exact field Cloudbeds uses for a guest's phone number on a
-// reservation has not been confirmed against real data yet (nothing built
-// before this needed it) — this tries the plausible candidates and leaves
-// phone undefined rather than guessing wrong if none are present. Confirm
-// and adjust this list once real Cloudbeds data is available.
 function extractPhone(reservation: Record<string, unknown>): string | undefined {
   const candidates = ['phone', 'guestPhone', 'phone1', 'cellPhone']
   for (const key of candidates) {
