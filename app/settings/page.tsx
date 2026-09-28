@@ -5,6 +5,39 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
+const STARTER_TEMPLATE = [
+  'You are the AI concierge for [HOTEL NAME], a [TYPE OF PROPERTY] in [CITY, COUNTRY].',
+  '',
+  'TONE',
+  '- Warm, clear and concise, like a knowledgeable local host rather than a corporate hotel.',
+  '- Short paragraphs; bullet points only when they genuinely help.',
+  '',
+  'LANGUAGE',
+  "- Always reply in the language of the guest's most recent message, even if earlier messages were in another language.",
+  '',
+  'RULES',
+  '- Use only the facts in this prompt. Never invent prices, availability, policies or exceptions.',
+  '- Never promise early check-in, late check-out, discounts, refunds or special arrangements.',
+  "- If you don't know something, say a member of the team will gladly help, and give the general contact below.",
+  '',
+  'KEY FACTS',
+  '- Check-in: [TIME]. Check-out: [TIME].',
+  '- Wi-Fi: network [NAME], password [PASSWORD].',
+  '- Address and how to find us: [DIRECTIONS].',
+  '- Food and breakfast: [DETAILS].',
+  '- House rules: [DETAILS].',
+  '',
+  'CONTACTS',
+  "- General questions and anything you can't answer: [EMAIL OR PHONE].",
+  '- Taxis and transfers: [NAME AND CONTACT].',
+  '- Tours and activities: [NAME AND CONTACT].',
+].join('\n')
+
+interface PlaygroundMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
 export default function SettingsPage() {
   const router = useRouter()
   const [name, setName] = useState('')
@@ -27,6 +60,11 @@ export default function SettingsPage() {
 
   const [activating, setActivating] = useState(false)
   const [activateError, setActivateError] = useState<string | null>(null)
+
+  const [pgMessages, setPgMessages] = useState<PlaygroundMessage[]>([])
+  const [pgInput, setPgInput] = useState('')
+  const [pgLoading, setPgLoading] = useState(false)
+  const [pgError, setPgError] = useState<string | null>(null)
 
   async function loadTenant() {
     const res = await fetch('/api/tenant')
@@ -59,6 +97,60 @@ export default function SettingsPage() {
       return
     }
     setMessage('Saved.')
+  }
+
+  function handleUseTemplate() {
+    if (
+      prompt.trim() &&
+      prompt.trim() !== STARTER_TEMPLATE &&
+      !confirm('Replace the current text with the starter template? Nothing is saved until you click Save changes.')
+    ) {
+      return
+    }
+    setPrompt(STARTER_TEMPLATE)
+  }
+
+  async function handlePlaygroundSend(e: React.FormEvent) {
+    e.preventDefault()
+    const text = pgInput.trim()
+    if (!text || pgLoading) return
+
+    const next: PlaygroundMessage[] = [...pgMessages, { role: 'user', content: text }]
+    setPgMessages(next)
+    setPgInput('')
+    setPgLoading(true)
+    setPgError(null)
+
+    try {
+      const res = await fetch('/api/tenant/playground', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, messages: next }),
+      })
+
+      // Read as text first so a timeout or crash page can't freeze the box.
+      const raw = await res.text()
+      let json: { reply?: string; error?: string } | null = null
+      try {
+        json = JSON.parse(raw)
+      } catch {
+        json = null
+      }
+
+      if (!json) {
+        setPgError(`Unexpected response (HTTP ${res.status}). It may have timed out.`)
+        return
+      }
+      if (!res.ok || !json.reply) {
+        setPgError(json.error ?? `HTTP ${res.status}`)
+        return
+      }
+      setPgMessages([...next, { role: 'assistant', content: json.reply }])
+    } catch (err) {
+      setPgError(err instanceof Error ? err.message : 'Network error')
+    } finally {
+      setPgLoading(false)
+    }
   }
 
   async function handleActivate() {
@@ -200,11 +292,85 @@ export default function SettingsPage() {
       </div>
 
       {canEdit && (
-        <button onClick={handleSave} disabled={saving}>
-          {saving ? 'Saving...' : 'Save changes'}
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving...' : 'Save changes'}
+          </button>
+          <button onClick={handleUseTemplate} type="button">
+            Use starter template
+          </button>
+        </div>
       )}
       {message && <p>{message}</p>}
+
+      {canEdit && (
+        <div style={{ marginTop: 32, border: '1px solid #ddd', borderRadius: 8, padding: 16 }}>
+          <h2 style={{ marginTop: 0, fontSize: 18 }}>Test your concierge</h2>
+          <p style={{ fontSize: 13, color: '#888', marginTop: 0 }}>
+            Chats using the text in the box above, even if you haven't saved it. Nothing here is
+            stored, and reservation lookups aren't simulated. Each message is a real AI call.
+          </p>
+
+          <div
+            style={{
+              border: '1px solid #eee',
+              borderRadius: 8,
+              minHeight: 120,
+              maxHeight: 320,
+              overflowY: 'auto',
+              padding: 12,
+              marginBottom: 12,
+            }}
+          >
+            {pgMessages.length === 0 && (
+              <p style={{ color: '#aaa', margin: 0 }}>
+                Ask something a guest would, e.g. "What's the Wi-Fi password?"
+              </p>
+            )}
+            {pgMessages.map((m, i) => (
+              <div key={i} style={{ marginBottom: 10, textAlign: m.role === 'user' ? 'right' : 'left' }}>
+                <div
+                  style={{
+                    display: 'inline-block',
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    maxWidth: '85%',
+                    background: m.role === 'user' ? '#dbeafe' : '#f0f0f0',
+                    whiteSpace: 'pre-wrap',
+                    textAlign: 'left',
+                  }}
+                >
+                  {m.content}
+                </div>
+              </div>
+            ))}
+            {pgLoading && <p style={{ color: '#888', margin: 0 }}>Thinking...</p>}
+          </div>
+
+          {pgError && <p style={{ color: 'red', marginTop: 0 }}>{pgError}</p>}
+
+          <form onSubmit={handlePlaygroundSend} style={{ display: 'flex', gap: 8 }}>
+            <input
+              value={pgInput}
+              onChange={(e) => setPgInput(e.target.value)}
+              placeholder="Type as a guest..."
+              style={{ flex: 1, padding: 8 }}
+            />
+            <button type="submit" disabled={pgLoading || !pgInput.trim()}>
+              Send
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPgMessages([])
+                setPgError(null)
+              }}
+            >
+              Reset
+            </button>
+          </form>
+        </div>
+      )}
 
       <div style={{ marginTop: 48, borderTop: '1px solid #eee', paddingTop: 16 }}>
         <h2>Your account</h2>
