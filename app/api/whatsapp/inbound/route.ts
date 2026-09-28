@@ -114,6 +114,19 @@ export async function POST(request: Request) {
     .eq('id', tenantId)
     .single()
 
+  const { data: guest, error: guestError } = await supabase
+    .from('guests')
+    .upsert({ tenant_id: tenantId, phone: from }, { onConflict: 'tenant_id,phone' })
+    .select()
+    .single()
+
+  if (guestError || !guest) {
+    return NextResponse.json(
+      { error: `Failed to upsert guest: ${guestError?.message}` },
+      { status: 500 }
+    )
+  }
+
   const { data: cloudbedsIntegration } = await supabase
     .from('tenant_integrations')
     .select('status, credentials, config')
@@ -168,25 +181,44 @@ export async function POST(request: Request) {
             if (!staffNumber) {
               return { success: false, error: `No ${input.category} contact configured` }
             }
-            // This guest's own channel is WhatsApp, so the same phoneNumberId
-            // and integration credentials the reply itself will be sent
-            // through are reused here to notify staff too.
             return notifyStaff(phoneNumberId, integration.credentials, staffNumber, from, input)
           },
         }
       : undefined
 
-  const { data: guest, error: guestError } = await supabase
-    .from('guests')
-    .upsert({ tenant_id: tenantId, phone: from }, { onConflict: 'tenant_id,phone' })
-    .select()
-    .single()
+  const waitlistTool = {
+    joinWaitlist: async (input: {
+      fullName: string
+      email: string
+      phone: string
+      dateRequested: string
+      notes?: string
+    }) => {
+      const { error: insertError } = await supabase.from('waitlist_entries').insert({
+        tenant_id: tenantId,
+        guest_id: guest.id,
+        full_name: input.fullName,
+        email: input.email,
+        phone: input.phone,
+        date_requested: input.dateRequested,
+        notes: input.notes ?? null,
+      })
 
-  if (guestError || !guest) {
-    return NextResponse.json(
-      { error: `Failed to upsert guest: ${guestError?.message}` },
-      { status: 500 }
-    )
+      if (insertError) {
+        return { success: false, error: insertError.message }
+      }
+
+      // Notification is best-effort — the entry above is saved regardless.
+      const reservationsContact = escalationContacts.reservations
+      if (reservationsContact) {
+        await notifyStaff(phoneNumberId, integration.credentials, reservationsContact, from, {
+          category: 'reservations',
+          summary: `Waitlist request: ${input.fullName}, wants ${input.dateRequested}. Contact: ${input.email} / ${input.phone}${input.notes ? `. Notes: ${input.notes}` : ''}`,
+        })
+      }
+
+      return { success: true }
+    },
   }
 
   const { data: existingConversation } = await supabase
@@ -281,7 +313,8 @@ export async function POST(request: Request) {
       claudeMessages,
       reservationTool,
       escalationTool,
-      arrivalUpdateTool
+      arrivalUpdateTool,
+      waitlistTool
     )
   } catch (err) {
     const fallbackText =
