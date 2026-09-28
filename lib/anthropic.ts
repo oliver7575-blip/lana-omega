@@ -17,11 +17,21 @@ interface EscalationTool {
   escalateToStaff: (input: EscalationToolInput) => Promise<unknown>
 }
 
+interface ArrivalUpdateToolInput {
+  confirmationNumber: string
+  arrivalTime: string
+}
+
+interface ArrivalUpdateTool {
+  updateArrivalTime: (input: ArrivalUpdateToolInput) => Promise<unknown>
+}
+
 export async function generateReply(
   systemPrompt: string,
   conversationHistory: ClaudeMessage[],
   reservationTool?: ReservationTool,
-  escalationTool?: EscalationTool
+  escalationTool?: EscalationTool,
+  arrivalUpdateTool?: ArrivalUpdateTool
 ): Promise<string> {
   const tools: Record<string, unknown>[] = []
 
@@ -66,6 +76,28 @@ export async function generateReply(
           },
         },
         required: ['category', 'summary'],
+      },
+    })
+  }
+
+  if (arrivalUpdateTool) {
+    tools.push({
+      name: 'update_arrival_time',
+      description:
+        "Update a guest's estimated arrival time on their EXISTING reservation via the property management system. Use this when a guest with a confirmation number tells you what time they expect to arrive. This is a real write to their reservation, not just a note — only call it once you have both a confirmation number and a specific time.",
+      input_schema: {
+        type: 'object',
+        properties: {
+          confirmationNumber: {
+            type: 'string',
+            description: "The guest's reservation confirmation number",
+          },
+          arrivalTime: {
+            type: 'string',
+            description: 'The estimated arrival time in 24-hour HH:MM format, e.g. 15:30',
+          },
+        },
+        required: ['confirmationNumber', 'arrivalTime'],
       },
     })
   }
@@ -119,6 +151,19 @@ export async function generateReply(
       if (toolUseBlock?.name === 'escalate_to_staff' && escalationTool) {
         const result = await escalationTool.escalateToStaff(
           toolUseBlock.input as unknown as EscalationToolInput
+        )
+        messages.push({
+          role: 'user',
+          content: [
+            { type: 'tool_result', tool_use_id: toolUseBlock.id, content: JSON.stringify(result) },
+          ],
+        })
+        continue
+      }
+
+      if (toolUseBlock?.name === 'update_arrival_time' && arrivalUpdateTool) {
+        const result = await arrivalUpdateTool.updateArrivalTime(
+          toolUseBlock.input as unknown as ArrivalUpdateToolInput
         )
         messages.push({
           role: 'user',
