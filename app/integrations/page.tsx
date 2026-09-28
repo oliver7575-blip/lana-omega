@@ -99,19 +99,40 @@ export default function IntegrationsPage() {
   async function handleTest(type: IntegrationType) {
     setTesting(type)
     setMessage(null)
-    const res = await fetch('/api/integrations/test', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ integrationType: type }),
-    })
-    const json = await res.json()
-    setTesting(null)
-    if (!res.ok) {
-      setMessage(`Error: ${json.error}`)
-      return
+    try {
+      const res = await fetch('/api/integrations/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ integrationType: type }),
+      })
+
+      // Read as text first: a timeout or crash returns a non-JSON error
+      // page, and parsing that directly is what used to freeze the button.
+      const text = await res.text()
+      let json: { ok?: boolean; detail?: string; error?: string } | null = null
+      try {
+        json = JSON.parse(text)
+      } catch {
+        json = null
+      }
+
+      if (!json) {
+        setMessage(
+          `Test failed: the server returned an unexpected response (HTTP ${res.status}). It may have timed out.`
+        )
+        return
+      }
+      if (!res.ok) {
+        setMessage(`Error: ${json.error ?? `HTTP ${res.status}`}`)
+        return
+      }
+      setTestDetail((prev) => ({ ...prev, [type]: json?.detail ?? '' }))
+      await loadStatuses()
+    } catch (err) {
+      setMessage(`Test failed: ${err instanceof Error ? err.message : 'network error'}`)
+    } finally {
+      setTesting(null)
     }
-    setTestDetail((prev) => ({ ...prev, [type]: json.detail ?? '' }))
-    loadStatuses()
   }
 
   if (loading) {
