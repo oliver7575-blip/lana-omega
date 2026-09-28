@@ -46,6 +46,12 @@ export default async function Home() {
     .select('id', { count: 'exact', head: true })
     .eq('status', 'human_takeover')
 
+  const { data: failingIntegrations } = await supabase
+    .from('tenant_integrations')
+    .select('integration_type')
+    .eq('status', 'connected')
+    .eq('last_check_ok', false)
+
   const { data: recentConversations } = await supabase
     .from('conversations')
     .select('id, channel, status, guest_id, last_message_at')
@@ -64,12 +70,39 @@ export default async function Home() {
     guestsById = Object.fromEntries((guests ?? []).map((g) => [g.id, g]))
   }
 
+  const integrationLabels: Record<string, string> = {
+    whatsapp: 'WhatsApp',
+    pms_cloudbeds: 'Cloudbeds',
+    instagram: 'Instagram',
+    email: 'Email',
+  }
+
   return (
     <main style={{ maxWidth: 640, margin: '60px auto', fontFamily: 'sans-serif' }}>
       <h1>{tenant?.name ?? 'Welcome to Lana Omega'}</h1>
       <p style={{ color: '#888' }}>
         Signed in as <strong>{user.email}</strong> ({staffRow.role}) · Status: {tenant?.status}
       </p>
+
+      {(failingIntegrations ?? []).length > 0 && (
+        <div
+          style={{
+            background: '#fef2f2',
+            border: '1px solid #fca5a5',
+            borderRadius: 8,
+            padding: 12,
+            margin: '16px 0',
+            color: '#991b1b',
+            fontSize: 14,
+          }}
+        >
+          ⚠ Connection problem:{' '}
+          {(failingIntegrations ?? [])
+            .map((i) => integrationLabels[i.integration_type] ?? i.integration_type)
+            .join(', ')}{' '}
+          failed its last check. <Link href="/integrations">Review integrations</Link>
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 16, margin: '24px 0' }}>
         <div style={{ border: '1px solid #ccc', borderRadius: 8, padding: 16, flex: 1 }}>
