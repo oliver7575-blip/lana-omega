@@ -13,7 +13,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('tenant_integrations')
-    .select('integration_type, status, config, connected_at')
+    .select('integration_type, status, config, connected_at, last_checked_at, last_check_ok, last_error')
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
