@@ -61,6 +61,12 @@ export default function SettingsPage() {
   const [activating, setActivating] = useState(false)
   const [activateError, setActivateError] = useState<string | null>(null)
 
+  const [maintenanceContact, setMaintenanceContact] = useState('')
+  const [cleaningContact, setCleaningContact] = useState('')
+  const [billingContact, setBillingContact] = useState('')
+  const [savingContacts, setSavingContacts] = useState(false)
+  const [contactsMessage, setContactsMessage] = useState<string | null>(null)
+
   const [pgMessages, setPgMessages] = useState<PlaygroundMessage[]>([])
   const [pgInput, setPgInput] = useState('')
   const [pgLoading, setPgLoading] = useState(false)
@@ -74,6 +80,10 @@ export default function SettingsPage() {
       setPrompt(json.tenant.ai_persona_prompt)
       setStatus(json.tenant.status)
       setRole(json.role)
+      const contacts = json.tenant.escalation_contacts ?? {}
+      setMaintenanceContact(contacts.maintenance ?? '')
+      setCleaningContact(contacts.cleaning ?? '')
+      setBillingContact(contacts.billing ?? '')
     }
     setLoading(false)
   }
@@ -97,6 +107,29 @@ export default function SettingsPage() {
       return
     }
     setMessage('Saved.')
+  }
+
+  async function handleSaveContacts() {
+    setSavingContacts(true)
+    setContactsMessage(null)
+    const res = await fetch('/api/tenant', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        escalation_contacts: {
+          maintenance: maintenanceContact,
+          cleaning: cleaningContact,
+          billing: billingContact,
+        },
+      }),
+    })
+    const json = await res.json()
+    setSavingContacts(false)
+    if (!res.ok) {
+      setContactsMessage(`Error: ${json.error}`)
+      return
+    }
+    setContactsMessage('Saved.')
   }
 
   function handleUseTemplate() {
@@ -128,7 +161,6 @@ export default function SettingsPage() {
         body: JSON.stringify({ prompt, messages: next }),
       })
 
-      // Read as text first so a timeout or crash page can't freeze the box.
       const raw = await res.text()
       let json: { reply?: string; error?: string } | null = null
       try {
@@ -305,10 +337,59 @@ export default function SettingsPage() {
 
       {canEdit && (
         <div style={{ marginTop: 32, border: '1px solid #ddd', borderRadius: 8, padding: 16 }}>
+          <h2 style={{ marginTop: 0, fontSize: 18 }}>Staff escalation contacts</h2>
+          <p style={{ fontSize: 13, color: '#888', marginTop: 0 }}>
+            WhatsApp numbers your AI concierge will message directly when a guest needs staff
+            attention. Include the country code, e.g. +52 958 128 5454. Leave a field blank to
+            disable escalation for that category. Requires WhatsApp to be connected under
+            Integrations.
+          </p>
+          <div style={{ marginBottom: 8 }}>
+            <label>Maintenance</label>
+            <br />
+            <input
+              value={maintenanceContact}
+              onChange={(e) => setMaintenanceContact(e.target.value)}
+              placeholder="+52 ..."
+              style={{ width: '100%', padding: 8 }}
+            />
+          </div>
+          <div style={{ marginBottom: 8 }}>
+            <label>Cleaning</label>
+            <br />
+            <input
+              value={cleaningContact}
+              onChange={(e) => setCleaningContact(e.target.value)}
+              placeholder="+52 ..."
+              style={{ width: '100%', padding: 8 }}
+            />
+          </div>
+          <div style={{ marginBottom: 8 }}>
+            <label>Billing</label>
+            <br />
+            <input
+              value={billingContact}
+              onChange={(e) => setBillingContact(e.target.value)}
+              placeholder="+52 ..."
+              style={{ width: '100%', padding: 8 }}
+            />
+          </div>
+          <button onClick={handleSaveContacts} disabled={savingContacts}>
+            {savingContacts ? 'Saving...' : 'Save contacts'}
+          </button>
+          {contactsMessage && <p>{contactsMessage}</p>}
+        </div>
+      )}
+
+      {canEdit && (
+        <div style={{ marginTop: 32, border: '1px solid #ddd', borderRadius: 8, padding: 16 }}>
           <h2 style={{ marginTop: 0, fontSize: 18 }}>Test your concierge</h2>
           <p style={{ fontSize: 13, color: '#888', marginTop: 0 }}>
             Chats using the text in the box above, even if you haven't saved it. Nothing here is
-            stored, and reservation lookups aren't simulated. Each message is a real AI call.
+            stored, and reservation lookups aren't simulated. Each message is a real AI call. Note:
+            escalation is NOT simulated here either — if your persona is set up to escalate,
+            testing that specific behavior needs a real conversation (WhatsApp or the widget), not
+            this box.
           </p>
 
           <div
