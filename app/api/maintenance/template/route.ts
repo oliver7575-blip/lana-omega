@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import type { EncryptedPayload } from '@/lib/crypto'
 import {
+  checkTemplateUsable,
   getMaintenanceTemplate,
+  listTemplatesForPicker,
+  resolveTemplateChoice,
   submitMaintenanceTemplate,
   validateTemplateBody,
   MAINTENANCE_TEMPLATE_DEFAULT_BODY,
@@ -21,14 +24,14 @@ async function loadContext() {
 
   const { data: staffRow } = await supabase
     .from('staff_users')
-    .select('role')
+    .select('role, tenant_id')
     .eq('auth_uid', user.id)
     .single()
   if (!staffRow) {
     return { error: NextResponse.json({ error: 'No tenant record found' }, { status: 404 }) }
   }
 
-  // RLS scopes this to the caller's own hotel.
+  // RLS scopes both reads to the caller's own hotel.
   const { data: whatsapp } = await supabase
     .from('tenant_integrations')
     .select('status, credentials, config')
@@ -45,23 +48,39 @@ async function loadContext() {
     }
   }
 
+  const { data: tenant } = await supabase
+    .from('tenants')
+    .select('maintenance_template')
+    .eq('id', staffRow.tenant_id)
+    .single()
+
   return {
+    supabase,
+    tenantId: staffRow.tenant_id as string,
     role: staffRow.role as string,
     wabaId,
     credentials: whatsapp.credentials as EncryptedPayload,
+    choice: resolveTemplateChoice(tenant?.maintenance_template),
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const ctx = await loadContext()
   if ('error' in ctx) return ctx.error
 
+  const wantList = new URL(request.url).searchParams.get('list') === '1'
+
   try {
-    const info = await getMaintenanceTemplate(ctx.wabaId, ctx.credentials)
+    if (wantList) {
+      const templates = await listTemplatesForPicker(ctx.wabaId, ctx.credentials)
+      return NextResponse.json({ templates })
+    }
+    const info = await getMaintenanceTemplate(ctx.wabaId, ctx.credentials, ctx.choice)
     return NextResponse.json({
       template: info,
-      name: MAINTENANCE_TEMPLATE_NAME,
-      buttons: MAINTENANCE_TEMPLATE_BUTTONS,
+      usingCustom: ctx.choice.custom,
+      defaultName: MAINTENANCE_TEMPLATE_NAME,
+      buttons: ctx.choice.custom ? (info.buttons ?? []) : MAINTENANCE_TEMPLATE_BUTTONS,
       defaultBody: MAINTENANCE_TEMPLATE_DEFAULT_BODY,
       canEdit: ['owner', 'admin'].includes(ctx.role),
     })
@@ -83,12 +102,55 @@ export async function POST(request: Request) {
     )
   }
 
-  const { body } = (await request.json()) as { body?: string }
-  const problem = validateTemplateBody(body ?? '')
-  if (problem) return NextResponse.json({ error: problem }, { status: 400 })
+  const payload = (await request.json()) as {
+    action?: 'submit' | 'select' | 'use_default'
+    body?: string
+    name?: string
+    language?: string
+  }
+  const action = payload.action ?? 'submit'
 
   try {
-    const result = await submitMaintenanceTemplate(ctx.wabaId, ctx.credentials, body!)
+    if (action === 'select') {
+      if (!payload.name || !payload.language) {
+        return NextResponse.json({ error: 'name and language are required' }, { status: 400 })
+      }
+      const problem = await checkTemplateUsable(ctx.wabaId, ctx.credentials, {
+        name: payload.name,
+        language: payload.language,
+      })
+      if (problem) return NextResponse.json({ error: problem }, { status: 400 })
+
+      const { data: updated, error } = await ctx.supabase
+        .from('tenants')
+        .update({ maintenance_template: { name: payload.name, language: payload.language } })
+        .eq('id', ctx.tenantId)
+        .select('id')
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      if (!updated?.length) {
+        return NextResponse.json({ error: 'Update not permitted' }, { status: 403 })
+      }
+      return NextResponse.json({ ok: true })
+    }
+
+    if (action === 'use_default') {
+      const { data: updated, error } = await ctx.supabase
+        .from('tenants')
+        .update({ maintenance_template: null })
+        .eq('id', ctx.tenantId)
+        .select('id')
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      if (!updated?.length) {
+        return NextResponse.json({ error: 'Update not permitted' }, { status: 403 })
+      }
+      return NextResponse.json({ ok: true })
+    }
+
+    // action === 'submit': create/edit Omega's own template.
+    const problem = validateTemplateBody(payload.body ?? '')
+    if (problem) return NextResponse.json({ error: problem }, { status: 400 })
+
+    const result = await submitMaintenanceTemplate(ctx.wabaId, ctx.credentials, payload.body!)
     if (!result.ok) {
       return NextResponse.json({ error: result.error ?? 'Meta rejected the request' }, { status: 400 })
     }
