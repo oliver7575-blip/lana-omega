@@ -1,5 +1,6 @@
 import { createServiceClient } from './supabase/service'
 import { sendWhatsAppMessage } from './whatsapp-send'
+import { parseMaintenancePayload } from './maintenance-template'
 
 interface StaffRow {
   id: string
@@ -126,13 +127,34 @@ export async function processMaintenanceButtonReply(
     return { handled: false, detail: 'Not a recognized active maintenance staff number' }
   }
 
-  const { data: candidates } = await supabase
+  // Taps on the template buttons carry a payload naming the exact task and
+  // action ("mt:<task id>:done"). Map it back to the button label so the
+  // rest of the flow is unchanged.
+  const payload = parseMaintenancePayload(buttonText)
+  if (payload) {
+    buttonText = { accept: 'Acepto', help: 'Necesito Ayuda', done: 'Terminado' }[payload.action]
+  }
+
+  let candidatesQuery = supabase
     .from('maintenance_tasks')
     .select('id, title, location, due_date, status, assigned_to')
     .eq('tenant_id', tenantId)
     .eq('assigned_to', worker.id)
     .in('status', ['open', 'in_progress'])
-    .not('last_reminded_at', 'is', null)
+  candidatesQuery = payload
+    ? candidatesQuery.eq('id', payload.taskId)
+    : candidatesQuery.not('last_reminded_at', 'is', null)
+  const { data: candidates } = await candidatesQuery
+
+  if (payload && (!candidates || candidates.length === 0)) {
+    // The task was already finished, reassigned, or belongs to someone else.
+    await sendConfirmation(
+      tenantId,
+      worker.phone,
+      'Esa tarea ya no está asignada a ti o ya fue completada. Gracias.'
+    )
+    return { handled: true, detail: 'Payload task not open/assigned to this worker' }
+  }
 
   if (!candidates || candidates.length !== 1) {
     if (candidates && candidates.length > 0) {
