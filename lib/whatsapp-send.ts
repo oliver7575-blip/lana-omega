@@ -109,3 +109,33 @@ export async function sendWhatsAppInteractiveButton(
     return { success: false, error: err instanceof Error ? err.message : 'Unknown error' }
   }
 }
+
+/** Sends an image by public URL (Meta fetches it). */
+export async function sendWhatsAppImage(
+  phoneNumberId: string,
+  encryptedCredentials: EncryptedPayload,
+  to: string,
+  imageUrl: string,
+  caption?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { access_token } = decryptCredentials<WhatsAppCredentials>(encryptedCredentials)
+    const response = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to,
+        type: 'image',
+        image: { link: imageUrl, ...(caption ? { caption } : {}) },
+      }),
+      signal: AbortSignal.timeout(15000),
+    })
+    if (!response.ok) {
+      return { success: false, error: `WhatsApp image send failed: ${response.status} ${await response.text()}` }
+    }
+    return { success: true }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unknown error' }
+  }
+}

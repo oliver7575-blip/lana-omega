@@ -133,6 +133,8 @@ export default async function Home() {
         {' · '}
         <Link href="/waitlist">Waitlist</Link>
         {' · '}
+        <Link href="/automations">Automated messages</Link>
+        {' · '}
         <Link href="/settings">Settings</Link>
         {' · '}
         <Link href="/staff">Staff</Link>

@@ -1,3 +1,9 @@
+/** The model behind every guest-facing reply. */
+export const CONCIERGE_MODEL = 'claude-sonnet-5'
+
+/** Returned by the model when a guest message needs no answer (e.g. "gracias"). */
+export const NO_REPLY_TOKEN = '[NO_REPLY]'
+
 interface ClaudeMessage {
   role: 'user' | 'assistant'
   content: unknown
@@ -11,10 +17,27 @@ interface EscalationToolInput {
   category: string
   roomNumber?: string
   summary: string
+  urgency?: 'low' | 'normal' | 'urgent'
 }
 
 interface EscalationTool {
+  /** Which staff categories exist for this hotel and when to use each. */
+  categories: { key: string; description?: string }[]
   escalateToStaff: (input: EscalationToolInput) => Promise<unknown>
+}
+
+export interface RoomPhotosResult {
+  found: boolean
+  roomTypeName?: string
+  photoCount?: number
+  availableRoomTypes?: string[]
+  error?: string
+  /** Photo URLs — handed back to the caller to send, never shown to the model. */
+  photoUrls?: string[]
+}
+
+interface RoomPhotosTool {
+  getRoomPhotos: (roomType: string) => Promise<RoomPhotosResult>
 }
 
 interface ArrivalUpdateToolInput {
@@ -60,6 +83,10 @@ interface ContactButtonTool {
 
 export interface GenerateReplyResult {
   text: string
+  /** True when the model decided the guest's message needs no answer. */
+  noReply?: boolean
+  /** Room photos the caller should send after the text. */
+  photoUrls?: string[]
   contactButton?: {
     contactName: string
     contactPhone: string
@@ -76,7 +103,8 @@ export async function generateReply(
   arrivalUpdateTool?: ArrivalUpdateTool,
   waitlistTool?: WaitlistTool,
   registerReservationTool?: RegisterReservationTool,
-  contactButtonTool?: ContactButtonTool
+  contactButtonTool?: ContactButtonTool,
+  roomPhotosTool?: RoomPhotosTool
 ): Promise<GenerateReplyResult> {
   const tools: Record<string, unknown>[] = []
 
@@ -98,18 +126,27 @@ export async function generateReply(
     })
   }
 
-  if (escalationTool) {
+  if (escalationTool && escalationTool.categories.length > 0) {
+    const categoryGuide = escalationTool.categories
+      .map((c) => `- ${c.key}${c.description ? `: ${c.description}` : ''}`)
+      .join('\n')
     tools.push({
       name: 'escalate_to_staff',
       description:
-        'Send a real, immediate notification directly to hotel staff about a guest issue that needs their attention (a maintenance problem, a cleaning request, or a billing question). This actually sends a message, so only call it once you have a clear picture of the issue — ask for the room number first if the problem is room-specific and you do not already have it.',
+        'Send a real, immediate notification directly to hotel staff about something that needs a person. This actually sends a message, so only call it once you have a clear picture of the issue — ask for the room number first if the problem is room-specific and you do not already have it. Call it once per issue, then tell the guest the team has been notified.\n\nCategories:\n' +
+        categoryGuide,
       input_schema: {
         type: 'object',
         properties: {
           category: {
             type: 'string',
-            enum: ['maintenance', 'cleaning', 'billing'],
-            description: 'Which staff team this should go to',
+            enum: escalationTool.categories.map((c) => c.key),
+            description: 'Which staff contact this should go to (see the category list)',
+          },
+          urgency: {
+            type: 'string',
+            enum: ['low', 'normal', 'urgent'],
+            description: 'How urgent this is. Use urgent only for safety issues, flooding, no power in the room, lockouts and similar.',
           },
           roomNumber: {
             type: 'string',
@@ -217,10 +254,29 @@ export async function generateReply(
     })
   }
 
+  if (roomPhotosTool) {
+    tools.push({
+      name: 'send_room_photos',
+      description:
+        "Send the guest real photos of one room type. Use this when a guest asks to see photos or pictures of a room or unit. The photos are sent automatically after your reply — just write a short, warm line introducing them and do not paste any image links. If the result says the room type wasn't found, tell the guest which room types exist (from availableRoomTypes) and ask which one they'd like to see.",
+      input_schema: {
+        type: 'object',
+        properties: {
+          roomType: {
+            type: 'string',
+            description: 'The room type the guest wants to see, as they described it (e.g. "rooftop", "king bedroom")',
+          },
+        },
+        required: ['roomType'],
+      },
+    })
+  }
+
   const messages: ClaudeMessage[] = [...conversationHistory]
   let contactButtonResult: GenerateReplyResult['contactButton'] = null
+  let photoUrls: string[] = []
 
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 6; i++) {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -229,8 +285,8 @@ export async function generateReply(
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1000,
+        model: CONCIERGE_MODEL,
+        max_tokens: 1500,
         system: systemPrompt,
         messages,
         ...(tools.length > 0 ? { tools } : {}),
@@ -245,102 +301,65 @@ export async function generateReply(
     const data = await response.json()
 
     if (data.stop_reason === 'tool_use') {
-      const toolUseBlock = data.content.find((b: { type: string }) => b.type === 'tool_use') as
-        | { type: string; id: string; name: string; input: Record<string, unknown> }
-        | undefined
+      const toolUseBlocks = (data.content as { type: string }[]).filter(
+        (b) => b.type === 'tool_use'
+      ) as { type: string; id: string; name: string; input: Record<string, unknown> }[]
 
       messages.push({ role: 'assistant', content: data.content })
 
-      if (toolUseBlock?.name === 'lookup_reservation' && reservationTool) {
-        const result = await reservationTool.lookupReservation(
-          toolUseBlock.input.confirmationNumber as string
-        )
-        messages.push({
-          role: 'user',
-          content: [
-            { type: 'tool_result', tool_use_id: toolUseBlock.id, content: JSON.stringify(result) },
-          ],
-        })
-        continue
+      // Sonnet may call several tools in one turn — every call needs a result.
+      const results: { type: 'tool_result'; tool_use_id: string; content: string }[] = []
+      for (const block of toolUseBlocks) {
+        let result: unknown = { success: false, error: `Tool ${block.name} is not available` }
+
+        if (block.name === 'lookup_reservation' && reservationTool) {
+          result = await reservationTool.lookupReservation(block.input.confirmationNumber as string)
+        } else if (block.name === 'escalate_to_staff' && escalationTool) {
+          result = await escalationTool.escalateToStaff(block.input as unknown as EscalationToolInput)
+        } else if (block.name === 'update_arrival_time' && arrivalUpdateTool) {
+          result = await arrivalUpdateTool.updateArrivalTime(
+            block.input as unknown as ArrivalUpdateToolInput
+          )
+        } else if (block.name === 'join_waitlist' && waitlistTool) {
+          result = await waitlistTool.joinWaitlist(block.input as unknown as WaitlistToolInput)
+        } else if (block.name === 'register_reservation' && registerReservationTool) {
+          result = await registerReservationTool.registerReservation(
+            block.input.confirmationNumber as string
+          )
+        } else if (block.name === 'send_room_photos' && roomPhotosTool) {
+          const photos = await roomPhotosTool.getRoomPhotos(block.input.roomType as string)
+          if (photos.found && photos.photoUrls?.length) photoUrls = photos.photoUrls
+          // The model only needs to know how many photos go out, not the URLs.
+          const { photoUrls: _omit, ...forModel } = photos
+          void _omit
+          result = forModel
+        } else if (block.name === 'send_contact_button' && contactButtonTool) {
+          contactButtonResult = block.input as unknown as ContactButtonToolInput
+          result = { success: true }
+        }
+
+        results.push({ type: 'tool_result', tool_use_id: block.id, content: JSON.stringify(result) })
       }
 
-      if (toolUseBlock?.name === 'escalate_to_staff' && escalationTool) {
-        const result = await escalationTool.escalateToStaff(
-          toolUseBlock.input as unknown as EscalationToolInput
-        )
-        messages.push({
-          role: 'user',
-          content: [
-            { type: 'tool_result', tool_use_id: toolUseBlock.id, content: JSON.stringify(result) },
-          ],
-        })
-        continue
-      }
-
-      if (toolUseBlock?.name === 'update_arrival_time' && arrivalUpdateTool) {
-        const result = await arrivalUpdateTool.updateArrivalTime(
-          toolUseBlock.input as unknown as ArrivalUpdateToolInput
-        )
-        messages.push({
-          role: 'user',
-          content: [
-            { type: 'tool_result', tool_use_id: toolUseBlock.id, content: JSON.stringify(result) },
-          ],
-        })
-        continue
-      }
-
-      if (toolUseBlock?.name === 'join_waitlist' && waitlistTool) {
-        const result = await waitlistTool.joinWaitlist(
-          toolUseBlock.input as unknown as WaitlistToolInput
-        )
-        messages.push({
-          role: 'user',
-          content: [
-            { type: 'tool_result', tool_use_id: toolUseBlock.id, content: JSON.stringify(result) },
-          ],
-        })
-        continue
-      }
-
-      if (toolUseBlock?.name === 'register_reservation' && registerReservationTool) {
-        const result = await registerReservationTool.registerReservation(
-          toolUseBlock.input.confirmationNumber as string
-        )
-        messages.push({
-          role: 'user',
-          content: [
-            { type: 'tool_result', tool_use_id: toolUseBlock.id, content: JSON.stringify(result) },
-          ],
-        })
-        continue
-      }
-
-      if (toolUseBlock?.name === 'send_contact_button' && contactButtonTool) {
-        const input = toolUseBlock.input as unknown as ContactButtonToolInput
-        contactButtonResult = input
-        messages.push({
-          role: 'user',
-          content: [
-            {
-              type: 'tool_result',
-              tool_use_id: toolUseBlock.id,
-              content: JSON.stringify({ success: true }),
-            },
-          ],
-        })
-        continue
-      }
+      messages.push({ role: 'user', content: results })
+      continue
     }
 
-    const textBlock = data.content?.find((b: { type: string }) => b.type === 'text') as
-      | { type: string; text: string }
-      | undefined
-    return { text: textBlock?.text ?? '', contactButton: contactButtonResult }
+    const text = ((data.content ?? []) as { type: string; text?: string }[])
+      .filter((b) => b.type === 'text')
+      .map((b) => b.text ?? '')
+      .join('\n')
+      .trim()
+    if (!text || text.includes(NO_REPLY_TOKEN)) {
+      // Nothing to say (e.g. the guest just wrote "gracias"). Photos still go out.
+      return { text: '', noReply: true, contactButton: null, photoUrls }
+    }
+    return { text, contactButton: contactButtonResult, photoUrls }
   }
 
   return {
     text: "I'm having trouble handling that right now — a staff member will follow up shortly.",
     contactButton: contactButtonResult,
+    photoUrls,
   }
 }

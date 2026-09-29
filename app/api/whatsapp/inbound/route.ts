@@ -1,12 +1,14 @@
 import { NextResponse, after } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { generateReply } from '@/lib/anthropic'
-import { sendWhatsAppMessage, sendWhatsAppInteractiveButton } from '@/lib/whatsapp-send'
+import { generateReply, NO_REPLY_TOKEN } from '@/lib/anthropic'
+import { sendWhatsAppMessage, sendWhatsAppInteractiveButton, sendWhatsAppImage } from '@/lib/whatsapp-send'
 import { downloadWhatsAppMedia, describeImage, transcribeAudio } from '@/lib/whatsapp-media'
 import { verifyMetaSignature } from '@/lib/verify-webhook'
 import { decryptCredentials, type EncryptedPayload } from '@/lib/crypto'
 import { lookupReservation, updateArrivalTime } from '@/lib/cloudbeds'
 import { notifyStaff } from '@/lib/escalation'
+import { parseEscalationContacts, findEscalationContact } from '@/lib/escalation-contacts'
+import { buildRoomPhotosTool } from '@/lib/room-photos'
 import { buildBookingLinkInstruction } from '@/lib/booking-link'
 import { buildKnowledgeBaseSection } from '@/lib/knowledge-base'
 import { processMaintenanceButtonReply } from '@/lib/maintenance-reply'
@@ -385,7 +387,7 @@ async function processInbound(msg: ExtractedMessage) {
 
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('ai_persona_prompt, knowledge_base, escalation_contacts, booking_config, contact_directory')
+    .select('ai_persona_prompt, knowledge_base, escalation_contacts, booking_config, contact_directory, message_templates')
     .eq('id', tenantId)
     .single()
 
@@ -427,20 +429,31 @@ async function processInbound(msg: ExtractedMessage) {
       }
     : undefined
 
-  const escalationContacts = (tenant?.escalation_contacts as Record<string, string>) ?? {}
+  const escalationContacts = parseEscalationContacts(tenant?.escalation_contacts)
+  const messageTemplates = tenant?.message_templates
   const escalationTool =
-    Object.keys(escalationContacts).length > 0
+    escalationContacts.length > 0
       ? {
+          categories: escalationContacts.map((c) => ({ key: c.key, description: c.description })),
           escalateToStaff: async (input: {
             category: string
             roomNumber?: string
             summary: string
+            urgency?: string
           }) => {
-            const staffNumber = escalationContacts[input.category]
-            if (!staffNumber) {
+            const contact = findEscalationContact(escalationContacts, input.category)
+            if (!contact) {
               return { success: false, error: `No ${input.category} contact configured` }
             }
-            return notifyStaff(phoneNumberId, credentials, staffNumber, from, input)
+            return notifyStaff(
+              phoneNumberId,
+              credentials,
+              contact.phone,
+              from,
+              input,
+              messageTemplates,
+              guestName
+            )
           },
         }
       : undefined
@@ -467,12 +480,20 @@ async function processInbound(msg: ExtractedMessage) {
         return { success: false, error: insertError.message }
       }
 
-      const reservationsContact = escalationContacts.reservations
+      const reservationsContact = findEscalationContact(escalationContacts, 'reservations')
       if (reservationsContact) {
-        await notifyStaff(phoneNumberId, credentials, reservationsContact, from, {
-          category: 'reservations',
-          summary: `Waitlist request: ${input.fullName}, wants ${input.dateRequested}. Contact: ${input.email} / ${input.phone}${input.notes ? `. Notes: ${input.notes}` : ''}`,
-        })
+        await notifyStaff(
+          phoneNumberId,
+          credentials,
+          reservationsContact.phone,
+          from,
+          {
+            category: 'reservations',
+            summary: `Waitlist request: ${input.fullName}, wants ${input.dateRequested}. Contact: ${input.email} / ${input.phone}${input.notes ? `. Notes: ${input.notes}` : ''}`,
+          },
+          messageTemplates,
+          input.fullName
+        )
       }
 
       return { success: true }
@@ -493,6 +514,13 @@ async function processInbound(msg: ExtractedMessage) {
       return { success: true }
     },
   }
+
+  const roomPhotosTool = cloudbedsReady
+    ? (() => {
+        const { api_key, propertyId } = getCloudbeds()
+        return propertyId ? buildRoomPhotosTool(api_key, propertyId) : undefined
+      })()
+    : undefined
 
   const contactDirectory = (tenant?.contact_directory as ContactDirectoryEntry[]) ?? []
   const contactButtonTool = contactDirectory.length > 0 ? { enabled: true as const } : undefined
@@ -541,7 +569,7 @@ async function processInbound(msg: ExtractedMessage) {
     ? `The guest's WhatsApp display name is "${guestName}". This is only a display name — don't treat it as confirming their identity or reservation.\n\n`
     : ''
 
-  const channelInstruction = `\n\nCHANNEL: You are replying on WhatsApp. Keep replies short and conversational. For emphasis use single asterisks (*like this*), never double asterisks, headings, tables or Markdown links — paste URLs as plain text. If several guest messages arrive in a row, answer them together in one reply. Messages in square brackets describe a photo, voice note or other attachment the guest sent.`
+  const channelInstruction = `\n\nCHANNEL: You are replying on WhatsApp. Keep replies short and conversational. For emphasis use single asterisks (*like this*), never double asterisks, headings, tables or Markdown links — paste URLs as plain text. If several guest messages arrive in a row, answer them together in one reply. Messages in square brackets describe a photo, voice note or other attachment the guest sent.\n\nNO REPLY: If the guest's latest message(s) only close the conversation — a thank-you, "ok", "perfecto", "listo", a farewell, or just an emoji/reaction — with no new question or request, reply with exactly ${NO_REPLY_TOKEN} and nothing else. The guest will then receive no message, which is what we want. Never answer a thank-you with "you're welcome" or another farewell.`
 
   // ---- History (most recent HISTORY_LIMIT messages) --------------------------
 
@@ -577,6 +605,8 @@ async function processInbound(msg: ExtractedMessage) {
   // ---- Generate + send --------------------------------------------------------
 
   let replyText: string
+  let noReply = false
+  let photoUrls: string[] = []
   let contactButton:
     | { contactName: string; contactPhone: string; contactUrl: string; buttonText: string }
     | null
@@ -590,9 +620,12 @@ async function processInbound(msg: ExtractedMessage) {
       arrivalUpdateTool,
       waitlistTool,
       registerReservationTool,
-      contactButtonTool
+      contactButtonTool,
+      roomPhotosTool
     )
     replyText = result.text
+    noReply = Boolean(result.noReply)
+    photoUrls = result.photoUrls ?? []
     contactButton = result.contactButton
   } catch (err) {
     console.error('[whatsapp-inbound] AI generation failed', err)
@@ -609,25 +642,39 @@ async function processInbound(msg: ExtractedMessage) {
     return
   }
 
-  await supabase.from('messages').insert({
-    tenant_id: tenantId,
-    conversation_id: conversationId,
-    sender_type: 'lana',
-    content: replyText,
-  })
+  const photoNote = photoUrls.length
+    ? `[Sent ${photoUrls.length} room photo${photoUrls.length === 1 ? '' : 's'}]`
+    : ''
+  if (!noReply || photoNote) {
+    await supabase.from('messages').insert({
+      tenant_id: tenantId,
+      conversation_id: conversationId,
+      sender_type: 'lana',
+      content: [noReply ? '' : replyText, photoNote].filter(Boolean).join('\n'),
+    })
+  }
 
-  const sendResult = contactButton
-    ? await sendWhatsAppInteractiveButton(
-        phoneNumberId,
-        credentials,
-        from,
-        replyText,
-        contactButton.contactUrl,
-        contactButton.buttonText
-      )
-    : await sendWhatsAppMessage(phoneNumberId, credentials, from, replyText)
+  if (!noReply) {
 
-  if (!sendResult.success) {
-    console.error('[whatsapp-inbound] send failed', sendResult.error)
+    const sendResult = contactButton
+      ? await sendWhatsAppInteractiveButton(
+          phoneNumberId,
+          credentials,
+          from,
+          replyText,
+          contactButton.contactUrl,
+          contactButton.buttonText
+        )
+      : await sendWhatsAppMessage(phoneNumberId, credentials, from, replyText)
+
+    if (!sendResult.success) {
+      console.error('[whatsapp-inbound] send failed', sendResult.error)
+    }
+  }
+
+  // Room photos go out one by one, after the text.
+  for (const url of photoUrls) {
+    const res = await sendWhatsAppImage(phoneNumberId, credentials, from, url)
+    if (!res.success) console.error('[whatsapp-inbound] photo send failed', res.error)
   }
 }

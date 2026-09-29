@@ -52,7 +52,7 @@ export interface TemplateListItem extends TemplateInfo {
   reason?: string
 }
 
-interface RawTemplate {
+export interface RawTemplate {
   id: string
   name: string
   status: string
@@ -109,7 +109,7 @@ export function compatibilityProblem(t: RawTemplate): string | null {
   return null
 }
 
-async function fetchTemplates(
+export async function fetchTemplates(
   wabaId: string,
   credentials: EncryptedPayload,
   nameFilter?: string

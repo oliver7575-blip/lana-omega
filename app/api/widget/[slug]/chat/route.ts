@@ -4,6 +4,8 @@ import { generateReply } from '@/lib/anthropic'
 import { decryptCredentials } from '@/lib/crypto'
 import { lookupReservation, updateArrivalTime } from '@/lib/cloudbeds'
 import { notifyStaff } from '@/lib/escalation'
+import { parseEscalationContacts, findEscalationContact } from '@/lib/escalation-contacts'
+import { buildRoomPhotosTool } from '@/lib/room-photos'
 import { buildBookingLinkInstruction } from '@/lib/booking-link'
 import { buildKnowledgeBaseSection } from '@/lib/knowledge-base'
 
@@ -105,7 +107,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
 
   const { data: tenant, error: tenantError } = await supabase
     .from('tenants')
-    .select('id, ai_persona_prompt, knowledge_base, status, escalation_contacts, booking_config')
+    .select('id, ai_persona_prompt, knowledge_base, status, escalation_contacts, booking_config, message_templates')
     .eq('slug', slug)
     .maybeSingle()
 
@@ -218,16 +220,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     .eq('integration_type', 'whatsapp')
     .maybeSingle()
 
-  const escalationContacts = (tenant.escalation_contacts as Record<string, string>) ?? {}
+  const escalationContacts = parseEscalationContacts(tenant.escalation_contacts)
   const escalationTool =
-    Object.keys(escalationContacts).length > 0 && whatsappForEscalation?.status === 'connected'
+    escalationContacts.length > 0 && whatsappForEscalation?.status === 'connected'
       ? {
+          categories: escalationContacts.map((c) => ({ key: c.key, description: c.description })),
           escalateToStaff: async (input: {
             category: string
             roomNumber?: string
             summary: string
+            urgency?: string
           }) => {
-            const staffNumber = escalationContacts[input.category]
+            const staffNumber = findEscalationContact(escalationContacts, input.category)?.phone
             if (!staffNumber) {
               return { success: false, error: `No ${input.category} contact configured` }
             }
@@ -240,8 +244,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
               phoneNumberId,
               whatsappForEscalation.credentials,
               staffNumber,
-              syntheticPhone,
-              input
+              'website chat',
+              input,
+              tenant.message_templates
             )
           },
         }
@@ -270,7 +275,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       }
 
       // Notification is best-effort — the entry above is saved regardless.
-      const reservationsContact = escalationContacts.reservations
+      const reservationsContact = findEscalationContact(escalationContacts, 'reservations')?.phone
       if (reservationsContact && whatsappForEscalation?.status === 'connected') {
         const phoneNumberId = (whatsappForEscalation.config as { phone_number_id?: string })
           ?.phone_number_id
@@ -279,11 +284,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
             phoneNumberId,
             whatsappForEscalation.credentials,
             reservationsContact,
-            syntheticPhone,
+            input.phone,
             {
               category: 'reservations',
-              summary: `Waitlist request: ${input.fullName}, wants ${input.dateRequested}. Contact: ${input.email} / ${input.phone}${input.notes ? `. Notes: ${input.notes}` : ''}`,
-            }
+              summary: `Waitlist request (website chat): ${input.fullName}, wants ${input.dateRequested}. Contact: ${input.email} / ${input.phone}${input.notes ? `. Notes: ${input.notes}` : ''}`,
+            },
+            tenant.message_templates,
+            input.fullName
           )
         }
       }
@@ -426,6 +433,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     buildKnowledgeBaseSection(tenant.knowledge_base as string | null) +
     buildBookingLinkInstruction(tenant.booking_config as Record<string, unknown>)
 
+  let roomPhotosTool: ReturnType<typeof buildRoomPhotosTool> | undefined
+  if (cloudbedsIntegration?.status === 'connected') {
+    const { api_key } = decryptCredentials<{ api_key: string }>(cloudbedsIntegration.credentials)
+    const propertyId = (cloudbedsIntegration.config as { property_id?: string })?.property_id
+    if (propertyId) roomPhotosTool = buildRoomPhotosTool(api_key, propertyId)
+  }
+
   let replyText: string
   try {
     const result = await generateReply(
@@ -435,9 +449,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       escalationTool,
       arrivalUpdateTool,
       waitlistTool,
-      registerReservationTool
+      registerReservationTool,
+      undefined,
+      roomPhotosTool
     )
-    replyText = result.text
+    // The widget shows plain text, so room photos go out as links.
+    const photoLinks = (result.photoUrls ?? []).join('\n')
+    replyText = [result.text || (photoLinks ? '' : '😊'), photoLinks].filter(Boolean).join('\n\n')
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'AI generation failed' },

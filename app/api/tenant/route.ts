@@ -1,3 +1,5 @@
+import { parseEscalationContacts, type EscalationContact } from '@/lib/escalation-contacts'
+import { normalizePhone } from '@/lib/phone'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
@@ -25,7 +27,7 @@ export async function GET() {
 
   const { data: tenant, error } = await supabase
     .from('tenants')
-    .select('name, status, ai_persona_prompt, knowledge_base, escalation_contacts, booking_config')
+    .select('name, status, ai_persona_prompt, knowledge_base, escalation_contacts, booking_config, post_stay_enabled')
     .eq('id', staffRow.tenant_id)
     .single()
 
@@ -60,8 +62,9 @@ export async function PATCH(request: Request) {
     name?: string
     ai_persona_prompt?: string
     knowledge_base?: string
-    escalation_contacts?: Record<string, string>
+    escalation_contacts?: unknown
     booking_config?: { booking_engine_code?: string; currency?: string }
+    post_stay_enabled?: boolean
     activate?: boolean
   }
 
@@ -104,8 +107,9 @@ export async function PATCH(request: Request) {
     name?: string
     ai_persona_prompt?: string
     knowledge_base?: string | null
-    escalation_contacts?: Record<string, string>
+    escalation_contacts?: EscalationContact[]
     booking_config?: { booking_engine_code?: string; currency?: string }
+    post_stay_enabled?: boolean
   } = {}
   if (typeof body.name === 'string' && body.name.trim()) updates.name = body.name.trim()
   if (typeof body.ai_persona_prompt === 'string' && body.ai_persona_prompt.trim()) {
@@ -121,12 +125,14 @@ export async function PATCH(request: Request) {
     // An empty box clears the knowledge base.
     updates.knowledge_base = body.knowledge_base.trim() || null
   }
-  if (body.escalation_contacts && typeof body.escalation_contacts === 'object') {
-    const cleaned: Record<string, string> = {}
-    for (const [key, value] of Object.entries(body.escalation_contacts)) {
-      if (typeof value === 'string' && value.trim()) cleaned[key] = value.trim()
-    }
-    updates.escalation_contacts = cleaned
+  if (body.escalation_contacts !== undefined) {
+    updates.escalation_contacts = parseEscalationContacts(body.escalation_contacts).map((c) => ({
+      ...c,
+      phone: normalizePhone(c.phone),
+    }))
+  }
+  if (typeof body.post_stay_enabled === 'boolean') {
+    updates.post_stay_enabled = body.post_stay_enabled
   }
   if (body.booking_config && typeof body.booking_config === 'object') {
     const code = body.booking_config.booking_engine_code?.trim()

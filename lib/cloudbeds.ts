@@ -157,6 +157,9 @@ export async function updateArrivalTime(
 export interface UpcomingArrival {
   reservationID: string
   guestName?: string
+  email?: string
+  status?: string
+  endDate?: string
   startDate?: string
   roomName?: string
   roomTypeName?: string
@@ -199,7 +202,10 @@ export async function getArrivalsInWindow(
       return {
         reservationID: r.reservationID as string,
         guestName: r.guestName as string | undefined,
+        email: guestDetail?.guestEmail,
+        status: r.status as string | undefined,
         startDate: r.startDate as string | undefined,
+        endDate: r.endDate as string | undefined,
         roomName: room?.roomName,
         roomTypeName: room?.roomTypeName,
         phone: extractPhone(guestDetail),
@@ -215,6 +221,9 @@ export async function getArrivalsInWindow(
 export interface RecentDeparture {
   reservationID: string
   guestName?: string
+  email?: string
+  status?: string
+  startDate?: string
   endDate?: string
   roomTypeName?: string
   phone?: string
@@ -257,6 +266,9 @@ export async function getDeparturesInWindow(
       return {
         reservationID: r.reservationID as string,
         guestName: r.guestName as string | undefined,
+        email: guestDetail?.guestEmail,
+        status: r.status as string | undefined,
+        startDate: r.startDate as string | undefined,
         endDate: r.endDate as string | undefined,
         roomTypeName: room?.roomTypeName,
         phone: extractPhone(guestDetail),
@@ -338,4 +350,63 @@ export async function getRecentlyCreatedReservations(
   } catch (err) {
     return { success: false, reservations: [], error: err instanceof Error ? err.message : 'Unknown error' }
   }
+}
+
+export interface RoomTypePhotos {
+  roomTypeName: string
+  photos: string[]
+}
+
+/** Every room type with its photo URLs, straight from Cloudbeds. */
+export async function getRoomTypePhotos(
+  apiKey: string,
+  propertyId: string
+): Promise<{ success: boolean; roomTypes: RoomTypePhotos[]; error?: string }> {
+  try {
+    const res = await fetch(
+      `https://api.cloudbeds.com/api/v1.3/getRoomTypes?propertyID=${encodeURIComponent(propertyId)}&pageSize=100`,
+      { headers: { 'x-api-key': apiKey }, signal: AbortSignal.timeout(15000) }
+    )
+    if (!res.ok) {
+      return { success: false, roomTypes: [], error: `Cloudbeds API error: ${res.status}` }
+    }
+    const data = await res.json()
+    if (!data.success) return { success: false, roomTypes: [], error: 'Cloudbeds API returned success=false' }
+    const roomTypes = ((data.data ?? []) as Record<string, unknown>[]).map((rt) => {
+      const raw = (rt.roomTypePhotos ?? []) as unknown[]
+      const photos = raw
+        .map((p) => (typeof p === 'string' ? p : ((p as { image?: string; url?: string })?.image ?? (p as { url?: string })?.url)))
+        .filter((u): u is string => typeof u === 'string' && /^https?:\/\//.test(u))
+      return { roomTypeName: String(rt.roomTypeName ?? ''), photos }
+    })
+    return { success: true, roomTypes }
+  } catch (err) {
+    return { success: false, roomTypes: [], error: err instanceof Error ? err.message : 'Unknown error' }
+  }
+}
+
+function normalizeRoomName(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\b(room|unit|the|habitacion|cuarto|suite|with|con|de|la|el)\b/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+/** Picks the room type a guest meant ("rooftop", "king room", "bungalow"…). */
+export function matchRoomType(query: string, roomTypes: RoomTypePhotos[]): RoomTypePhotos | undefined {
+  const q = normalizeRoomName(query)
+  if (!q) return undefined
+  const scored = roomTypes.map((rt) => {
+    const n = normalizeRoomName(rt.roomTypeName)
+    if (n === q) return { rt, score: 100 }
+    if (n.includes(q) || q.includes(n)) return { rt, score: 80 }
+    const qWords = q.split(' ')
+    const hits = qWords.filter((w) => w.length > 2 && n.split(' ').includes(w)).length
+    return { rt, score: hits ? (hits / qWords.length) * 60 : 0 }
+  })
+  const best = scored.sort((a, b) => b.score - a.score)[0]
+  return best && best.score > 0 ? best.rt : undefined
 }

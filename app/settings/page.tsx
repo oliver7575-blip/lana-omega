@@ -64,10 +64,10 @@ export default function SettingsPage() {
   const [activating, setActivating] = useState(false)
   const [activateError, setActivateError] = useState<string | null>(null)
 
-  const [maintenanceContact, setMaintenanceContact] = useState('')
-  const [cleaningContact, setCleaningContact] = useState('')
-  const [billingContact, setBillingContact] = useState('')
-  const [reservationsContact, setReservationsContact] = useState('')
+  const [contacts, setContacts] = useState<{ key: string; phone: string; description: string }[]>([])
+  const [postStayEnabled, setPostStayEnabled] = useState(false)
+  const [savingPostStay, setSavingPostStay] = useState(false)
+  const [postStayMessage, setPostStayMessage] = useState<string | null>(null)
   const [savingContacts, setSavingContacts] = useState(false)
   const [contactsMessage, setContactsMessage] = useState<string | null>(null)
 
@@ -90,11 +90,21 @@ export default function SettingsPage() {
       setKnowledgeBase(json.tenant.knowledge_base ?? '')
       setStatus(json.tenant.status)
       setRole(json.role)
-      const contacts = json.tenant.escalation_contacts ?? {}
-      setMaintenanceContact(contacts.maintenance ?? '')
-      setCleaningContact(contacts.cleaning ?? '')
-      setBillingContact(contacts.billing ?? '')
-      setReservationsContact(contacts.reservations ?? '')
+      const raw = json.tenant.escalation_contacts
+      setContacts(
+        Array.isArray(raw)
+          ? raw.map((c: { key?: string; phone?: string; description?: string }) => ({
+              key: c.key ?? '',
+              phone: c.phone ?? '',
+              description: c.description ?? '',
+            }))
+          : Object.entries((raw ?? {}) as Record<string, string>).map(([key, phone]) => ({
+              key,
+              phone,
+              description: '',
+            }))
+      )
+      setPostStayEnabled(Boolean(json.tenant.post_stay_enabled))
       const booking = json.tenant.booking_config ?? {}
       setBookingEngineCode(booking.booking_engine_code ?? '')
       setBookingCurrency(booking.currency ?? '')
@@ -147,12 +157,7 @@ export default function SettingsPage() {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        escalation_contacts: {
-          maintenance: maintenanceContact,
-          cleaning: cleaningContact,
-          billing: billingContact,
-          reservations: reservationsContact,
-        },
+        escalation_contacts: contacts.filter((c) => c.key.trim() && c.phone.trim()),
       }),
     })
     const json = await res.json()
@@ -162,6 +167,29 @@ export default function SettingsPage() {
       return
     }
     setContactsMessage('Saved.')
+    loadTenant()
+  }
+
+  async function handleTogglePostStay(next: boolean) {
+    setSavingPostStay(true)
+    setPostStayMessage(null)
+    const res = await fetch('/api/tenant', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ post_stay_enabled: next }),
+    })
+    const json = await res.json()
+    setSavingPostStay(false)
+    if (!res.ok) {
+      setPostStayMessage(`Error: ${json.error}`)
+      return
+    }
+    setPostStayEnabled(next)
+    setPostStayMessage(next ? 'Post-stay messages are on.' : 'Post-stay messages are off.')
+  }
+
+  function updateContact(index: number, field: 'key' | 'phone' | 'description', value: string) {
+    setContacts((prev) => prev.map((c, i) => (i === index ? { ...c, [field]: value } : c)))
   }
 
   async function handleSaveBooking() {
@@ -424,54 +452,75 @@ export default function SettingsPage() {
           <h2 style={{ marginTop: 0, fontSize: 18 }}>Staff escalation contacts</h2>
           <p style={{ fontSize: 13, color: '#888', marginTop: 0 }}>
             WhatsApp numbers your AI concierge will message directly when a guest needs staff
-            attention. Include the country code, e.g. +52 958 128 5454. Leave a field blank to
-            disable escalation for that category. Requires WhatsApp to be connected under
-            Integrations.
+            attention. Each contact is a category the concierge can choose — the description tells
+            it when. Include the country code, e.g. +52 958 128 5454. A contact called
+            &quot;reservations&quot; also receives new waitlist entries. Staff alerts use the approved
+            template chosen under <Link href="/automations">Automated messages</Link>.
           </p>
-          <div style={{ marginBottom: 8 }}>
-            <label>Maintenance</label>
-            <br />
-            <input
-              value={maintenanceContact}
-              onChange={(e) => setMaintenanceContact(e.target.value)}
-              placeholder="+52 ..."
-              style={{ width: '100%', padding: 8 }}
-            />
-          </div>
-          <div style={{ marginBottom: 8 }}>
-            <label>Cleaning</label>
-            <br />
-            <input
-              value={cleaningContact}
-              onChange={(e) => setCleaningContact(e.target.value)}
-              placeholder="+52 ..."
-              style={{ width: '100%', padding: 8 }}
-            />
-          </div>
-          <div style={{ marginBottom: 8 }}>
-            <label>Billing</label>
-            <br />
-            <input
-              value={billingContact}
-              onChange={(e) => setBillingContact(e.target.value)}
-              placeholder="+52 ..."
-              style={{ width: '100%', padding: 8 }}
-            />
-          </div>
-          <div style={{ marginBottom: 8 }}>
-            <label>Reservations / Waitlist</label>
-            <br />
-            <input
-              value={reservationsContact}
-              onChange={(e) => setReservationsContact(e.target.value)}
-              placeholder="+52 ..."
-              style={{ width: '100%', padding: 8 }}
-            />
-          </div>
+          {contacts.map((c, i) => (
+            <div
+              key={i}
+              style={{ border: '1px solid #eee', borderRadius: 6, padding: 10, marginBottom: 8 }}
+            >
+              <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+                <input
+                  value={c.key}
+                  onChange={(e) => updateContact(i, 'key', e.target.value)}
+                  placeholder="Category, e.g. maintenance or oliver"
+                  style={{ flex: 1, padding: 8 }}
+                />
+                <input
+                  value={c.phone}
+                  onChange={(e) => updateContact(i, 'phone', e.target.value)}
+                  placeholder="+52 ..."
+                  style={{ flex: 1, padding: 8 }}
+                />
+                <button
+                  onClick={() => setContacts((prev) => prev.filter((_, j) => j !== i))}
+                  title="Remove"
+                >
+                  Remove
+                </button>
+              </div>
+              <input
+                value={c.description}
+                onChange={(e) => updateContact(i, 'description', e.target.value)}
+                placeholder="When should the concierge use this? e.g. Only when the guest asks to speak with Oliver"
+                style={{ width: '100%', padding: 8 }}
+              />
+            </div>
+          ))}
+          <button
+            onClick={() => setContacts((prev) => [...prev, { key: '', phone: '', description: '' }])}
+            style={{ marginRight: 8, marginBottom: 8 }}
+          >
+            + Add contact
+          </button>
+          <br />
           <button onClick={handleSaveContacts} disabled={savingContacts}>
             {savingContacts ? 'Saving...' : 'Save contacts'}
           </button>
           {contactsMessage && <p>{contactsMessage}</p>}
+        </div>
+      )}
+
+      {canEdit && (
+        <div style={{ marginTop: 32, border: '1px solid #ddd', borderRadius: 8, padding: 16 }}>
+          <h2 style={{ marginTop: 0, fontSize: 18 }}>Post-stay messages</h2>
+          <p style={{ fontSize: 13, color: '#888', marginTop: 0 }}>
+            When on, guests get a feedback message (WhatsApp and/or email) the day after
+            check-out. Set up the message under <Link href="/automations">Automated messages</Link>.
+          </p>
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              type="checkbox"
+              checked={postStayEnabled}
+              disabled={savingPostStay}
+              onChange={(e) => handleTogglePostStay(e.target.checked)}
+            />
+            Send post-stay messages
+          </label>
+          {postStayMessage && <p>{postStayMessage}</p>}
         </div>
       )}
 
