@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import MaintenanceTemplateCard from '@/components/MaintenanceTemplateCard'
 
 interface StaffMember {
   id: string
@@ -123,6 +124,8 @@ export default function MaintenancePage() {
         <Link href="/">← Back home</Link>
       </p>
       <h1>Maintenance</h1>
+
+      <MaintenanceTemplateCard />
 
       <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 16, marginBottom: 24 }}>
         <h2 style={{ marginTop: 0, fontSize: 18 }}>Staff roster</h2>
