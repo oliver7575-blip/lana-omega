@@ -42,6 +42,9 @@ export default function SettingsPage() {
   const router = useRouter()
   const [name, setName] = useState('')
   const [prompt, setPrompt] = useState('')
+  const [knowledgeBase, setKnowledgeBase] = useState('')
+  const [savingKb, setSavingKb] = useState(false)
+  const [kbMessage, setKbMessage] = useState<string | null>(null)
   const [status, setStatus] = useState('')
   const [role, setRole] = useState('')
   const [loading, setLoading] = useState(true)
@@ -84,6 +87,7 @@ export default function SettingsPage() {
     if (json.tenant) {
       setName(json.tenant.name)
       setPrompt(json.tenant.ai_persona_prompt)
+      setKnowledgeBase(json.tenant.knowledge_base ?? '')
       setStatus(json.tenant.status)
       setRole(json.role)
       const contacts = json.tenant.escalation_contacts ?? {}
@@ -117,6 +121,23 @@ export default function SettingsPage() {
       return
     }
     setMessage('Saved.')
+  }
+
+  async function handleSaveKnowledgeBase() {
+    setSavingKb(true)
+    setKbMessage(null)
+    const res = await fetch('/api/tenant', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ knowledge_base: knowledgeBase }),
+    })
+    const json = await res.json()
+    setSavingKb(false)
+    if (!res.ok) {
+      setKbMessage(`Error: ${json.error}`)
+      return
+    }
+    setKbMessage('Saved.')
   }
 
   async function handleSaveContacts() {
@@ -191,7 +212,7 @@ export default function SettingsPage() {
       const res = await fetch('/api/tenant/playground', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, messages: next }),
+        body: JSON.stringify({ prompt, knowledgeBase, messages: next }),
       })
 
       const raw = await res.text()
@@ -368,6 +389,36 @@ export default function SettingsPage() {
       )}
       {message && <p>{message}</p>}
 
+      <div style={{ marginTop: 32, marginBottom: 16 }}>
+        <label>
+          <strong>Knowledge base</strong>
+        </label>
+        <br />
+        <span style={{ fontSize: 13, color: '#888' }}>
+          Your hotel's reference manual: facts, policies, prices, contacts, local tips (parking,
+          Wi-Fi, restaurants, taxis, tours, house rules...). The concierge treats this as the
+          source of truth. Keep tone and behaviour rules in the persona box above. Plain text or
+          Markdown, up to 60,000 characters.
+        </span>
+        <br />
+        <textarea
+          value={knowledgeBase}
+          onChange={(e) => setKnowledgeBase(e.target.value)}
+          disabled={!canEdit}
+          rows={24}
+          style={{ width: '100%', padding: 8, marginTop: 4, fontFamily: 'monospace', fontSize: 13 }}
+        />
+        <span style={{ fontSize: 12, color: knowledgeBase.length > 60000 ? 'red' : '#888' }}>
+          {knowledgeBase.length.toLocaleString('en-US')} / 60,000 characters
+        </span>
+      </div>
+      {canEdit && (
+        <button onClick={handleSaveKnowledgeBase} disabled={savingKb || knowledgeBase.length > 60000}>
+          {savingKb ? 'Saving...' : 'Save knowledge base'}
+        </button>
+      )}
+      {kbMessage && <p>{kbMessage}</p>}
+
       {canEdit && (
         <div style={{ marginTop: 32, border: '1px solid #ddd', borderRadius: 8, padding: 16 }}>
           <h2 style={{ marginTop: 0, fontSize: 18 }}>Staff escalation contacts</h2>
@@ -463,7 +514,7 @@ export default function SettingsPage() {
         <div style={{ marginTop: 32, border: '1px solid #ddd', borderRadius: 8, padding: 16 }}>
           <h2 style={{ marginTop: 0, fontSize: 18 }}>Test your concierge</h2>
           <p style={{ fontSize: 13, color: '#888', marginTop: 0 }}>
-            Chats using the text in the box above, even if you haven't saved it. Nothing here is
+            Chats using the persona and knowledge base boxes above, even if you haven't saved them. Nothing here is
             stored, and reservation lookups aren't simulated. Each message is a real AI call. Note:
             escalation, the waitlist, and the booking link are NOT simulated here either — testing
             those needs a real conversation (WhatsApp or the widget), not this box.
