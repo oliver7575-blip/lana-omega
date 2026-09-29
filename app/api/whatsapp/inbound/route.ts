@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { generateReply } from '@/lib/anthropic'
-import { sendWhatsAppMessage } from '@/lib/whatsapp-send'
+import { sendWhatsAppMessage, sendWhatsAppInteractiveButton } from '@/lib/whatsapp-send'
 import { verifyMetaSignature } from '@/lib/verify-webhook'
 import { decryptCredentials } from '@/lib/crypto'
 import { lookupReservation, updateArrivalTime } from '@/lib/cloudbeds'
@@ -41,10 +41,6 @@ function extractMessage(body: Record<string, unknown>): ExtractedMessage | null 
 
     if (message && phoneNumberId && (message.type === 'text' || message.type === 'button')) {
       const textObj = message.text as { body?: string } | undefined
-      // A tapped quick-reply button from an approved template arrives as
-      // type "button" with the label text in button.payload (confirmed
-      // against real Meta docs, not guessed) — not the "interactive"/
-      // button_reply shape a plain ad-hoc interactive message would use.
       const buttonObj = message.button as { payload?: string; text?: string } | undefined
       return {
         phoneNumberId,
@@ -235,6 +231,64 @@ export async function POST(request: Request) {
     },
   }
 
+  // Register: lets a guest confirm ownership of a reservation once and be
+  // recognized automatically on future messages from this same number —
+  // real write, only called by Claude after explicit guest confirmation.
+  const registerReservationTool = {
+    registerReservation: async (confirmationNumber: string) => {
+      const { error: upsertError } = await supabase
+        .from('guest_reservations')
+        .upsert(
+          { tenant_id: tenantId, guest_id: guest.id, confirmation_number: confirmationNumber },
+          { onConflict: 'tenant_id,guest_id' }
+        )
+      if (upsertError) {
+        return { success: false, error: upsertError.message }
+      }
+      return { success: true }
+    },
+  }
+
+  // Native WhatsApp CTA button — WhatsApp-only, since it sends via the
+  // WhatsApp Business API directly rather than returning to a UI.
+  const contactButtonTool = { enabled: true as const }
+
+  // Known-guest recognition: if this phone has a previously-confirmed
+  // reservation on file, re-verify it live against Cloudbeds right now
+  // (never trust a stale cached snapshot) and inject it into the system
+  // prompt so the guest doesn't have to re-identify themselves.
+  let knownGuestContext = ''
+  if (cloudbedsIntegration?.status === 'connected') {
+    const { data: savedReservation } = await supabase
+      .from('guest_reservations')
+      .select('confirmation_number')
+      .eq('tenant_id', tenantId)
+      .eq('guest_id', guest.id)
+      .maybeSingle()
+
+    if (savedReservation) {
+      try {
+        const { api_key } = decryptCredentials<{ api_key: string }>(
+          cloudbedsIntegration.credentials
+        )
+        const propertyId = (cloudbedsIntegration.config as { property_id?: string })?.property_id
+        if (propertyId) {
+          const liveLookup = (await lookupReservation(
+            api_key,
+            propertyId,
+            savedReservation.confirmation_number
+          )) as { found?: boolean; [key: string]: unknown }
+          if (liveLookup?.found) {
+            knownGuestContext = `KNOWN GUEST CONTEXT\n\nThis guest's identity and active reservation have already been confirmed. Their reservation details:\n${JSON.stringify(liveLookup)}\n\nDo not ask them for their name or confirmation number again unless they explicitly want to look up or update a different reservation. Use these details directly.\n\n`
+          }
+        }
+      } catch {
+        // Best-effort only — if the live check fails, fall through and
+        // treat the guest as unidentified rather than trust stale data.
+      }
+    }
+  }
+
   const { data: existingConversation } = await supabase
     .from('conversations')
     .select('id, status')
@@ -316,20 +370,26 @@ export async function POST(request: Request) {
   }))
 
   const systemPrompt =
+    knownGuestContext +
     (tenant?.ai_persona_prompt ??
       'You are a helpful, warm hotel concierge assistant. Answer guest questions clearly and concisely.') +
     buildBookingLinkInstruction(tenant?.booking_config as Record<string, unknown>)
 
   let replyText: string
+  let contactButton: { contactName: string; contactPhone: string; contactUrl: string; buttonText: string } | null | undefined
   try {
-    replyText = await generateReply(
+    const result = await generateReply(
       systemPrompt,
       claudeMessages,
       reservationTool,
       escalationTool,
       arrivalUpdateTool,
-      waitlistTool
+      waitlistTool,
+      registerReservationTool,
+      contactButtonTool
     )
+    replyText = result.text
+    contactButton = result.contactButton
   } catch (err) {
     const fallbackText =
       "Sorry, I'm having trouble responding right now — a member of our team will follow up with you shortly."
@@ -369,12 +429,16 @@ export async function POST(request: Request) {
     .select()
     .single()
 
-  const sendResult = await sendWhatsAppMessage(
-    phoneNumberId,
-    integration.credentials,
-    from,
-    replyText
-  )
+  const sendResult = contactButton
+    ? await sendWhatsAppInteractiveButton(
+        phoneNumberId,
+        integration.credentials,
+        from,
+        replyText,
+        contactButton.contactUrl,
+        contactButton.buttonText
+      )
+    : await sendWhatsAppMessage(phoneNumberId, integration.credentials, from, replyText)
 
   return NextResponse.json({
     tenantId,
@@ -383,6 +447,7 @@ export async function POST(request: Request) {
     messageId: guestMessage.id,
     aiReplyMessageId: aiMessage?.id ?? null,
     aiReplyText: replyText,
+    contactButton: contactButton ?? null,
     whatsappSendResult: sendResult,
   })
 }
