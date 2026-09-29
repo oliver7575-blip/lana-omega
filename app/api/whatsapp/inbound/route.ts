@@ -7,6 +7,7 @@ import { decryptCredentials } from '@/lib/crypto'
 import { lookupReservation, updateArrivalTime } from '@/lib/cloudbeds'
 import { notifyStaff } from '@/lib/escalation'
 import { buildBookingLinkInstruction } from '@/lib/booking-link'
+import { processMaintenanceButtonReply } from '@/lib/maintenance-reply'
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -38,12 +39,17 @@ function extractMessage(body: Record<string, unknown>): ExtractedMessage | null 
     const message = messages?.[0]
     const phoneNumberId = metadata?.phone_number_id as string | undefined
 
-    if (message && phoneNumberId && message.type === 'text') {
+    if (message && phoneNumberId && (message.type === 'text' || message.type === 'button')) {
       const textObj = message.text as { body?: string } | undefined
+      // A tapped quick-reply button from an approved template arrives as
+      // type "button" with the label text in button.payload (confirmed
+      // against real Meta docs, not guessed) — not the "interactive"/
+      // button_reply shape a plain ad-hoc interactive message would use.
+      const buttonObj = message.button as { payload?: string; text?: string } | undefined
       return {
         phoneNumberId,
         from: message.from as string,
-        text: textObj?.body ?? '',
+        text: textObj?.body ?? buttonObj?.payload ?? buttonObj?.text ?? '',
       }
     }
     return null
@@ -108,24 +114,20 @@ export async function POST(request: Request) {
 
   const tenantId = integration.tenant_id
 
+  // Maintenance staff replies are handled entirely separately and never
+  // touch the guest-facing pipeline below — matches Beta's own real
+  // architecture, which checks for a maintenance-staff phone match first
+  // and routes away entirely rather than treating them as a guest.
+  const maintenanceResult = await processMaintenanceButtonReply(tenantId, from, text)
+  if (maintenanceResult.handled) {
+    return NextResponse.json({ tenantId, maintenanceReply: true, detail: maintenanceResult.detail })
+  }
+
   const { data: tenant } = await supabase
     .from('tenants')
     .select('ai_persona_prompt, escalation_contacts, booking_config')
     .eq('id', tenantId)
     .single()
-
-  const { data: guest, error: guestError } = await supabase
-    .from('guests')
-    .upsert({ tenant_id: tenantId, phone: from }, { onConflict: 'tenant_id,phone' })
-    .select()
-    .single()
-
-  if (guestError || !guest) {
-    return NextResponse.json(
-      { error: `Failed to upsert guest: ${guestError?.message}` },
-      { status: 500 }
-    )
-  }
 
   const { data: cloudbedsIntegration } = await supabase
     .from('tenant_integrations')
@@ -186,6 +188,19 @@ export async function POST(request: Request) {
         }
       : undefined
 
+  const { data: guest, error: guestError } = await supabase
+    .from('guests')
+    .upsert({ tenant_id: tenantId, phone: from }, { onConflict: 'tenant_id,phone' })
+    .select()
+    .single()
+
+  if (guestError || !guest) {
+    return NextResponse.json(
+      { error: `Failed to upsert guest: ${guestError?.message}` },
+      { status: 500 }
+    )
+  }
+
   const waitlistTool = {
     joinWaitlist: async (input: {
       fullName: string
@@ -208,7 +223,6 @@ export async function POST(request: Request) {
         return { success: false, error: insertError.message }
       }
 
-      // Notification is best-effort — the entry above is saved regardless.
       const reservationsContact = escalationContacts.reservations
       if (reservationsContact) {
         await notifyStaff(phoneNumberId, integration.credentials, reservationsContact, from, {
