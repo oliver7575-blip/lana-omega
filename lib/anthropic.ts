@@ -38,14 +38,46 @@ interface WaitlistTool {
   joinWaitlist: (input: WaitlistToolInput) => Promise<unknown>
 }
 
+interface RegisterReservationTool {
+  registerReservation: (confirmationNumber: string) => Promise<unknown>
+}
+
+interface ContactButtonToolInput {
+  contactName: string
+  contactPhone: string
+  contactUrl: string
+  buttonText: string
+}
+
+interface ContactButtonTool {
+  // Present only so callers can opt this capability in/out the same way as
+  // the other tools. It performs no side effect itself — sending the real
+  // WhatsApp interactive button requires the channel credentials, which
+  // only the calling route has, so generateReply just captures Claude's
+  // intent and hands it back to the caller to actually send.
+  enabled: true
+}
+
+export interface GenerateReplyResult {
+  text: string
+  contactButton?: {
+    contactName: string
+    contactPhone: string
+    contactUrl: string
+    buttonText: string
+  } | null
+}
+
 export async function generateReply(
   systemPrompt: string,
   conversationHistory: ClaudeMessage[],
   reservationTool?: ReservationTool,
   escalationTool?: EscalationTool,
   arrivalUpdateTool?: ArrivalUpdateTool,
-  waitlistTool?: WaitlistTool
-): Promise<string> {
+  waitlistTool?: WaitlistTool,
+  registerReservationTool?: RegisterReservationTool,
+  contactButtonTool?: ContactButtonTool
+): Promise<GenerateReplyResult> {
   const tools: Record<string, unknown>[] = []
 
   if (reservationTool) {
@@ -140,9 +172,55 @@ export async function generateReply(
     })
   }
 
-  const messages: ClaudeMessage[] = [...conversationHistory]
+  if (registerReservationTool) {
+    tools.push({
+      name: 'register_reservation',
+      description:
+        "Save a confirmed reservation to this guest's profile so they're automatically recognized next time they message, without needing to give their confirmation number again. Only call this after the guest has EXPLICITLY confirmed a specific reservation belongs to them (e.g. they said \"yes\" after you asked whether a reservation you found belongs to them). Never call this speculatively or before that explicit confirmation.",
+      input_schema: {
+        type: 'object',
+        properties: {
+          confirmationNumber: {
+            type: 'string',
+            description: 'The confirmation number of the reservation the guest just confirmed is theirs',
+          },
+        },
+        required: ['confirmationNumber'],
+      },
+    })
+  }
 
-  for (let i = 0; i < 3; i++) {
+  if (contactButtonTool) {
+    tools.push({
+      name: 'send_contact_button',
+      description:
+        "Signal that the guest should be shown a native WhatsApp button linking directly to a specific contact's WhatsApp chat, instead of writing out a raw link. Use this when recommending or sharing contact details for a tour guide, taxi driver, or delivery service that has a real WhatsApp contact available. After calling this, still write a short, warm conversational reply mentioning who the contact is and their phone number — the button itself is added separately by the system, so do not include the raw WhatsApp URL in your reply text.",
+      input_schema: {
+        type: 'object',
+        properties: {
+          contactName: { type: 'string', description: "The contact's name" },
+          contactPhone: {
+            type: 'string',
+            description: "The contact's phone number in display format, e.g. +52 958 128 5454",
+          },
+          contactUrl: {
+            type: 'string',
+            description: "The contact's wa.me WhatsApp link",
+          },
+          buttonText: {
+            type: 'string',
+            description: 'Short button label, e.g. "WhatsApp Kevin"',
+          },
+        },
+        required: ['contactName', 'contactPhone', 'contactUrl', 'buttonText'],
+      },
+    })
+  }
+
+  const messages: ClaudeMessage[] = [...conversationHistory]
+  let contactButtonResult: GenerateReplyResult['contactButton'] = null
+
+  for (let i = 0; i < 4; i++) {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -224,13 +302,45 @@ export async function generateReply(
         })
         continue
       }
+
+      if (toolUseBlock?.name === 'register_reservation' && registerReservationTool) {
+        const result = await registerReservationTool.registerReservation(
+          toolUseBlock.input.confirmationNumber as string
+        )
+        messages.push({
+          role: 'user',
+          content: [
+            { type: 'tool_result', tool_use_id: toolUseBlock.id, content: JSON.stringify(result) },
+          ],
+        })
+        continue
+      }
+
+      if (toolUseBlock?.name === 'send_contact_button' && contactButtonTool) {
+        const input = toolUseBlock.input as unknown as ContactButtonToolInput
+        contactButtonResult = input
+        messages.push({
+          role: 'user',
+          content: [
+            {
+              type: 'tool_result',
+              tool_use_id: toolUseBlock.id,
+              content: JSON.stringify({ success: true }),
+            },
+          ],
+        })
+        continue
+      }
     }
 
     const textBlock = data.content?.find((b: { type: string }) => b.type === 'text') as
       | { type: string; text: string }
       | undefined
-    return textBlock?.text ?? ''
+    return { text: textBlock?.text ?? '', contactButton: contactButtonResult }
   }
 
-  return "I'm having trouble handling that right now — a staff member will follow up shortly."
+  return {
+    text: "I'm having trouble handling that right now — a staff member will follow up shortly.",
+    contactButton: contactButtonResult,
+  }
 }
