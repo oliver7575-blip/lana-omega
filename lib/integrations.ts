@@ -1,4 +1,10 @@
-export const INTEGRATION_TYPES = ['whatsapp', 'instagram', 'email', 'pms_cloudbeds'] as const
+export const INTEGRATION_TYPES = [
+  'whatsapp',
+  'instagram',
+  'email',
+  'pms_cloudbeds',
+  'transcription_deepgram',
+] as const
 export type IntegrationType = (typeof INTEGRATION_TYPES)[number]
 
 export interface IntegrationFieldDef {
@@ -49,5 +55,13 @@ export const INTEGRATIONS: IntegrationDef[] = [
     label: 'Cloudbeds (PMS)',
     credentialFields: [{ key: 'api_key', label: 'API Key', type: 'password' }],
     configFields: [{ key: 'property_id', label: 'Property ID', type: 'text' }],
+  },
+  {
+    // Lets the concierge understand guests' WhatsApp voice notes. Without it,
+    // Lana politely asks guests to type instead.
+    type: 'transcription_deepgram',
+    label: 'Voice notes (Deepgram)',
+    credentialFields: [{ key: 'api_key', label: 'Deepgram API Key', type: 'password' }],
+    configFields: [],
   },
 ]
