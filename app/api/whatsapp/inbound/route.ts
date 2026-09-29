@@ -1,13 +1,27 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { generateReply } from '@/lib/anthropic'
 import { sendWhatsAppMessage, sendWhatsAppInteractiveButton } from '@/lib/whatsapp-send'
+import { downloadWhatsAppMedia, describeImage, transcribeAudio } from '@/lib/whatsapp-media'
 import { verifyMetaSignature } from '@/lib/verify-webhook'
-import { decryptCredentials } from '@/lib/crypto'
+import { decryptCredentials, type EncryptedPayload } from '@/lib/crypto'
 import { lookupReservation, updateArrivalTime } from '@/lib/cloudbeds'
 import { notifyStaff } from '@/lib/escalation'
 import { buildBookingLinkInstruction } from '@/lib/booking-link'
 import { processMaintenanceButtonReply } from '@/lib/maintenance-reply'
+
+// Meta must get a fast 200. All real work runs in after(), which keeps the
+// function alive (up to maxDuration) after the response has been sent.
+export const maxDuration = 60
+
+// How long to wait for more messages before replying, so a guest who sends
+// several quick messages gets one combined answer (same idea as Beta's
+// 10-second debounce).
+const DEBOUNCE_MS = 8000
+
+// How many past messages to give the AI. Keeps long-running conversations
+// from growing without limit.
+const HISTORY_LIMIT = 40
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -21,11 +35,20 @@ export async function GET(request: Request) {
   return new Response('Forbidden', { status: 403 })
 }
 
+type MediaKind = 'image' | 'audio' | 'video' | 'document' | 'sticker'
+
 interface ExtractedMessage {
   phoneNumberId: string
   from: string
+  messageId: string | null
+  type: string
   text: string
+  mediaId?: string
+  mediaKind?: MediaKind
+  profileName?: string
 }
+
+const MEDIA_KINDS: MediaKind[] = ['image', 'audio', 'video', 'document', 'sticker']
 
 function extractMessage(body: Record<string, unknown>): ExtractedMessage | null {
   if (body.entry) {
@@ -36,30 +59,117 @@ function extractMessage(body: Record<string, unknown>): ExtractedMessage | null 
       | undefined
     const metadata = value?.metadata as Record<string, unknown> | undefined
     const messages = value?.messages as Record<string, unknown>[] | undefined
+    const contacts = value?.contacts as { profile?: { name?: string } }[] | undefined
     const message = messages?.[0]
     const phoneNumberId = metadata?.phone_number_id as string | undefined
 
-    if (message && phoneNumberId && (message.type === 'text' || message.type === 'button')) {
+    // Status updates (sent/delivered/read) have no `messages` — ignore them.
+    if (!message || !phoneNumberId) return null
+
+    const type = message.type as string
+    const base = {
+      phoneNumberId,
+      from: message.from as string,
+      messageId: (message.id as string) ?? null,
+      type,
+      profileName: contacts?.[0]?.profile?.name,
+    }
+
+    if (type === 'text') {
       const textObj = message.text as { body?: string } | undefined
+      return { ...base, text: textObj?.body ?? '' }
+    }
+    if (type === 'button') {
       const buttonObj = message.button as { payload?: string; text?: string } | undefined
+      return { ...base, text: buttonObj?.payload ?? buttonObj?.text ?? '' }
+    }
+    if (type === 'interactive') {
+      const inter = message.interactive as
+        | { button_reply?: { title?: string }; list_reply?: { title?: string } }
+        | undefined
+      return { ...base, text: inter?.button_reply?.title ?? inter?.list_reply?.title ?? '' }
+    }
+    if (type === 'reaction') {
+      const reaction = message.reaction as { emoji?: string } | undefined
+      // An empty emoji means the guest removed a reaction — nothing to answer.
+      if (!reaction?.emoji) return null
+      return { ...base, text: `[The guest reacted with ${reaction.emoji}]` }
+    }
+    if (type === 'location') {
+      const loc = message.location as
+        | { latitude?: number; longitude?: number; name?: string; address?: string }
+        | undefined
+      const place = [loc?.name, loc?.address].filter(Boolean).join(', ')
       return {
-        phoneNumberId,
-        from: message.from as string,
-        text: textObj?.body ?? buttonObj?.payload ?? buttonObj?.text ?? '',
+        ...base,
+        text: `[The guest shared a location${place ? `: ${place}` : ''} (${loc?.latitude}, ${loc?.longitude})]`,
       }
     }
-    return null
+    if ((MEDIA_KINDS as string[]).includes(type)) {
+      const media = message[type] as { id?: string; caption?: string } | undefined
+      return {
+        ...base,
+        text: media?.caption ?? '',
+        mediaId: media?.id,
+        mediaKind: type as MediaKind,
+      }
+    }
+    // Anything else (contacts cards, unsupported types): acknowledge generically.
+    return { ...base, text: `[The guest sent a ${type} message, which can't be displayed here]` }
   }
 
+  // Internal/manual test shape: { phoneNumberId, from, text }
   if (body.phoneNumberId && body.from && body.text) {
     return {
       phoneNumberId: body.phoneNumberId as string,
       from: body.from as string,
+      messageId: (body.messageId as string) ?? null,
+      type: 'text',
       text: body.text as string,
     }
   }
 
   return null
+}
+
+/**
+ * Turns a photo / voice note / other media into text the AI can read and the
+ * database can store. Never throws: if anything fails, returns a placeholder
+ * so the guest still gets a sensible reply.
+ */
+async function resolveMediaToText(
+  msg: ExtractedMessage,
+  credentials: EncryptedPayload
+): Promise<string> {
+  const caption = msg.text ? ` Their caption: "${msg.text}"` : ''
+  const kind = msg.mediaKind
+
+  if (!msg.mediaId || !kind) return msg.text
+
+  if (kind === 'image' || kind === 'sticker') {
+    try {
+      const { buffer, mimeType } = await downloadWhatsAppMedia(msg.mediaId, credentials)
+      const description = await describeImage(buffer, mimeType)
+      return `[The guest sent a ${kind === 'sticker' ? 'sticker' : 'photo'}. It shows: ${description}]${caption}`
+    } catch (err) {
+      console.error('[whatsapp-inbound] image resolve failed', err)
+      return `[The guest sent a photo that couldn't be viewed.]${caption}`
+    }
+  }
+
+  if (kind === 'audio') {
+    try {
+      const { buffer, mimeType } = await downloadWhatsAppMedia(msg.mediaId, credentials)
+      const transcript = await transcribeAudio(buffer, mimeType)
+      return `[Voice message, transcribed]: ${transcript}`
+    } catch (err) {
+      console.error('[whatsapp-inbound] audio resolve failed', err)
+      return "[The guest sent a voice message that couldn't be transcribed. Politely ask them to type their message instead.]"
+    }
+  }
+
+  if (kind === 'video') return `[The guest sent a video.]${caption}`
+  return `[The guest sent a document.]${caption}`
 }
 
 interface ContactDirectoryEntry {
@@ -82,15 +192,33 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
 
-  const parsedBody = JSON.parse(rawBody) as Record<string, unknown>
-  const extracted = extractMessage(parsedBody)
+  let parsedBody: Record<string, unknown>
+  try {
+    parsedBody = JSON.parse(rawBody) as Record<string, unknown>
+  } catch {
+    return NextResponse.json({ ignored: true, reason: 'invalid json' })
+  }
 
+  const extracted = extractMessage(parsedBody)
   if (!extracted) {
     return NextResponse.json({ ignored: true })
   }
 
-  const { phoneNumberId, from, text } = extracted
+  // Acknowledge immediately. Any non-200 (or a slow response) makes Meta
+  // retry the same message, which would produce duplicate replies.
+  after(async () => {
+    try {
+      await processInbound(extracted)
+    } catch (err) {
+      console.error('[whatsapp-inbound] processing failed', err)
+    }
+  })
 
+  return NextResponse.json({ received: true })
+}
+
+async function processInbound(msg: ExtractedMessage) {
+  const { phoneNumberId, from } = msg
   const supabase = createServiceClient()
 
   const { data: integration, error: integrationError } = await supabase
@@ -101,27 +229,136 @@ export async function POST(request: Request) {
     .maybeSingle()
 
   if (integrationError) {
-    return NextResponse.json({ error: integrationError.message }, { status: 500 })
+    console.error('[whatsapp-inbound] integration lookup failed', integrationError.message)
+    return
   }
   if (!integration) {
-    return NextResponse.json(
-      { error: 'No tenant found for this phone_number_id' },
-      { status: 404 }
-    )
+    console.warn('[whatsapp-inbound] no tenant for phone_number_id', phoneNumberId)
+    return
   }
   if (integration.status !== 'connected') {
-    return NextResponse.json(
-      { error: "This tenant's WhatsApp integration is not currently connected" },
-      { status: 409 }
-    )
+    console.warn('[whatsapp-inbound] tenant WhatsApp not connected', integration.tenant_id)
+    return
   }
 
-  const tenantId = integration.tenant_id
+  const tenantId = integration.tenant_id as string
+  const credentials = integration.credentials as EncryptedPayload
 
-  const maintenanceResult = await processMaintenanceButtonReply(tenantId, from, text)
-  if (maintenanceResult.handled) {
-    return NextResponse.json({ tenantId, maintenanceReply: true, detail: maintenanceResult.detail })
+  // Maintenance staff replies (button taps / text) are routed away from the
+  // guest pipeline entirely.
+  if (!msg.mediaId && msg.text) {
+    const maintenanceResult = await processMaintenanceButtonReply(tenantId, from, msg.text)
+    if (maintenanceResult.handled) return
   }
+
+  // ---- Guest + conversation -------------------------------------------------
+
+  const { data: guest, error: guestError } = await supabase
+    .from('guests')
+    .upsert({ tenant_id: tenantId, phone: from }, { onConflict: 'tenant_id,phone' })
+    .select()
+    .single()
+
+  if (guestError || !guest) {
+    console.error('[whatsapp-inbound] guest upsert failed', guestError?.message)
+    return
+  }
+
+  if (!guest.name && msg.profileName) {
+    await supabase.from('guests').update({ name: msg.profileName }).eq('id', guest.id)
+  }
+
+  const { data: existingConversation } = await supabase
+    .from('conversations')
+    .select('id, status')
+    .eq('tenant_id', tenantId)
+    .eq('guest_id', guest.id)
+    .eq('channel', 'whatsapp')
+    .neq('status', 'closed')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  let conversationId = existingConversation?.id as string | undefined
+
+  if (!conversationId) {
+    const { data: newConversation, error: conversationError } = await supabase
+      .from('conversations')
+      .insert({
+        tenant_id: tenantId,
+        guest_id: guest.id,
+        channel: 'whatsapp',
+        status: 'active',
+        last_message_at: new Date().toISOString(),
+      })
+      .select()
+      .single()
+
+    if (conversationError || !newConversation) {
+      console.error('[whatsapp-inbound] conversation create failed', conversationError?.message)
+      return
+    }
+    conversationId = newConversation.id as string
+  } else {
+    await supabase
+      .from('conversations')
+      .update({ last_message_at: new Date().toISOString() })
+      .eq('id', conversationId)
+  }
+
+  // ---- Log the guest message (idempotent on Meta's message id) --------------
+
+  const content = msg.mediaId ? await resolveMediaToText(msg, credentials) : msg.text
+  if (!content) return
+
+  const { data: guestMessage, error: messageError } = await supabase
+    .from('messages')
+    .insert({
+      tenant_id: tenantId,
+      conversation_id: conversationId,
+      sender_type: 'guest',
+      content,
+      external_id: msg.messageId,
+      media_type: msg.mediaKind ?? null,
+    })
+    .select('id')
+    .single()
+
+  if (messageError) {
+    // 23505 = unique violation: Meta re-delivered a message we already have.
+    if (messageError.code === '23505') return
+    console.error('[whatsapp-inbound] message insert failed', messageError.message)
+    return
+  }
+  if (!guestMessage) return
+
+  // ---- Debounce: only the newest message in a burst triggers a reply --------
+
+  await new Promise((resolve) => setTimeout(resolve, DEBOUNCE_MS))
+
+  const { data: latestGuestMessage } = await supabase
+    .from('messages')
+    .select('id')
+    .eq('conversation_id', conversationId)
+    .eq('sender_type', 'guest')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (latestGuestMessage && latestGuestMessage.id !== guestMessage.id) {
+    // A newer message arrived during the wait — its own run will reply to all.
+    return
+  }
+
+  // Re-check takeover after the wait, in case staff took over meanwhile.
+  const { data: convoNow } = await supabase
+    .from('conversations')
+    .select('status')
+    .eq('id', conversationId)
+    .single()
+  if (convoNow?.status === 'human_takeover' || convoNow?.status === 'closed') return
+
+  // ---- Tools & context ------------------------------------------------------
 
   const { data: tenant } = await supabase
     .from('tenants')
@@ -136,39 +373,36 @@ export async function POST(request: Request) {
     .eq('integration_type', 'pms_cloudbeds')
     .maybeSingle()
 
-  const reservationTool =
-    cloudbedsIntegration?.status === 'connected'
-      ? {
-          lookupReservation: async (confirmationNumber: string) => {
-            const { api_key } = decryptCredentials<{ api_key: string }>(
-              cloudbedsIntegration.credentials
-            )
-            const propertyId = (cloudbedsIntegration.config as { property_id?: string })
-              ?.property_id
-            if (!propertyId) {
-              return { found: false, error: 'No property_id configured for this tenant' }
-            }
-            return lookupReservation(api_key, propertyId, confirmationNumber)
-          },
-        }
-      : undefined
+  const cloudbedsReady = cloudbedsIntegration?.status === 'connected'
+  const getCloudbeds = () => {
+    const { api_key } = decryptCredentials<{ api_key: string }>(cloudbedsIntegration!.credentials)
+    const propertyId = (cloudbedsIntegration!.config as { property_id?: string })?.property_id
+    return { api_key, propertyId }
+  }
 
-  const arrivalUpdateTool =
-    cloudbedsIntegration?.status === 'connected'
-      ? {
-          updateArrivalTime: async (input: { confirmationNumber: string; arrivalTime: string }) => {
-            const { api_key } = decryptCredentials<{ api_key: string }>(
-              cloudbedsIntegration.credentials
-            )
-            const propertyId = (cloudbedsIntegration.config as { property_id?: string })
-              ?.property_id
-            if (!propertyId) {
-              return { success: false, error: 'No property_id configured for this tenant' }
-            }
-            return updateArrivalTime(api_key, propertyId, input.confirmationNumber, input.arrivalTime)
-          },
-        }
-      : undefined
+  const reservationTool = cloudbedsReady
+    ? {
+        lookupReservation: async (confirmationNumber: string) => {
+          const { api_key, propertyId } = getCloudbeds()
+          if (!propertyId) {
+            return { found: false, error: 'No property_id configured for this tenant' }
+          }
+          return lookupReservation(api_key, propertyId, confirmationNumber)
+        },
+      }
+    : undefined
+
+  const arrivalUpdateTool = cloudbedsReady
+    ? {
+        updateArrivalTime: async (input: { confirmationNumber: string; arrivalTime: string }) => {
+          const { api_key, propertyId } = getCloudbeds()
+          if (!propertyId) {
+            return { success: false, error: 'No property_id configured for this tenant' }
+          }
+          return updateArrivalTime(api_key, propertyId, input.confirmationNumber, input.arrivalTime)
+        },
+      }
+    : undefined
 
   const escalationContacts = (tenant?.escalation_contacts as Record<string, string>) ?? {}
   const escalationTool =
@@ -183,23 +417,10 @@ export async function POST(request: Request) {
             if (!staffNumber) {
               return { success: false, error: `No ${input.category} contact configured` }
             }
-            return notifyStaff(phoneNumberId, integration.credentials, staffNumber, from, input)
+            return notifyStaff(phoneNumberId, credentials, staffNumber, from, input)
           },
         }
       : undefined
-
-  const { data: guest, error: guestError } = await supabase
-    .from('guests')
-    .upsert({ tenant_id: tenantId, phone: from }, { onConflict: 'tenant_id,phone' })
-    .select()
-    .single()
-
-  if (guestError || !guest) {
-    return NextResponse.json(
-      { error: `Failed to upsert guest: ${guestError?.message}` },
-      { status: 500 }
-    )
-  }
 
   const waitlistTool = {
     joinWaitlist: async (input: {
@@ -225,7 +446,7 @@ export async function POST(request: Request) {
 
       const reservationsContact = escalationContacts.reservations
       if (reservationsContact) {
-        await notifyStaff(phoneNumberId, integration.credentials, reservationsContact, from, {
+        await notifyStaff(phoneNumberId, credentials, reservationsContact, from, {
           category: 'reservations',
           summary: `Waitlist request: ${input.fullName}, wants ${input.dateRequested}. Contact: ${input.email} / ${input.phone}${input.notes ? `. Notes: ${input.notes}` : ''}`,
         })
@@ -264,7 +485,7 @@ export async function POST(request: Request) {
       : ''
 
   let knownGuestContext = ''
-  if (cloudbedsIntegration?.status === 'connected') {
+  if (cloudbedsReady) {
     const { data: savedReservation } = await supabase
       .from('guest_reservations')
       .select('confirmation_number')
@@ -274,10 +495,7 @@ export async function POST(request: Request) {
 
     if (savedReservation) {
       try {
-        const { api_key } = decryptCredentials<{ api_key: string }>(
-          cloudbedsIntegration.credentials
-        )
-        const propertyId = (cloudbedsIntegration.config as { property_id?: string })?.property_id
+        const { api_key, propertyId } = getCloudbeds()
         if (propertyId) {
           const liveLookup = (await lookupReservation(
             api_key,
@@ -289,101 +507,56 @@ export async function POST(request: Request) {
           }
         }
       } catch {
-        // Best-effort only — if the live check fails, fall through and
-        // treat the guest as unidentified rather than trust stale data.
+        // Best-effort only — if the live check fails, treat the guest as
+        // unidentified rather than trust stale data.
       }
     }
   }
 
-  const { data: existingConversation } = await supabase
-    .from('conversations')
-    .select('id, status')
-    .eq('tenant_id', tenantId)
-    .eq('guest_id', guest.id)
-    .eq('channel', 'whatsapp')
-    .neq('status', 'closed')
-    .maybeSingle()
+  const guestName = (guest.name as string | null) ?? msg.profileName
+  const guestNameContext = guestName
+    ? `The guest's WhatsApp display name is "${guestName}". This is only a display name — don't treat it as confirming their identity or reservation.\n\n`
+    : ''
 
-  let conversationId = existingConversation?.id
-  let conversationStatus = existingConversation?.status
+  const channelInstruction = `\n\nCHANNEL: You are replying on WhatsApp. Keep replies short and conversational. For emphasis use single asterisks (*like this*), never double asterisks, headings, tables or Markdown links — paste URLs as plain text. If several guest messages arrive in a row, answer them together in one reply. Messages in square brackets describe a photo, voice note or other attachment the guest sent.`
 
-  if (!conversationId) {
-    const { data: newConversation, error: conversationError } = await supabase
-      .from('conversations')
-      .insert({
-        tenant_id: tenantId,
-        guest_id: guest.id,
-        channel: 'whatsapp',
-        status: 'active',
-        last_message_at: new Date().toISOString(),
-      })
-      .select()
-      .single()
+  // ---- History (most recent HISTORY_LIMIT messages) --------------------------
 
-    if (conversationError || !newConversation) {
-      return NextResponse.json(
-        { error: `Failed to create conversation: ${conversationError?.message}` },
-        { status: 500 }
-      )
-    }
-    conversationId = newConversation.id
-    conversationStatus = newConversation.status
-  } else {
-    await supabase
-      .from('conversations')
-      .update({ last_message_at: new Date().toISOString() })
-      .eq('id', conversationId)
-  }
-
-  const { data: guestMessage, error: messageError } = await supabase
-    .from('messages')
-    .insert({
-      tenant_id: tenantId,
-      conversation_id: conversationId,
-      sender_type: 'guest',
-      content: text,
-    })
-    .select()
-    .single()
-
-  if (messageError || !guestMessage) {
-    return NextResponse.json(
-      { error: `Failed to log message: ${messageError?.message}` },
-      { status: 500 }
-    )
-  }
-
-  if (conversationStatus === 'human_takeover') {
-    return NextResponse.json({
-      tenantId,
-      guestId: guest.id,
-      conversationId,
-      messageId: guestMessage.id,
-      humanTakeover: true,
-    })
-  }
-
-  const { data: history } = await supabase
+  const { data: recent } = await supabase
     .from('messages')
     .select('sender_type, content')
     .eq('conversation_id', conversationId)
     .in('sender_type', ['guest', 'lana'])
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
+    .limit(HISTORY_LIMIT)
 
-  const claudeMessages = (history ?? []).map((m) => ({
+  const chronological = (recent ?? []).reverse()
+  // The AI API requires the conversation to start with a guest turn.
+  while (chronological.length > 0 && chronological[0].sender_type !== 'guest') {
+    chronological.shift()
+  }
+
+  const claudeMessages = chronological.map((m) => ({
     role: m.sender_type === 'guest' ? ('user' as const) : ('assistant' as const),
-    content: m.content,
+    content: m.content as string,
   }))
 
   const systemPrompt =
     knownGuestContext +
     contactDirectoryContext +
+    guestNameContext +
     (tenant?.ai_persona_prompt ??
       'You are a helpful, warm hotel concierge assistant. Answer guest questions clearly and concisely.') +
-    buildBookingLinkInstruction(tenant?.booking_config as Record<string, unknown>)
+    buildBookingLinkInstruction(tenant?.booking_config as Record<string, unknown>) +
+    channelInstruction
+
+  // ---- Generate + send --------------------------------------------------------
 
   let replyText: string
-  let contactButton: { contactName: string; contactPhone: string; contactUrl: string; buttonText: string } | null | undefined
+  let contactButton:
+    | { contactName: string; contactPhone: string; contactUrl: string; buttonText: string }
+    | null
+    | undefined
   try {
     const result = await generateReply(
       systemPrompt,
@@ -398,6 +571,7 @@ export async function POST(request: Request) {
     replyText = result.text
     contactButton = result.contactButton
   } catch (err) {
+    console.error('[whatsapp-inbound] AI generation failed', err)
     const fallbackText =
       "Sorry, I'm having trouble responding right now — a member of our team will follow up with you shortly."
 
@@ -407,54 +581,29 @@ export async function POST(request: Request) {
       sender_type: 'lana',
       content: fallbackText,
     })
-
-    const fallbackSendResult = await sendWhatsAppMessage(
-      phoneNumberId,
-      integration.credentials,
-      from,
-      fallbackText
-    )
-
-    return NextResponse.json({
-      tenantId,
-      guestId: guest.id,
-      conversationId,
-      messageId: guestMessage.id,
-      aiError: err instanceof Error ? err.message : 'AI generation failed',
-      fallbackSendResult,
-    })
+    await sendWhatsAppMessage(phoneNumberId, credentials, from, fallbackText)
+    return
   }
 
-  const { data: aiMessage } = await supabase
-    .from('messages')
-    .insert({
-      tenant_id: tenantId,
-      conversation_id: conversationId,
-      sender_type: 'lana',
-      content: replyText,
-    })
-    .select()
-    .single()
+  await supabase.from('messages').insert({
+    tenant_id: tenantId,
+    conversation_id: conversationId,
+    sender_type: 'lana',
+    content: replyText,
+  })
 
   const sendResult = contactButton
     ? await sendWhatsAppInteractiveButton(
         phoneNumberId,
-        integration.credentials,
+        credentials,
         from,
         replyText,
         contactButton.contactUrl,
         contactButton.buttonText
       )
-    : await sendWhatsAppMessage(phoneNumberId, integration.credentials, from, replyText)
+    : await sendWhatsAppMessage(phoneNumberId, credentials, from, replyText)
 
-  return NextResponse.json({
-    tenantId,
-    guestId: guest.id,
-    conversationId,
-    messageId: guestMessage.id,
-    aiReplyMessageId: aiMessage?.id ?? null,
-    aiReplyText: replyText,
-    contactButton: contactButton ?? null,
-    whatsappSendResult: sendResult,
-  })
+  if (!sendResult.success) {
+    console.error('[whatsapp-inbound] send failed', sendResult.error)
+  }
 }
