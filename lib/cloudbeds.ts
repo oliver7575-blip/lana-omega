@@ -232,11 +232,6 @@ export async function getDeparturesInWindow(
   date: string
 ): Promise<GetDeparturesResult> {
   try {
-    // NOTE: unlike getArrivalsInWindow, this does NOT use a checkOutFrom /
-    // checkOutTo query parameter — that pair has never been confirmed
-    // against real Cloudbeds data (only checkInFrom/checkInTo has, from
-    // Beta's own working setup). Filtering client-side on endDate instead,
-    // same safe approach lookupReservation already uses successfully.
     const url = `https://api.cloudbeds.com/api/v1.3/getReservations?propertyID=${encodeURIComponent(propertyId)}&pageSize=100&includeGuestsDetails=true`
 
     const response = await fetch(url, {
@@ -271,5 +266,76 @@ export async function getDeparturesInWindow(
     return { success: true, departures }
   } catch (err) {
     return { success: false, departures: [], error: err instanceof Error ? err.message : 'Unknown error' }
+  }
+}
+
+export interface NewReservation {
+  reservationID: string
+  guestName?: string
+  startDate?: string
+  endDate?: string
+  roomTypeName?: string
+  phone?: string
+}
+
+export interface GetNewReservationsResult {
+  success: boolean
+  reservations: NewReservation[]
+  error?: string
+}
+
+export async function getRecentlyCreatedReservations(
+  apiKey: string,
+  propertyId: string,
+  sinceHoursAgo: number
+): Promise<GetNewReservationsResult> {
+  try {
+    const url = `https://api.cloudbeds.com/api/v1.3/getReservations?propertyID=${encodeURIComponent(propertyId)}&pageSize=100&includeGuestsDetails=true`
+
+    const response = await fetch(url, {
+      headers: { 'x-api-key': apiKey },
+    })
+
+    if (!response.ok) {
+      const errText = await response.text()
+      return { success: false, reservations: [], error: `Cloudbeds API error: ${response.status} ${errText}` }
+    }
+
+    const data = await response.json()
+    if (!data.success) {
+      return { success: false, reservations: [], error: 'Cloudbeds API returned success=false' }
+    }
+
+    const cutoff = Date.now() - sinceHoursAgo * 60 * 60 * 1000
+    const all = (data.data ?? []) as Record<string, unknown>[]
+
+    // dateCreated is a plain "YYYY-MM-DD HH:MM:SS" string with no timezone
+    // marker in real data seen so far — treated as UTC here for a
+    // deliberately generous cutoff window; a wrong assumption here means
+    // catching a booking a bit early or late, not missing it or double
+    // sending (sent_reminders dedup still protects against a repeat).
+    const recent = all.filter((r) => {
+      const created = r.dateCreated as string | undefined
+      if (!created) return false
+      const createdMs = new Date(created.replace(' ', 'T') + 'Z').getTime()
+      return !Number.isNaN(createdMs) && createdMs >= cutoff
+    })
+
+    const reservations: NewReservation[] = recent.map((r) => {
+      const guestDetail = extractGuestDetail(r)
+      const room = guestDetail?.rooms?.[0]
+      return {
+        reservationID: r.reservationID as string,
+        guestName: r.guestName as string | undefined,
+        startDate: r.startDate as string | undefined,
+        endDate: r.endDate as string | undefined,
+        roomTypeName: room?.roomTypeName,
+        phone: extractPhone(guestDetail),
+      }
+    })
+
+    return { success: true, reservations }
+  } catch (err) {
+    return { success: false, reservations: [], error: err instanceof Error ? err.message : 'Unknown error' }
   }
 }
