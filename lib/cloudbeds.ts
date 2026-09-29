@@ -1,3 +1,5 @@
+import { normalizePhone } from './phone'
+
 interface CloudbedsRoom {
   roomName?: string
   roomTypeName?: string
@@ -409,4 +411,62 @@ export function matchRoomType(query: string, roomTypes: RoomTypePhotos[]): RoomT
   })
   const best = scored.sort((a, b) => b.score - a.score)[0]
   return best && best.score > 0 ? best.rt : undefined
+}
+
+/** Two numbers match if one ends with the other's last 10 digits (Cloudbeds often drops the country code). */
+function phonesMatch(a: string | undefined, b: string): boolean {
+  const na = normalizePhone(a)
+  const nb = normalizePhone(b)
+  if (na.length < 8 || nb.length < 8) return false
+  const tail = (x: string) => x.slice(-10)
+  return na.endsWith(tail(nb)) || nb.endsWith(tail(na))
+}
+
+/**
+ * Finds the guest's current or upcoming reservation from their WhatsApp
+ * number (Beta's "phone match"). Returns found:false if none or several match.
+ */
+export async function findReservationByPhone(
+  apiKey: string,
+  propertyId: string,
+  phone: string
+): Promise<ReservationLookupResult & { matches?: number }> {
+  try {
+    const today = new Date().toISOString().slice(0, 10)
+    const url = `https://api.cloudbeds.com/api/v1.3/getReservations?propertyID=${encodeURIComponent(propertyId)}&checkOutFrom=${today}&pageSize=100&includeGuestsDetails=true`
+    const response = await fetch(url, { headers: { 'x-api-key': apiKey }, signal: AbortSignal.timeout(15000) })
+    if (!response.ok) return { found: false, error: `Cloudbeds API error: ${response.status}` }
+    const data = await response.json()
+    if (!data.success) return { found: false, error: 'Cloudbeds API returned success=false' }
+
+    const matches = ((data.data ?? []) as Record<string, unknown>[]).filter((r) => {
+      const status = String(r.status ?? '').toLowerCase()
+      if (['canceled', 'cancelled', 'no_show', 'checked_out'].includes(status)) return false
+      return phonesMatch(extractPhone(extractGuestDetail(r)), phone)
+    })
+    if (matches.length !== 1) return { found: false, matches: matches.length }
+
+    const match = matches[0]
+    const guestDetail = extractGuestDetail(match)
+    const room = guestDetail?.rooms?.[0]
+    return {
+      found: true,
+      reservationID: match.reservationID as string,
+      guestName: match.guestName as string | undefined,
+      guestEmail: guestDetail?.guestEmail,
+      guestPhone: extractPhone(guestDetail),
+      startDate: match.startDate as string | undefined,
+      endDate: match.endDate as string | undefined,
+      status: match.status as string | undefined,
+      roomName: room?.roomName,
+      roomTypeName: room?.roomTypeName,
+      adults: match.adults as string | undefined,
+      children: match.children as string | undefined,
+      balance: match.balance as number | undefined,
+      sourceName: match.sourceName as string | undefined,
+      matches: 1,
+    }
+  } catch (err) {
+    return { found: false, error: err instanceof Error ? err.message : 'Unknown error' }
+  }
 }

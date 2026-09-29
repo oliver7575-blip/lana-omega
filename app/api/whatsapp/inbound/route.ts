@@ -5,7 +5,7 @@ import { sendWhatsAppMessage, sendWhatsAppInteractiveButton, sendWhatsAppImage }
 import { downloadWhatsAppMedia, describeImage, transcribeAudio } from '@/lib/whatsapp-media'
 import { verifyMetaSignature } from '@/lib/verify-webhook'
 import { decryptCredentials, type EncryptedPayload } from '@/lib/crypto'
-import { lookupReservation, updateArrivalTime } from '@/lib/cloudbeds'
+import { lookupReservation, updateArrivalTime, findReservationByPhone } from '@/lib/cloudbeds'
 import { notifyStaff } from '@/lib/escalation'
 import { parseEscalationContacts, findEscalationContact } from '@/lib/escalation-contacts'
 import { buildRoomPhotosTool } from '@/lib/room-photos'
@@ -434,10 +434,23 @@ async function processInbound(msg: ExtractedMessage) {
 
   const reservationTool = cloudbedsReady
     ? {
-        lookupReservation: async (confirmationNumber: string) => {
+        lookupReservation: async (confirmationNumber?: string) => {
           const { api_key, propertyId } = getCloudbeds()
           if (!propertyId) {
             return { found: false, error: 'No property_id configured for this tenant' }
+          }
+          if (!confirmationNumber) {
+            const byPhone = await findReservationByPhone(api_key, propertyId, from)
+            if (!byPhone.found && !byPhone.error) {
+              return {
+                found: false,
+                note:
+                  (byPhone.matches ?? 0) > 1
+                    ? 'Several reservations match this phone number — ask the guest for their confirmation number.'
+                    : 'No current reservation matches this phone number — ask the guest for their confirmation number.',
+              }
+            }
+            return byPhone
           }
           return lookupReservation(api_key, propertyId, confirmationNumber)
         },

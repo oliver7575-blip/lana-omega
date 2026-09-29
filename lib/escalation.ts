@@ -44,10 +44,11 @@ export async function notifyStaff(
   }
 
   const messageText = [
-    `🔔 ${input.category.toUpperCase()}${input.urgency === 'urgent' ? ' — URGENT' : ''} — guest needs attention`,
-    input.roomNumber ? `Room: ${input.roomNumber}` : null,
-    `Guest: ${guestName ? `${guestName} (${guestIdentifier})` : guestIdentifier}`,
-    `Issue: ${input.summary}`,
+    `🔔 ${input.category.toUpperCase()}${input.urgency === 'urgent' ? ' — URGENTE' : ''}`,
+    input.roomNumber ? `Habitación: ${input.roomNumber}` : null,
+    `Huésped: ${guestName ? `${guestName} (${guestIdentifier})` : guestIdentifier}`,
+    `Asunto: ${input.summary}`,
+    '*Favor de atender al huésped*',
   ]
     .filter(Boolean)
     .join('\n')

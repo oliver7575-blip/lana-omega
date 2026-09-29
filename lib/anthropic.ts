@@ -10,7 +10,8 @@ interface ClaudeMessage {
 }
 
 interface ReservationTool {
-  lookupReservation: (confirmationNumber: string) => Promise<unknown>
+  /** No confirmation number = find the guest's reservation from their phone (WhatsApp only). */
+  lookupReservation: (confirmationNumber?: string) => Promise<unknown>
 }
 
 interface EscalationToolInput {
@@ -112,7 +113,7 @@ export async function generateReply(
     tools.push({
       name: 'lookup_reservation',
       description:
-        "Look up a guest's hotel reservation by their confirmation number via the property management system. Use this whenever a guest provides a confirmation number and asks about their reservation, dates, or room.",
+        "Look up a guest's reservation in the property management system: dates, room, balance, payment status. Pass the confirmation number if the guest gave one (exactly as given — never question its format). If the guest asks about \"my reservation\" without a number, call this WITHOUT confirmationNumber: on WhatsApp the system finds their reservation from their phone number. Only ask for the confirmation number if that returns found: false.",
       input_schema: {
         type: 'object',
         properties: {
@@ -121,7 +122,7 @@ export async function generateReply(
             description: "The guest's reservation confirmation number",
           },
         },
-        required: ['confirmationNumber'],
+        required: [],
       },
     })
   }
@@ -272,6 +273,10 @@ export async function generateReply(
     })
   }
 
+  // Anthropic-hosted web search, for genuinely current info (weather, closures).
+  // Turned off automatically for the rest of this reply if the API rejects it.
+  let useWebSearch = process.env.DISABLE_WEB_SEARCH !== 'true'
+
   const messages: ClaudeMessage[] = [...conversationHistory]
   let contactButtonResult: GenerateReplyResult['contactButton'] = null
   let photoUrls: string[] = []
@@ -289,16 +294,35 @@ export async function generateReply(
         max_tokens: 1500,
         system: systemPrompt,
         messages,
-        ...(tools.length > 0 ? { tools } : {}),
+        ...(tools.length > 0 || useWebSearch
+          ? {
+              tools: [
+                ...tools,
+                ...(useWebSearch ? [{ type: 'web_search_20250305', name: 'web_search', max_uses: 2 }] : []),
+              ],
+            }
+          : {}),
       }),
     })
 
     if (!response.ok) {
       const errText = await response.text()
+      if (useWebSearch && response.status === 400 && /web_search/i.test(errText)) {
+        console.error('[concierge] web search unavailable, continuing without it', errText.slice(0, 200))
+        useWebSearch = false
+        i--
+        continue
+      }
       throw new Error(`Anthropic API error: ${response.status} ${errText}`)
     }
 
     const data = await response.json()
+
+    // A long server-side web search can pause the turn; hand it back to continue.
+    if (data.stop_reason === 'pause_turn') {
+      messages.push({ role: 'assistant', content: data.content })
+      continue
+    }
 
     if (data.stop_reason === 'tool_use') {
       const toolUseBlocks = (data.content as { type: string }[]).filter(
@@ -313,7 +337,8 @@ export async function generateReply(
         let result: unknown = { success: false, error: `Tool ${block.name} is not available` }
 
         if (block.name === 'lookup_reservation' && reservationTool) {
-          result = await reservationTool.lookupReservation(block.input.confirmationNumber as string)
+          const num = String(block.input.confirmationNumber ?? '').trim()
+          result = await reservationTool.lookupReservation(num || undefined)
         } else if (block.name === 'escalate_to_staff' && escalationTool) {
           result = await escalationTool.escalateToStaff(block.input as unknown as EscalationToolInput)
         } else if (block.name === 'update_arrival_time' && arrivalUpdateTool) {
@@ -354,7 +379,7 @@ export async function generateReply(
     const text = ((data.content ?? []) as { type: string; text?: string }[])
       .filter((b) => b.type === 'text')
       .map((b) => b.text ?? '')
-      .join('\n')
+      .join('')
       .trim()
     if (!text || text.includes(NO_REPLY_TOKEN)) {
       // Nothing to say (e.g. the guest just wrote "gracias"). Photos still go out.

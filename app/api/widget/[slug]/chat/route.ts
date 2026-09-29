@@ -179,7 +179,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   const reservationTool =
     cloudbedsIntegration?.status === 'connected'
       ? {
-          lookupReservation: async (confirmationNumber: string) => {
+          lookupReservation: async (confirmationNumber?: string) => {
+            // Website visitors have no phone on file, so a number is required here.
+            if (!confirmationNumber) {
+              return { found: false, note: 'Ask the guest for their confirmation number.' }
+            }
             const { api_key } = decryptCredentials<{ api_key: string }>(
               cloudbedsIntegration.credentials
             )
