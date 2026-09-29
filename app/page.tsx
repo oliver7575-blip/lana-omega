@@ -75,6 +75,7 @@ export default async function Home() {
     pms_cloudbeds: 'Cloudbeds',
     instagram: 'Instagram',
     email: 'Email',
+    transcription_deepgram: 'Voice notes (Deepgram)',
   }
 
   return (
@@ -127,6 +128,10 @@ export default async function Home() {
         <Link href="/integrations">Integrations</Link>
         {' · '}
         <Link href="/conversations">Conversations</Link>
+        {' · '}
+        <Link href="/maintenance">Maintenance</Link>
+        {' · '}
+        <Link href="/waitlist">Waitlist</Link>
         {' · '}
         <Link href="/settings">Settings</Link>
         {' · '}
