@@ -135,6 +135,16 @@ export async function processMaintenanceButtonReply(
   const payload = parseMaintenancePayload(buttonText)
   if (payload) {
     buttonText = { accept: 'Acepto', help: 'Necesito Ayuda', done: 'Terminado' }[payload.action]
+  } else {
+    // Staff are guests too: only an exact button label counts as a
+    // maintenance reply. Anything else goes to the concierge as normal.
+    const label = ['Acepto', 'Necesito Ayuda', 'Terminado'].find(
+      (l) => l.toLowerCase() === buttonText.trim().toLowerCase()
+    )
+    if (!label) {
+      return { handled: false, detail: 'Staff member sent a normal message, not a button reply' }
+    }
+    buttonText = label
   }
 
   let candidatesQuery = supabase
