@@ -8,6 +8,7 @@ import { decryptCredentials, type EncryptedPayload } from '@/lib/crypto'
 import { lookupReservation, updateArrivalTime } from '@/lib/cloudbeds'
 import { notifyStaff } from '@/lib/escalation'
 import { buildBookingLinkInstruction } from '@/lib/booking-link'
+import { buildKnowledgeBaseSection } from '@/lib/knowledge-base'
 import { processMaintenanceButtonReply } from '@/lib/maintenance-reply'
 
 // Meta must get a fast 200. All real work runs in after(), which keeps the
@@ -362,7 +363,7 @@ async function processInbound(msg: ExtractedMessage) {
 
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('ai_persona_prompt, escalation_contacts, booking_config, contact_directory')
+    .select('ai_persona_prompt, knowledge_base, escalation_contacts, booking_config, contact_directory')
     .eq('id', tenantId)
     .single()
 
@@ -547,6 +548,7 @@ async function processInbound(msg: ExtractedMessage) {
     guestNameContext +
     (tenant?.ai_persona_prompt ??
       'You are a helpful, warm hotel concierge assistant. Answer guest questions clearly and concisely.') +
+    buildKnowledgeBaseSection(tenant?.knowledge_base as string | null) +
     buildBookingLinkInstruction(tenant?.booking_config as Record<string, unknown>) +
     channelInstruction
 
