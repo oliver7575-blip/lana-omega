@@ -140,7 +140,8 @@ function extractMessage(body: Record<string, unknown>): ExtractedMessage | null 
  */
 async function resolveMediaToText(
   msg: ExtractedMessage,
-  credentials: EncryptedPayload
+  credentials: EncryptedPayload,
+  deepgramApiKey: string | undefined
 ): Promise<string> {
   const caption = msg.text ? ` Their caption: "${msg.text}"` : ''
   const kind = msg.mediaKind
@@ -161,7 +162,7 @@ async function resolveMediaToText(
   if (kind === 'audio') {
     try {
       const { buffer, mimeType } = await downloadWhatsAppMedia(msg.mediaId, credentials)
-      const transcript = await transcribeAudio(buffer, mimeType)
+      const transcript = await transcribeAudio(buffer, mimeType, deepgramApiKey)
       return `[Voice message, transcribed]: ${transcript}`
     } catch (err) {
       console.error('[whatsapp-inbound] audio resolve failed', err)
@@ -309,7 +310,28 @@ async function processInbound(msg: ExtractedMessage) {
 
   // ---- Log the guest message (idempotent on Meta's message id) --------------
 
-  const content = msg.mediaId ? await resolveMediaToText(msg, credentials) : msg.text
+  let deepgramApiKey: string | undefined
+  if (msg.mediaKind === 'audio') {
+    const { data: deepgramIntegration } = await supabase
+      .from('tenant_integrations')
+      .select('status, credentials')
+      .eq('tenant_id', tenantId)
+      .eq('integration_type', 'transcription_deepgram')
+      .maybeSingle()
+    if (deepgramIntegration?.status === 'connected' && deepgramIntegration.credentials) {
+      try {
+        deepgramApiKey = decryptCredentials<{ api_key: string }>(
+          deepgramIntegration.credentials as EncryptedPayload
+        ).api_key
+      } catch (err) {
+        console.error('[whatsapp-inbound] could not decrypt Deepgram key', err)
+      }
+    }
+  }
+
+  const content = msg.mediaId
+    ? await resolveMediaToText(msg, credentials, deepgramApiKey)
+    : msg.text
   if (!content) return
 
   const { data: guestMessage, error: messageError } = await supabase
