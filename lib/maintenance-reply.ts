@@ -1,6 +1,7 @@
 import { createServiceClient } from './supabase/service'
 import { sendWhatsAppMessage } from './whatsapp-send'
 import { parseMaintenancePayload } from './maintenance-template'
+import { samePhone } from './phone'
 
 interface StaffRow {
   id: string
@@ -115,13 +116,14 @@ export async function processMaintenanceButtonReply(
 ): Promise<ButtonReplyResult> {
   const supabase = createServiceClient()
 
-  const { data: worker } = await supabase
+  // Compare normalised numbers: WhatsApp sends digits only ("31629030860"),
+  // while a roster entry may have been typed as "+31 6 2903 0860".
+  const { data: activeStaff } = await supabase
     .from('maintenance_staff')
     .select('id, name, phone, unavailable_from, unavailable_until, weekly_days_off')
     .eq('tenant_id', tenantId)
-    .eq('phone', fromPhone)
     .eq('active', true)
-    .maybeSingle()
+  const worker = (activeStaff ?? []).find((s) => samePhone(s.phone, fromPhone))
 
   if (!worker) {
     return { handled: false, detail: 'Not a recognized active maintenance staff number' }
