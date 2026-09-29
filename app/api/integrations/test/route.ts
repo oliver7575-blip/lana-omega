@@ -79,6 +79,30 @@ async function checkCloudbeds(
   return { ok: true, detail: 'API reachable, key accepted' }
 }
 
+async function checkDeepgram(credentials: unknown): Promise<CheckResult> {
+  const { api_key } = decryptCredentials<{ api_key: string }>(
+    credentials as Parameters<typeof decryptCredentials>[0]
+  )
+
+  // Listing the key's projects is a free, read-only call: a 200 means the
+  // key exists and Deepgram accepts it.
+  const res = await fetch('https://api.deepgram.com/v1/projects', {
+    headers: { Authorization: `Token ${api_key}` },
+    signal: AbortSignal.timeout(8000),
+  })
+
+  if (!res.ok) {
+    const text = await res.text()
+    return { ok: false, error: `Deepgram API ${res.status}: ${text.slice(0, 300)}` }
+  }
+
+  const data = (await res.json()) as { projects?: { name?: string }[] }
+  const name = data.projects?.[0]?.name
+  return { ok: true, detail: name ? `Key accepted · project "${name}"` : 'Key accepted' }
+}
+
+const TESTABLE_TYPES = ['whatsapp', 'pms_cloudbeds', 'transcription_deepgram']
+
 export async function POST(request: Request) {
   const supabase = await createClient()
 
@@ -91,7 +115,7 @@ export async function POST(request: Request) {
 
   const { integrationType } = (await request.json()) as { integrationType?: string }
 
-  if (integrationType !== 'whatsapp' && integrationType !== 'pms_cloudbeds') {
+  if (!integrationType || !TESTABLE_TYPES.includes(integrationType)) {
     return NextResponse.json(
       { error: 'Testing is not available for this integration yet' },
       { status: 400 }
@@ -114,7 +138,9 @@ export async function POST(request: Request) {
     result =
       integrationType === 'whatsapp'
         ? await checkWhatsApp(row.credentials, row.config as Record<string, string> | null)
-        : await checkCloudbeds(row.credentials, row.config as Record<string, string> | null)
+        : integrationType === 'transcription_deepgram'
+          ? await checkDeepgram(row.credentials)
+          : await checkCloudbeds(row.credentials, row.config as Record<string, string> | null)
   } catch (err) {
     result = { ok: false, error: err instanceof Error ? err.message : 'Check failed unexpectedly' }
   }
