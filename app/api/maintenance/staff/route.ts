@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { normalizePhone } from '@/lib/phone'
 
 export async function GET() {
   const supabase = await createClient()
@@ -35,10 +36,18 @@ export async function POST(request: Request) {
   if (!body.name?.trim() || !body.phone?.trim()) {
     return NextResponse.json({ error: 'name and phone are required' }, { status: 400 })
   }
+  // Stored digits-only (with country code), the same form WhatsApp uses.
+  const phone = normalizePhone(body.phone)
+  if (phone.length < 8) {
+    return NextResponse.json(
+      { error: 'Enter the full phone number including country code, e.g. +52 958 123 4567' },
+      { status: 400 }
+    )
+  }
 
   const { data, error } = await supabase
     .from('maintenance_staff')
-    .insert({ tenant_id: staffRow.tenant_id, name: body.name.trim(), phone: body.phone.trim() })
+    .insert({ tenant_id: staffRow.tenant_id, name: body.name.trim(), phone })
     .select()
     .single()
 
