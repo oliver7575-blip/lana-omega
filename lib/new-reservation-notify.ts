@@ -62,7 +62,7 @@ export async function processNewReservation(tenantId: string, reservationID: str
 
   const systemPrompt =
     (tenant?.ai_persona_prompt ?? 'You are a warm, helpful hotel concierge.') +
-    `\n\nWrite a short, warm WhatsApp welcome message to ${lookup.guestName ?? 'the guest'}, confirming their new reservation from ${lookup.startDate} to ${lookup.endDate}. Invite them to reach out with any questions before their stay. Do not ask any questions yourself, just send the welcome.`
+    `\n\nWrite a short, warm WhatsApp welcome message to ${lookup.guestName ?? 'the guest'}, confirming their new reservation from ${lookup.startDate} to ${lookup.endDate}. Invite them to reach out with any questions before their stay. Do not ask any questions yourself, just send the welcome.\n\nIMPORTANT: Output ONLY the exact raw text of the WhatsApp message itself, nothing else — no title, no markdown headers, no horizontal rules, no notes to yourself, no commentary about the message. Whatever you output will be sent to the guest exactly as-is.`
 
   let messageText: string
   try {
