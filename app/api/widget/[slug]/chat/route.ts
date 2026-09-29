@@ -291,6 +291,52 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     },
   }
 
+  const registerReservationTool = {
+    registerReservation: async (confirmationNumber: string) => {
+      const { error: upsertError } = await supabase
+        .from('guest_reservations')
+        .upsert(
+          { tenant_id: tenantId, guest_id: guest.id, confirmation_number: confirmationNumber },
+          { onConflict: 'tenant_id,guest_id' }
+        )
+      if (upsertError) {
+        return { success: false, error: upsertError.message }
+      }
+      return { success: true }
+    },
+  }
+
+  let knownGuestContext = ''
+  if (cloudbedsIntegration?.status === 'connected') {
+    const { data: savedReservation } = await supabase
+      .from('guest_reservations')
+      .select('confirmation_number')
+      .eq('tenant_id', tenantId)
+      .eq('guest_id', guest.id)
+      .maybeSingle()
+
+    if (savedReservation) {
+      try {
+        const { api_key } = decryptCredentials<{ api_key: string }>(
+          cloudbedsIntegration.credentials
+        )
+        const propertyId = (cloudbedsIntegration.config as { property_id?: string })?.property_id
+        if (propertyId) {
+          const liveLookup = (await lookupReservation(
+            api_key,
+            propertyId,
+            savedReservation.confirmation_number
+          )) as { found?: boolean; [key: string]: unknown }
+          if (liveLookup?.found) {
+            knownGuestContext = `KNOWN GUEST CONTEXT\n\nThis guest's identity and active reservation have already been confirmed. Their reservation details:\n${JSON.stringify(liveLookup)}\n\nDo not ask them for their name or confirmation number again unless they explicitly want to look up or update a different reservation. Use these details directly.\n\n`
+          }
+        }
+      } catch {
+        // Best-effort only — treat as unidentified if the live check fails.
+      }
+    }
+  }
+
   const { data: existingConversation } = await supabase
     .from('conversations')
     .select('id, status')
@@ -373,20 +419,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   }))
 
   const systemPrompt =
+    knownGuestContext +
     (tenant.ai_persona_prompt ??
       'You are a helpful, warm hotel concierge assistant. Answer guest questions clearly and concisely.') +
     buildBookingLinkInstruction(tenant.booking_config as Record<string, unknown>)
 
   let replyText: string
   try {
-    replyText = await generateReply(
+    const result = await generateReply(
       systemPrompt,
       claudeMessages,
       reservationTool,
       escalationTool,
       arrivalUpdateTool,
-      waitlistTool
+      waitlistTool,
+      registerReservationTool
     )
+    replyText = result.text
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'AI generation failed' },
