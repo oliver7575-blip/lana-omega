@@ -32,7 +32,7 @@ export async function GET(request: Request) {
   const { api_key } = decryptCredentials<{ api_key: string }>(cloudbedsIntegration.credentials)
   const propertyId = (cloudbedsIntegration.config as { property_id?: string })?.property_id
 
-  const url = `https://api.cloudbeds.com/api/v1.3/getReservations?propertyID=${encodeURIComponent(propertyId ?? '')}&pageSize=100`
+  const url = `https://api.cloudbeds.com/api/v1.3/getReservations?propertyID=${encodeURIComponent(propertyId ?? '')}&pageSize=100&includeGuestsDetails=true`
   const response = await fetch(url, { headers: { 'x-api-key': api_key } })
   const data = await response.json()
 
