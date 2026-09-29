@@ -81,7 +81,7 @@ export async function GET(request: Request) {
 
       const systemPrompt =
         (tenant.ai_persona_prompt ?? 'You are a warm, helpful hotel concierge.') +
-        `\n\nWrite a short, warm WhatsApp message to ${departure.guestName ?? 'the guest'} thanking them for their recent stay, and asking if they'd be willing to share quick feedback or a review. Keep it brief and genuine, not pushy. Do not ask more than one question.`
+        `\n\nWrite a short, warm WhatsApp message to ${departure.guestName ?? 'the guest'} thanking them for their recent stay, and asking if they'd be willing to share quick feedback or a review. Keep it brief and genuine, not pushy. Do not ask more than one question.\n\nIMPORTANT: Output ONLY the exact raw text of the WhatsApp message itself, nothing else — no title, no markdown headers, no horizontal rules, no notes to yourself, no commentary about the message. Whatever you output will be sent to the guest exactly as-is.`
 
       let messageText: string
       try {
