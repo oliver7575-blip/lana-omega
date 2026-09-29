@@ -4,6 +4,28 @@ interface WhatsAppCredentials {
   access_token: string
 }
 
+/**
+ * Converts the Markdown the AI naturally writes into WhatsApp's own
+ * formatting, so guests don't see stray symbols.
+ *   **bold** / __bold__  -> *bold*
+ *   ## Heading           -> *Heading*
+ *   [text](https://url)  -> text: https://url
+ *   horizontal rules     -> removed
+ * Single *x* and _x_ are already valid WhatsApp syntax and are left alone.
+ */
+export function toWhatsAppFormat(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '*$1*')
+    .replace(/__(.+?)__/g, '*$1*')
+    .replace(/^#{1,6}\s+(.+)$/gm, '*$1*')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, (_m, label: string, url: string) =>
+      label.trim() === url.trim() ? url : `${label}: ${url}`
+    )
+    .replace(/^\s*(-{3,}|\*{3,}|_{3,})\s*$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
 export async function sendWhatsAppMessage(
   phoneNumberId: string,
   encryptedCredentials: EncryptedPayload,
@@ -23,7 +45,7 @@ export async function sendWhatsAppMessage(
         messaging_product: 'whatsapp',
         to,
         type: 'text',
-        text: { body: text },
+        text: { body: toWhatsAppFormat(text) },
       }),
     })
 
@@ -40,10 +62,8 @@ export async function sendWhatsAppMessage(
 
 // Native WhatsApp CTA button — used for send_contact_button. Uses Meta's
 // "cta_url" interactive message type from general API knowledge, not
-// verified against a real send this session — worth confirming for real
-// once WhatsApp is fully working, the same way every other integration
-// point this session has been proven against a real response rather than
-// assumed correct.
+// verified against a real send yet — confirm with a real send now that
+// WhatsApp inbound/outbound works end to end.
 export async function sendWhatsAppInteractiveButton(
   phoneNumberId: string,
   encryptedCredentials: EncryptedPayload,
@@ -67,7 +87,7 @@ export async function sendWhatsAppInteractiveButton(
         type: 'interactive',
         interactive: {
           type: 'cta_url',
-          body: { text: bodyText },
+          body: { text: toWhatsAppFormat(bodyText) },
           action: {
             name: 'cta_url',
             parameters: {
