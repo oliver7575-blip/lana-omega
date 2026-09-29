@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { KNOWLEDGE_BASE_MAX_CHARS } from '@/lib/knowledge-base'
 
 export async function GET() {
   const supabase = await createClient()
@@ -24,7 +25,7 @@ export async function GET() {
 
   const { data: tenant, error } = await supabase
     .from('tenants')
-    .select('name, status, ai_persona_prompt, escalation_contacts, booking_config')
+    .select('name, status, ai_persona_prompt, knowledge_base, escalation_contacts, booking_config')
     .eq('id', staffRow.tenant_id)
     .single()
 
@@ -58,6 +59,7 @@ export async function PATCH(request: Request) {
   const body = (await request.json()) as {
     name?: string
     ai_persona_prompt?: string
+    knowledge_base?: string
     escalation_contacts?: Record<string, string>
     booking_config?: { booking_engine_code?: string; currency?: string }
     activate?: boolean
@@ -101,12 +103,23 @@ export async function PATCH(request: Request) {
   const updates: {
     name?: string
     ai_persona_prompt?: string
+    knowledge_base?: string | null
     escalation_contacts?: Record<string, string>
     booking_config?: { booking_engine_code?: string; currency?: string }
   } = {}
   if (typeof body.name === 'string' && body.name.trim()) updates.name = body.name.trim()
   if (typeof body.ai_persona_prompt === 'string' && body.ai_persona_prompt.trim()) {
     updates.ai_persona_prompt = body.ai_persona_prompt.trim()
+  }
+  if (typeof body.knowledge_base === 'string') {
+    if (body.knowledge_base.length > KNOWLEDGE_BASE_MAX_CHARS) {
+      return NextResponse.json(
+        { error: `The knowledge base must be under ${KNOWLEDGE_BASE_MAX_CHARS.toLocaleString('en-US')} characters` },
+        { status: 400 }
+      )
+    }
+    // An empty box clears the knowledge base.
+    updates.knowledge_base = body.knowledge_base.trim() || null
   }
   if (body.escalation_contacts && typeof body.escalation_contacts === 'object') {
     const cleaned: Record<string, string> = {}
