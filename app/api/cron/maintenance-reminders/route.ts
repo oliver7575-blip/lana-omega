@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import type { EncryptedPayload } from '@/lib/crypto'
-import { getMaintenanceTemplate, sendMaintenanceTemplate } from '@/lib/maintenance-template'
+import {
+  getMaintenanceTemplate,
+  resolveTemplateChoice,
+  sendMaintenanceTemplate,
+} from '@/lib/maintenance-template'
 
 export const maxDuration = 60
 
@@ -25,7 +29,7 @@ export async function GET(request: Request) {
   const today = new Date().toISOString().slice(0, 10)
   const cooldownCutoff = new Date(Date.now() - COOLDOWN_HOURS * 60 * 60 * 1000).toISOString()
 
-  const { data: tenants } = await supabase.from('tenants').select('id')
+  const { data: tenants } = await supabase.from('tenants').select('id, maintenance_template')
   const results: Record<string, unknown>[] = []
 
   for (const tenant of tenants ?? []) {
@@ -63,10 +67,11 @@ export async function GET(request: Request) {
 
     // Reminders go out as the Meta-approved template, so they're delivered
     // even outside WhatsApp's 24-hour window. No approved template = no send.
+    const choice = resolveTemplateChoice(tenant.maintenance_template)
     let templateStatus = 'UNKNOWN'
     try {
       const info = config.waba_id
-        ? await getMaintenanceTemplate(config.waba_id, credentials)
+        ? await getMaintenanceTemplate(config.waba_id, credentials, choice)
         : { exists: false }
       templateStatus = info.exists ? (info.status ?? 'UNKNOWN') : 'NOT_SUBMITTED'
     } catch (err) {
@@ -75,7 +80,7 @@ export async function GET(request: Request) {
     if (templateStatus !== 'APPROVED') {
       results.push({
         tenantId: tenant.id,
-        skipped: `maintenance template not approved (${templateStatus})`,
+        skipped: `maintenance template ${choice.name} not approved (${templateStatus})`,
         dueTasks: eligible.length,
       })
       continue
@@ -121,7 +126,8 @@ export async function GET(request: Request) {
             location: (task.location as string | null) ?? '—',
             due: formatDue(task.due_date as string, today),
           },
-          task.id
+          task.id,
+          choice
         )
 
         if (sendResult.success) {
