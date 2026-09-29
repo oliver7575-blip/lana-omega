@@ -1,11 +1,43 @@
+interface CloudbedsRoom {
+  roomName?: string
+  roomTypeName?: string
+}
+
+interface CloudbedsGuestDetail {
+  guestEmail?: string
+  guestPhone?: string
+  guestCellPhone?: string
+  rooms?: CloudbedsRoom[]
+}
+
+function extractGuestDetail(reservation: Record<string, unknown>): CloudbedsGuestDetail | undefined {
+  const guestID = reservation.guestID as string | undefined
+  const guestList = reservation.guestList as Record<string, CloudbedsGuestDetail> | undefined
+  if (!guestID || !guestList) return undefined
+  return guestList[guestID]
+}
+
+function extractPhone(guestDetail: CloudbedsGuestDetail | undefined): string | undefined {
+  if (!guestDetail) return undefined
+  const phone = guestDetail.guestPhone?.trim() || guestDetail.guestCellPhone?.trim()
+  return phone || undefined
+}
+
 export interface ReservationLookupResult {
   found: boolean
   reservationID?: string
   guestName?: string
+  guestEmail?: string
+  guestPhone?: string
   startDate?: string
   endDate?: string
   status?: string
+  roomName?: string
   roomTypeName?: string
+  adults?: string
+  children?: string
+  balance?: number
+  sourceName?: string
   error?: string
 }
 
@@ -41,14 +73,24 @@ export async function lookupReservation(
       return { found: false }
     }
 
+    const guestDetail = extractGuestDetail(match)
+    const room = guestDetail?.rooms?.[0]
+
     return {
       found: true,
       reservationID: match.reservationID,
       guestName: match.guestName,
+      guestEmail: guestDetail?.guestEmail,
+      guestPhone: extractPhone(guestDetail),
       startDate: match.startDate,
       endDate: match.endDate,
       status: match.status,
-      roomTypeName: match.assigned?.[0]?.roomTypeName,
+      roomName: room?.roomName,
+      roomTypeName: room?.roomTypeName,
+      adults: match.adults,
+      children: match.children,
+      balance: match.balance,
+      sourceName: match.sourceName,
     }
   } catch (err) {
     return { found: false, error: err instanceof Error ? err.message : 'Unknown error' }
@@ -116,6 +158,7 @@ export interface UpcomingArrival {
   reservationID: string
   guestName?: string
   startDate?: string
+  roomName?: string
   roomTypeName?: string
   phone?: string
 }
@@ -124,15 +167,6 @@ export interface GetArrivalsResult {
   success: boolean
   arrivals: UpcomingArrival[]
   error?: string
-}
-
-function extractPhone(reservation: Record<string, unknown>): string | undefined {
-  const candidates = ['phone', 'guestPhone', 'phone1', 'cellPhone']
-  for (const key of candidates) {
-    const value = reservation[key]
-    if (typeof value === 'string' && value.trim()) return value.trim()
-  }
-  return undefined
 }
 
 export async function getArrivalsInWindow(
@@ -159,13 +193,18 @@ export async function getArrivalsInWindow(
 
     const reservations = (data.data ?? []) as Record<string, unknown>[]
 
-    const arrivals: UpcomingArrival[] = reservations.map((r) => ({
-      reservationID: r.reservationID as string,
-      guestName: r.guestName as string | undefined,
-      startDate: r.startDate as string | undefined,
-      roomTypeName: (r.assigned as { roomTypeName?: string }[] | undefined)?.[0]?.roomTypeName,
-      phone: extractPhone(r),
-    }))
+    const arrivals: UpcomingArrival[] = reservations.map((r) => {
+      const guestDetail = extractGuestDetail(r)
+      const room = guestDetail?.rooms?.[0]
+      return {
+        reservationID: r.reservationID as string,
+        guestName: r.guestName as string | undefined,
+        startDate: r.startDate as string | undefined,
+        roomName: room?.roomName,
+        roomTypeName: room?.roomTypeName,
+        phone: extractPhone(guestDetail),
+      }
+    })
 
     return { success: true, arrivals }
   } catch (err) {
