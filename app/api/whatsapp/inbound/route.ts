@@ -184,6 +184,31 @@ interface ContactDirectoryEntry {
   category?: string
 }
 
+/**
+ * Meta accepts a message first and reports delivery later, in a separate
+ * "status" webhook. Failures there (24-hour window closed, recipient not
+ * allowed, media unreachable…) are otherwise invisible, so log them.
+ */
+function logFailedDeliveries(body: Record<string, unknown>) {
+  const entries = (body.entry as { changes?: { value?: { statuses?: unknown[] } }[] }[]) ?? []
+  for (const entry of entries) {
+    for (const change of entry.changes ?? []) {
+      for (const raw of change.value?.statuses ?? []) {
+        const st = raw as {
+          status?: string
+          recipient_id?: string
+          errors?: { code?: number; title?: string; message?: string; error_data?: { details?: string } }[]
+        }
+        if (st.status !== 'failed') continue
+        const err = st.errors?.[0]
+        console.error(
+          `[whatsapp-delivery] failed to ${st.recipient_id}: ${err?.code ?? ''} ${err?.title ?? err?.message ?? 'unknown error'}${err?.error_data?.details ? ` — ${err.error_data.details}` : ''}`
+        )
+      }
+    }
+  }
+}
+
 export async function POST(request: Request) {
   const rawBody = await request.text()
   const signature = request.headers.get('x-hub-signature-256')
@@ -202,6 +227,8 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ ignored: true, reason: 'invalid json' })
   }
+
+  logFailedDeliveries(parsedBody)
 
   const extracted = extractMessage(parsedBody)
   if (!extracted) {
