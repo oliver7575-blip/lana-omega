@@ -215,6 +215,16 @@ export async function submitMaintenanceTemplate(
   body: string
 ): Promise<{ ok: boolean; created: boolean; status?: string; error?: string }> {
   const existing = await getMaintenanceTemplate(wabaId, credentials)
+  // Meta only allows edits to templates that are approved, rejected or
+  // paused — not while a review is still running.
+  if (existing.exists && (existing.status === 'PENDING' || existing.status === 'IN_APPEAL')) {
+    return {
+      ok: false,
+      created: false,
+      error:
+        'This template is still being reviewed by Meta, so it can’t be edited right now. Wait until it is approved or rejected, then try again.',
+    }
+  }
   const headers = {
     Authorization: `Bearer ${token(credentials)}`,
     'Content-Type': 'application/json',
