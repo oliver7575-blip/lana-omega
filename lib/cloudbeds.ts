@@ -211,3 +211,65 @@ export async function getArrivalsInWindow(
     return { success: false, arrivals: [], error: err instanceof Error ? err.message : 'Unknown error' }
   }
 }
+
+export interface RecentDeparture {
+  reservationID: string
+  guestName?: string
+  endDate?: string
+  roomTypeName?: string
+  phone?: string
+}
+
+export interface GetDeparturesResult {
+  success: boolean
+  departures: RecentDeparture[]
+  error?: string
+}
+
+export async function getDeparturesInWindow(
+  apiKey: string,
+  propertyId: string,
+  date: string
+): Promise<GetDeparturesResult> {
+  try {
+    // NOTE: unlike getArrivalsInWindow, this does NOT use a checkOutFrom /
+    // checkOutTo query parameter — that pair has never been confirmed
+    // against real Cloudbeds data (only checkInFrom/checkInTo has, from
+    // Beta's own working setup). Filtering client-side on endDate instead,
+    // same safe approach lookupReservation already uses successfully.
+    const url = `https://api.cloudbeds.com/api/v1.3/getReservations?propertyID=${encodeURIComponent(propertyId)}&pageSize=100&includeGuestsDetails=true`
+
+    const response = await fetch(url, {
+      headers: { 'x-api-key': apiKey },
+    })
+
+    if (!response.ok) {
+      const errText = await response.text()
+      return { success: false, departures: [], error: `Cloudbeds API error: ${response.status} ${errText}` }
+    }
+
+    const data = await response.json()
+    if (!data.success) {
+      return { success: false, departures: [], error: 'Cloudbeds API returned success=false' }
+    }
+
+    const reservations = (data.data ?? []) as Record<string, unknown>[]
+    const matching = reservations.filter((r) => r.endDate === date)
+
+    const departures: RecentDeparture[] = matching.map((r) => {
+      const guestDetail = extractGuestDetail(r)
+      const room = guestDetail?.rooms?.[0]
+      return {
+        reservationID: r.reservationID as string,
+        guestName: r.guestName as string | undefined,
+        endDate: r.endDate as string | undefined,
+        roomTypeName: room?.roomTypeName,
+        phone: extractPhone(guestDetail),
+      }
+    })
+
+    return { success: true, departures }
+  } catch (err) {
+    return { success: false, departures: [], error: err instanceof Error ? err.message : 'Unknown error' }
+  }
+}
