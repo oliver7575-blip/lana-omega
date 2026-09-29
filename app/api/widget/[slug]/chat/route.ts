@@ -5,6 +5,7 @@ import { decryptCredentials } from '@/lib/crypto'
 import { lookupReservation, updateArrivalTime } from '@/lib/cloudbeds'
 import { notifyStaff } from '@/lib/escalation'
 import { buildBookingLinkInstruction } from '@/lib/booking-link'
+import { buildKnowledgeBaseSection } from '@/lib/knowledge-base'
 
 const RATE_LIMIT_WINDOW_MINUTES = 10
 const RATE_LIMIT_MAX_MESSAGES = 15
@@ -104,7 +105,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
 
   const { data: tenant, error: tenantError } = await supabase
     .from('tenants')
-    .select('id, ai_persona_prompt, status, escalation_contacts, booking_config')
+    .select('id, ai_persona_prompt, knowledge_base, status, escalation_contacts, booking_config')
     .eq('slug', slug)
     .maybeSingle()
 
@@ -422,6 +423,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     knownGuestContext +
     (tenant.ai_persona_prompt ??
       'You are a helpful, warm hotel concierge assistant. Answer guest questions clearly and concisely.') +
+    buildKnowledgeBaseSection(tenant.knowledge_base as string | null) +
     buildBookingLinkInstruction(tenant.booking_config as Record<string, unknown>)
 
   let replyText: string
