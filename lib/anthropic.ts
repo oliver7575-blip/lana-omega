@@ -133,7 +133,7 @@ export async function generateReply(
     tools.push({
       name: 'escalate_to_staff',
       description:
-        'Send a real, immediate notification directly to hotel staff about something that needs a person. This actually sends a message, so only call it once you have a clear picture of the issue — ask for the room number first if the problem is room-specific and you do not already have it. Call it once per issue, then tell the guest the team has been notified.\n\nCategories:\n' +
+        'Send a real, immediate notification directly to hotel staff about something that needs a person. This actually sends a message, so only call it once you have a clear picture of the issue — ask for the room number first if the problem is room-specific and you do not already have it. Call it once per issue, then tell the guest the team has been notified. NEVER tell a guest that staff, Oliver, Lucia or anyone else has been notified or will contact them unless you called this tool in your current reply and it returned success: true. If the guest repeats a request that was escalated earlier in the conversation, call it again. If it returns an error, apologise and tell the guest to write to the hotel instead.\n\nCategories:\n' +
         categoryGuide,
       input_schema: {
         type: 'object',
@@ -338,6 +338,12 @@ export async function generateReply(
           result = { success: true }
         }
 
+        const ok = (result as { success?: boolean; found?: boolean } | null) ?? {}
+        console.log(
+          `[concierge-tool] ${block.name} ${JSON.stringify(block.input).slice(0, 300)} → ${
+            ok.success === false || ok.found === false ? 'FAILED ' : 'ok '
+          }${JSON.stringify(result).slice(0, 300)}`
+        )
         results.push({ type: 'tool_result', tool_use_id: block.id, content: JSON.stringify(result) })
       }
 
