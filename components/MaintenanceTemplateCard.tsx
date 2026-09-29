@@ -204,6 +204,7 @@ export default function MaintenanceTemplateCard() {
   }
 
   const style = template?.status ? STATUS_STYLE[template.status] : undefined
+  const inReview = template?.exists && (template.status === 'PENDING' || template.status === 'IN_APPEAL')
 
   return (
     <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 16, marginBottom: 24 }}>
@@ -289,7 +290,7 @@ export default function MaintenanceTemplateCard() {
               <textarea
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
-                disabled={!canEdit || saving}
+                disabled={!canEdit || saving || inReview}
                 rows={8}
                 style={{ width: '100%', padding: 8, fontFamily: 'monospace', fontSize: 13 }}
               />
@@ -299,17 +300,23 @@ export default function MaintenanceTemplateCard() {
               <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
                 The three buttons are fixed — they drive the task updates.
               </div>
+              {inReview && (
+                <div style={{ fontSize: 13, color: '#854d0e', marginTop: 8 }}>
+                  Editing is locked while Meta reviews this template. Once it's approved or
+                  rejected you can edit and resubmit it.
+                </div>
+              )}
 
               {canEdit && (
                 <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-                  <button onClick={handleSubmit} disabled={saving}>
+                  <button onClick={handleSubmit} disabled={saving || inReview}>
                     {saving
                       ? 'Working...'
                       : template.exists
                         ? 'Save & resubmit for approval'
                         : 'Submit for approval'}
                   </button>
-                  {body !== defaultBody && (
+                  {body !== defaultBody && !inReview && (
                     <button onClick={() => setBody(defaultBody)} disabled={saving} type="button">
                       Reset to default text
                     </button>
