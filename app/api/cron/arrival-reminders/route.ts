@@ -85,9 +85,10 @@ export async function GET(request: Request) {
 
       let messageText: string
       try {
-        messageText = await generateReply(systemPrompt, [
+        const result = await generateReply(systemPrompt, [
           { role: 'user', content: 'Write the reminder message now.' },
         ])
+        messageText = result.text
       } catch (err) {
         results.push({
           tenantId: tenant.id,

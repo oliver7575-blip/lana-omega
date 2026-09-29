@@ -66,9 +66,10 @@ export async function processNewReservation(tenantId: string, reservationID: str
 
   let messageText: string
   try {
-    messageText = await generateReply(systemPrompt, [
+    const result = await generateReply(systemPrompt, [
       { role: 'user', content: 'Write the welcome message now.' },
     ])
+    messageText = result.text
   } catch (err) {
     return {
       step: 'ai_generation',
