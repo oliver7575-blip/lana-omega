@@ -93,12 +93,16 @@ export async function describeImage(buffer: Buffer, mimeType: string): Promise<s
 
 /**
  * Transcribes a voice note with Deepgram (pre-recorded API, automatic
- * language detection). Optional: if DEEPGRAM_API_KEY isn't set, this throws
- * and the caller falls back to a placeholder so Lana asks the guest to type.
+ * language detection), using the tenant's own Deepgram key from the
+ * Integrations page. If the tenant hasn't connected one, this throws and the
+ * caller falls back to a placeholder so Lana asks the guest to type.
  */
-export async function transcribeAudio(buffer: Buffer, mimeType: string): Promise<string> {
-  const apiKey = process.env.DEEPGRAM_API_KEY
-  if (!apiKey) throw new Error('DEEPGRAM_API_KEY not configured')
+export async function transcribeAudio(
+  buffer: Buffer,
+  mimeType: string,
+  apiKey: string | undefined
+): Promise<string> {
+  if (!apiKey) throw new Error('Voice notes (Deepgram) integration not connected')
 
   const response = await fetch(
     'https://api.deepgram.com/v1/listen?model=nova-3-general&detect_language=true&smart_format=true',
