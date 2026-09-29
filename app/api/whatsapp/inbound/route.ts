@@ -62,6 +62,14 @@ function extractMessage(body: Record<string, unknown>): ExtractedMessage | null 
   return null
 }
 
+interface ContactDirectoryEntry {
+  name: string
+  phone: string
+  url: string
+  button_text: string
+  category?: string
+}
+
 export async function POST(request: Request) {
   const rawBody = await request.text()
   const signature = request.headers.get('x-hub-signature-256')
@@ -110,10 +118,6 @@ export async function POST(request: Request) {
 
   const tenantId = integration.tenant_id
 
-  // Maintenance staff replies are handled entirely separately and never
-  // touch the guest-facing pipeline below — matches Beta's own real
-  // architecture, which checks for a maintenance-staff phone match first
-  // and routes away entirely rather than treating them as a guest.
   const maintenanceResult = await processMaintenanceButtonReply(tenantId, from, text)
   if (maintenanceResult.handled) {
     return NextResponse.json({ tenantId, maintenanceReply: true, detail: maintenanceResult.detail })
@@ -121,7 +125,7 @@ export async function POST(request: Request) {
 
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('ai_persona_prompt, escalation_contacts, booking_config')
+    .select('ai_persona_prompt, escalation_contacts, booking_config, contact_directory')
     .eq('id', tenantId)
     .single()
 
@@ -231,9 +235,6 @@ export async function POST(request: Request) {
     },
   }
 
-  // Register: lets a guest confirm ownership of a reservation once and be
-  // recognized automatically on future messages from this same number —
-  // real write, only called by Claude after explicit guest confirmation.
   const registerReservationTool = {
     registerReservation: async (confirmationNumber: string) => {
       const { error: upsertError } = await supabase
@@ -249,14 +250,19 @@ export async function POST(request: Request) {
     },
   }
 
-  // Native WhatsApp CTA button — WhatsApp-only, since it sends via the
-  // WhatsApp Business API directly rather than returning to a UI.
-  const contactButtonTool = { enabled: true as const }
+  const contactDirectory = (tenant?.contact_directory as ContactDirectoryEntry[]) ?? []
+  const contactButtonTool = contactDirectory.length > 0 ? { enabled: true as const } : undefined
 
-  // Known-guest recognition: if this phone has a previously-confirmed
-  // reservation on file, re-verify it live against Cloudbeds right now
-  // (never trust a stale cached snapshot) and inject it into the system
-  // prompt so the guest doesn't have to re-identify themselves.
+  const contactDirectoryContext =
+    contactDirectory.length > 0
+      ? `AVAILABLE CONTACTS\n\nThese are real, pre-approved contacts you can recommend and share via the send_contact_button tool. Use their exact name, phone, url, and buttonText values when calling that tool — do not alter them.\n\n${contactDirectory
+          .map(
+            (c) =>
+              `- ${c.name}${c.category ? ` (${c.category})` : ''}: phone="${c.phone}", url="${c.url}", buttonText="${c.button_text}"`
+          )
+          .join('\n')}\n\n`
+      : ''
+
   let knownGuestContext = ''
   if (cloudbedsIntegration?.status === 'connected') {
     const { data: savedReservation } = await supabase
@@ -371,6 +377,7 @@ export async function POST(request: Request) {
 
   const systemPrompt =
     knownGuestContext +
+    contactDirectoryContext +
     (tenant?.ai_persona_prompt ??
       'You are a helpful, warm hotel concierge assistant. Answer guest questions clearly and concisely.') +
     buildBookingLinkInstruction(tenant?.booking_config as Record<string, unknown>)
