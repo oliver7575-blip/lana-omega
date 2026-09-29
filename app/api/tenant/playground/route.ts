@@ -69,11 +69,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    // No reservation tool is passed on purpose: this tests persona and
-    // policies only, and nothing here touches guests, conversations or
-    // messages, so no real data is written.
-    const reply = await generateReply(prompt, messages)
-    return NextResponse.json({ reply })
+    // No tools are passed on purpose: this tests persona and policies
+    // only, and nothing here touches guests, conversations or messages,
+    // so no real data is written.
+    const result = await generateReply(prompt, messages)
+    return NextResponse.json({ reply: result.text })
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'AI generation failed' },
