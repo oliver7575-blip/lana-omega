@@ -7,10 +7,6 @@
     {
       "path": "/api/cron/post-stay-feedback",
       "schedule": "0 12 * * *"
-    },
-    {
-      "path": "/api/cron/new-reservation-welcome",
-      "schedule": "*/30 * * * *"
     }
   ]
 }
