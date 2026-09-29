@@ -31,18 +31,26 @@ export async function POST(request: Request) {
 
   const endpointUrl = `https://lana-omega-soiree-lana.vercel.app/api/webhooks/cloudbeds/${tenantId}`
 
-  const params = new URLSearchParams({
+  // endpointUrl/object/action go in the request BODY as form-urlencoded data
+  // (matches Cloudbeds's own real curl example exactly, --data-urlencode).
+  // propertyID goes in the URL query string instead — the docs explicitly
+  // call that one out as a separate, URL-only parameter for multi-property
+  // accounts.
+  const body = new URLSearchParams({
     endpointUrl,
     object: 'reservation',
     action: 'created',
-    propertyID: propertyId ?? '',
   })
 
   const response = await fetch(
-    `https://api.cloudbeds.com/api/v1.3/postWebhook?${params.toString()}`,
+    `https://api.cloudbeds.com/api/v1.3/postWebhook?propertyID=${encodeURIComponent(propertyId ?? '')}`,
     {
       method: 'POST',
-      headers: { 'x-api-key': api_key },
+      headers: {
+        'x-api-key': api_key,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: body.toString(),
     }
   )
 
