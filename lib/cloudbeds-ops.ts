@@ -1,0 +1,410 @@
+/**
+ * Cloudbeds reads and actions for the panel's Dashview and Calendar
+ * (the same features as Beta's Cloudbeds pages).
+ */
+const BASE = 'https://api.cloudbeds.com/api/v1.3'
+
+export interface CB {
+  apiKey: string
+  propertyId: string
+}
+
+type Json = Record<string, unknown>
+
+async function cbGet(cb: CB, method: string, params: Record<string, string | number | boolean | undefined>): Promise<Json> {
+  const qs = new URLSearchParams()
+  for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== '') qs.set(k, String(v))
+  const res = await fetch(`${BASE}/${method}?${qs}`, {
+    headers: { 'x-api-key': cb.apiKey },
+    signal: AbortSignal.timeout(20000),
+    cache: 'no-store',
+  })
+  if (!res.ok) throw new Error(`Cloudbeds ${method} failed: ${res.status}`)
+  const json = (await res.json()) as Json
+  if (json.success === false) throw new Error(`Cloudbeds ${method}: ${(json.message as string) ?? 'error'}`)
+  return json
+}
+
+/** PUT with PHP-style form fields (Cloudbeds expects x-www-form-urlencoded). */
+async function cbPut(cb: CB, method: string, fields: Record<string, string>): Promise<Json> {
+  const res = await fetch(`${BASE}/${method}`, {
+    method: 'PUT',
+    headers: { 'x-api-key': cb.apiKey, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ propertyID: cb.propertyId, ...fields }),
+    signal: AbortSignal.timeout(20000),
+  })
+  const json = (await res.json().catch(() => ({}))) as Json
+  if (!res.ok || json.success === false) {
+    throw new Error((json.message as string) ?? `Cloudbeds ${method} failed: ${res.status}`)
+  }
+  return json
+}
+
+/** All pages of getReservations (max 5 × 100). */
+async function listReservations(cb: CB, params: Record<string, string | number | boolean | undefined>): Promise<Json[]> {
+  const out: Json[] = []
+  for (let page = 1; page <= 5; page++) {
+    const json = await cbGet(cb, 'getReservations', { propertyID: cb.propertyId, pageSize: 100, pageNumber: page, ...params })
+    const data = (json.data as Json[]) ?? []
+    out.push(...data)
+    if (data.length < 100) break
+  }
+  return out
+}
+
+async function mapLimit<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length)
+  let i = 0
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (i < items.length) {
+        const idx = i++
+        results[idx] = await fn(items[idx])
+      }
+    })
+  )
+  return results
+}
+
+export function addDays(date: string, days: number): string {
+  const d = new Date(`${date}T12:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+const nightsBetween = (a?: string, b?: string) =>
+  a && b ? Math.max(0, Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86400000)) : 0
+
+const ACTIVE = (s: unknown) => !['canceled', 'cancelled', 'no_show'].includes(String(s ?? '').toLowerCase())
+
+// ---------------------------------------------------------------------------
+// Single reservation
+// ---------------------------------------------------------------------------
+
+export interface ReservationDetail {
+  reservationID: string
+  guestName: string
+  guestEmail: string | null
+  status: string
+  source: string | null
+  startDate: string
+  endDate: string
+  adults: number
+  children: number
+  rooms: { subReservationID: string; roomTypeID: string; roomTypeName: string; roomName: string | null; startDate: string; endDate: string; adults: number; children: number }[]
+  total: number | null
+  balance: number | null
+  estimatedArrivalTime: string | null
+}
+
+export async function getReservationDetail(cb: CB, reservationID: string): Promise<ReservationDetail> {
+  const json = await cbGet(cb, 'getReservation', { propertyID: cb.propertyId, reservationID })
+  const d = (json.data ?? {}) as Json
+  const assigned = ((d.assigned as Json[]) ?? []).map((r) => ({
+    subReservationID: String(r.subReservationID ?? ''),
+    roomTypeID: String(r.roomTypeID ?? ''),
+    roomTypeName: String(r.roomTypeName ?? ''),
+    roomName: (r.roomName as string) ?? null,
+    startDate: String(r.startDate ?? d.startDate ?? ''),
+    endDate: String(r.endDate ?? d.endDate ?? ''),
+    adults: Number(r.adults ?? 0),
+    children: Number(r.children ?? 0),
+  }))
+  const unassigned = ((d.unassigned as Json[]) ?? []).map((r) => ({
+    subReservationID: String(r.subReservationID ?? ''),
+    roomTypeID: String(r.roomTypeID ?? ''),
+    roomTypeName: String(r.roomTypeName ?? ''),
+    roomName: null,
+    startDate: String(r.startDate ?? d.startDate ?? ''),
+    endDate: String(r.endDate ?? d.endDate ?? ''),
+    adults: Number(r.adults ?? 0),
+    children: Number(r.children ?? 0),
+  }))
+  const rooms = [...assigned, ...unassigned]
+  return {
+    reservationID: String(d.reservationID ?? reservationID),
+    guestName: String(d.guestName ?? ''),
+    guestEmail: (d.guestEmail as string) ?? null,
+    status: String(d.status ?? ''),
+    source: (d.source as string) ?? null,
+    startDate: String(d.startDate ?? ''),
+    endDate: String(d.endDate ?? ''),
+    adults: rooms.reduce((s, r) => s + r.adults, 0),
+    children: rooms.reduce((s, r) => s + r.children, 0),
+    rooms,
+    total: typeof d.total === 'number' ? d.total : d.total ? Number(d.total) : null,
+    balance: typeof d.balance === 'number' ? d.balance : d.balance ? Number(d.balance) : null,
+    estimatedArrivalTime: (d.estimatedArrivalTime as string) || null,
+  }
+}
+
+export async function checkIn(cb: CB, reservationID: string) {
+  await cbPut(cb, 'putReservation', { reservationID, status: 'checked_in' })
+}
+
+export async function setArrivalTime(cb: CB, reservationID: string, time: string) {
+  await cbPut(cb, 'putReservation', { reservationID, estimatedArrivalTime: time })
+}
+
+/** Moves every room of the reservation to the new stay dates. */
+export async function setStayDates(cb: CB, reservationID: string, checkin: string, checkout: string) {
+  const r = await getReservationDetail(cb, reservationID)
+  if (r.rooms.length === 0) throw new Error('This reservation has no rooms to update')
+  const fields: Record<string, string> = { reservationID }
+  r.rooms.forEach((room, i) => {
+    fields[`rooms[${i}][subReservationID]`] = room.subReservationID
+    fields[`rooms[${i}][roomTypeID]`] = room.roomTypeID
+    fields[`rooms[${i}][checkinDate]`] = checkin
+    fields[`rooms[${i}][checkoutDate]`] = checkout
+    fields[`rooms[${i}][adults]`] = String(room.adults || 1)
+    fields[`rooms[${i}][children]`] = String(room.children || 0)
+  })
+  await cbPut(cb, 'putReservation', fields)
+}
+
+// ---------------------------------------------------------------------------
+// Dashview
+// ---------------------------------------------------------------------------
+
+export interface DashRow {
+  reservationID: string
+  guestName: string
+  room: string
+  arrivalTime: string | null
+  status: string
+  startDate: string
+  endDate: string
+}
+
+function roomLabel(r: Json): string {
+  const rooms = (r.rooms as Json[]) ?? []
+  const names = rooms.map((x) => x.roomName).filter(Boolean) as string[]
+  if (names.length) return [...new Set(names)].join(', ')
+  const types = rooms.map((x) => x.roomTypeName).filter(Boolean) as string[]
+  return types.length ? `${[...new Set(types)].join(', ')} (unassigned)` : '—'
+}
+
+export async function dashList(cb: CB, tab: 'arrivals' | 'departures' | 'stayovers' | 'inhouse', day: string): Promise<DashRow[]> {
+  let params: Record<string, string | boolean> = { includeAllRooms: true }
+  if (tab === 'arrivals') params = { ...params, checkInFrom: day, checkInTo: day }
+  if (tab === 'departures') params = { ...params, checkOutFrom: day, checkOutTo: day }
+  if (tab === 'stayovers') params = { ...params, checkInTo: addDays(day, -1), checkOutFrom: addDays(day, 1) }
+  if (tab === 'inhouse') params = { ...params, status: 'checked_in' }
+  const list = (await listReservations(cb, params)).filter((r) => ACTIVE(r.status))
+
+  // Arrival times only come with the full reservation.
+  const times = tab === 'arrivals'
+    ? await mapLimit(list.slice(0, 40), 5, async (r) => {
+        try {
+          return (await getReservationDetail(cb, String(r.reservationID))).estimatedArrivalTime
+        } catch {
+          return null
+        }
+      })
+    : []
+
+  return list.map((r, i) => ({
+    reservationID: String(r.reservationID),
+    guestName: String(r.guestName ?? ''),
+    room: roomLabel(r),
+    arrivalTime: times[i] ?? null,
+    status: String(r.status ?? ''),
+    startDate: String(r.startDate ?? ''),
+    endDate: String(r.endDate ?? ''),
+  }))
+}
+
+export interface ActivityRow {
+  reservationID: string
+  guestName: string
+  revenue: number | null
+  checkIn: string
+  nights: number
+  status: string
+}
+
+export async function dashSummary(cb: CB, today: string, dayStartIso: string) {
+  const [dash, sales, cancels] = await Promise.all([
+    cbGet(cb, 'getDashboard', { propertyID: cb.propertyId, date: today }).catch(() => ({ data: {} })),
+    listReservations(cb, { resultsFrom: dayStartIso.replace('T', ' ').slice(0, 19) }),
+    listReservations(cb, { status: 'canceled', modifiedFrom: dayStartIso.replace('T', ' ').slice(0, 19) }),
+  ])
+  const d = (dash.data ?? {}) as Json
+
+  const detail = async (r: Json): Promise<ActivityRow> => {
+    let total: number | null = null
+    try {
+      total = (await getReservationDetail(cb, String(r.reservationID))).total
+    } catch {
+      total = null
+    }
+    return {
+      reservationID: String(r.reservationID),
+      guestName: String(r.guestName ?? ''),
+      revenue: total,
+      checkIn: String(r.startDate ?? ''),
+      nights: nightsBetween(r.startDate as string, r.endDate as string),
+      status: String(r.status ?? ''),
+    }
+  }
+  const salesRows = await mapLimit(sales.filter((r) => ACTIVE(r.status)).slice(0, 30), 5, detail)
+  const cancelRows = await mapLimit(cancels.slice(0, 30), 5, detail)
+
+  return {
+    arrivals: Number(d.arrivals ?? 0),
+    departures: Number(d.departures ?? 0),
+    inHouse: Number(d.inHouse ?? 0),
+    roomsOccupied: Number(d.roomsOccupied ?? 0),
+    percentageOccupied: Number(d.percentageOccupied ?? 0),
+    sales: {
+      count: salesRows.length,
+      roomNights: salesRows.reduce((s, r) => s + r.nights, 0),
+      revenue: salesRows.reduce((s, r) => s + (r.revenue ?? 0), 0),
+      rows: salesRows,
+    },
+    cancellations: {
+      count: cancelRows.length,
+      roomNights: cancelRows.reduce((s, r) => s + r.nights, 0),
+      revenue: cancelRows.reduce((s, r) => s + (r.revenue ?? 0), 0),
+      rows: cancelRows,
+    },
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Calendar
+// ---------------------------------------------------------------------------
+
+export interface CalendarData {
+  start: string
+  days: string[]
+  roomTypes: {
+    id: string
+    name: string
+    rates: Record<string, number>
+    rooms: { id: string; name: string }[]
+  }[]
+  bookings: {
+    reservationID: string
+    guestName: string
+    status: string
+    roomID: string
+    start: string
+    end: string
+  }[]
+  unassigned: { reservationID: string; guestName: string; roomTypeID: string; start: string; end: string; status: string }[]
+  blocks: { roomID: string; start: string; end: string; reason: string }[]
+  overbookings: { roomID: string; reservationIDs: string[] }[]
+}
+
+export async function calendar(cb: CB, start: string, dayCount: number): Promise<CalendarData> {
+  const end = addDays(start, dayCount)
+  const days = Array.from({ length: dayCount }, (_, i) => addDays(start, i))
+
+  const [roomsJson, reservations, blocksJson, ratesJson] = await Promise.all([
+    cbGet(cb, 'getRooms', { propertyIDs: cb.propertyId, pageSize: 100 }),
+    listReservations(cb, { checkInTo: end, checkOutFrom: start, includeAllRooms: true }),
+    cbGet(cb, 'getRoomBlocks', { propertyID: cb.propertyId, startDate: start, endDate: addDays(start, Math.min(dayCount, 34)) }).catch(() => ({ data: {} })),
+    cbGet(cb, 'getRatePlans', { propertyIDs: cb.propertyId, startDate: start, endDate: end, detailedRates: true }).catch(() => ({ data: [] })),
+  ])
+
+  // Rooms grouped by room type, in Cloudbeds order.
+  const typeMap = new Map<string, CalendarData['roomTypes'][number]>()
+  for (const prop of (roomsJson.data as Json[]) ?? []) {
+    for (const r of (prop.rooms as Json[]) ?? []) {
+      if (r.isVirtual) continue
+      const id = String(r.roomTypeID)
+      if (!typeMap.has(id)) typeMap.set(id, { id, name: String(r.roomTypeName ?? ''), rates: {}, rooms: [] })
+      typeMap.get(id)!.rooms.push({ id: String(r.roomID), name: String(r.roomName ?? '') })
+    }
+  }
+  for (const t of typeMap.values()) {
+    t.rooms.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+  }
+
+  // Base (non-derived, no promo) rate per room type per night.
+  for (const rp of (ratesJson.data as Json[]) ?? []) {
+    const t = typeMap.get(String(rp.roomTypeID))
+    if (!t || rp.isDerived || rp.promoCode) continue
+    for (const day of (rp.roomRateDetailed as Json[]) ?? []) {
+      const date = String(day.date)
+      const rate = Number(day.rateBase ?? day.totalRate ?? 0)
+      if (!(date in t.rates) || rate < t.rates[date]) t.rates[date] = rate
+    }
+  }
+
+  const bookings: CalendarData['bookings'] = []
+  const unassigned: CalendarData['unassigned'] = []
+  for (const r of reservations) {
+    if (!ACTIVE(r.status)) continue
+    for (const room of (r.rooms as Json[]) ?? []) {
+      const s = String(room.roomCheckIn ?? r.startDate)
+      const e = String(room.roomCheckOut ?? r.endDate)
+      if (room.roomID) {
+        bookings.push({ reservationID: String(r.reservationID), guestName: String(room.guestName ?? r.guestName ?? ''), status: String(room.roomStatus ?? r.status), roomID: String(room.roomID), start: s, end: e })
+      } else {
+        unassigned.push({ reservationID: String(r.reservationID), guestName: String(r.guestName ?? ''), roomTypeID: String(room.roomTypeID ?? ''), start: s, end: e, status: String(r.status) })
+      }
+    }
+  }
+
+  const blocks: CalendarData['blocks'] = []
+  for (const b of (((blocksJson.data ?? {}) as Json).roomBlocks as Json[]) ?? []) {
+    for (const room of (b.rooms as Json[]) ?? []) {
+      blocks.push({ roomID: String(room.roomID), start: String(b.startDate), end: String(b.endDate), reason: String(b.roomBlockReason ?? b.roomBlockType ?? 'Blocked') })
+    }
+  }
+
+  // Two stays in the same room on the same night.
+  const overbookings: CalendarData['overbookings'] = []
+  const byRoom = new Map<string, CalendarData['bookings']>()
+  for (const b of bookings) byRoom.set(b.roomID, [...(byRoom.get(b.roomID) ?? []), b])
+  for (const [roomID, list] of byRoom) {
+    const sorted = [...list].sort((a, b) => a.start.localeCompare(b.start))
+    for (let i = 1; i < sorted.length; i++) {
+      if (sorted[i].start < sorted[i - 1].end && sorted[i].reservationID !== sorted[i - 1].reservationID) {
+        overbookings.push({ roomID, reservationIDs: [sorted[i - 1].reservationID, sorted[i].reservationID] })
+      }
+    }
+  }
+
+  return { start, days, roomTypes: [...typeMap.values()], bookings, unassigned, blocks, overbookings }
+}
+
+// ---------------------------------------------------------------------------
+// Search
+// ---------------------------------------------------------------------------
+
+export async function searchReservations(cb: CB, q: string): Promise<DashRow[]> {
+  const term = q.trim()
+  if (!term) return []
+  if (/^\d{5,}$/.test(term)) {
+    try {
+      const r = await getReservationDetail(cb, term)
+      return [{ reservationID: r.reservationID, guestName: r.guestName, room: r.rooms.map((x) => x.roomName ?? x.roomTypeName).join(', '), arrivalTime: r.estimatedArrivalTime, status: r.status, startDate: r.startDate, endDate: r.endDate }]
+    } catch {
+      return []
+    }
+  }
+  const parts = term.split(/\s+/)
+  const queries: Record<string, string>[] = parts.length > 1
+    ? [{ firstName: parts[0], lastName: parts.slice(1).join(' ') }, { lastName: term }]
+    : [{ lastName: term }, { firstName: term }]
+  const seen = new Map<string, DashRow>()
+  for (const params of queries) {
+    const list = await listReservations(cb, { ...params, includeAllRooms: true }).catch(() => [])
+    for (const r of list) {
+      const id = String(r.reservationID)
+      if (!seen.has(id)) {
+        seen.set(id, { reservationID: id, guestName: String(r.guestName ?? ''), room: roomLabel(r), arrivalTime: null, status: String(r.status ?? ''), startDate: String(r.startDate ?? ''), endDate: String(r.endDate ?? '') })
+      }
+    }
+  }
+  return [...seen.values()].sort((a, b) => b.startDate.localeCompare(a.startDate)).slice(0, 50)
+}
+
+export function cloudbedsLinks(propertyId: string) {
+  return {
+    newReservation: `https://hotels.cloudbeds.com/connect/${propertyId}#/newReservation`,
+    reservation: (id: string) => `https://hotels.cloudbeds.com/connect/${propertyId}#/reservations/${id}`,
+  }
+}
