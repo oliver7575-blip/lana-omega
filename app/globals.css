@@ -65,7 +65,8 @@ body {
    Beta's dark theme applied to their plain markup. */
 .legacy-dark {
   color: #e7e9f0;
-  font-size: 0.95rem;
+  font-size: 12.5px;
+  line-height: 1.45;
 }
 .legacy-dark main {
   max-width: 880px !important;
@@ -76,12 +77,12 @@ body {
 .legacy-dark h1 {
   font-family: var(--font-playfair), serif;
   font-style: italic;
-  font-size: 1.9rem;
+  font-size: 1.6rem !important;
   color: #fff;
   margin-bottom: 0.5rem;
 }
 .legacy-dark h2 {
-  font-size: 1.05rem;
+  font-size: 14px !important;
   font-weight: 600;
   color: #fff;
   margin-bottom: 0.4rem;
@@ -113,8 +114,9 @@ body {
   background: #0a0e1a !important;
   color: #e7e9f0 !important;
   border: 1px solid #232a40 !important;
-  border-radius: 8px;
-  padding: 7px 10px;
+  border-radius: 6px;
+  padding: 4px 8px !important;
+  font-size: 12.5px !important;
   outline: none;
 }
 .legacy-dark input:focus,
@@ -134,8 +136,9 @@ body {
   background: #1b2340;
   color: #e7e9f0;
   border: 1px solid #232a40;
-  border-radius: 8px;
-  padding: 6px 12px;
+  border-radius: 6px;
+  padding: 4px 10px !important;
+  font-size: 12px !important;
   cursor: pointer;
 }
 .legacy-dark button:hover:not(:disabled) {
@@ -160,3 +163,25 @@ body {
   background: #0a0e1a;
   color: #e7e9f0;
 }
+
+/* Denser layout for the older pages: shrink their inline sizes and spacing. */
+.legacy-dark [style*='font-size: 24px'] { font-size: 20px !important; }
+.legacy-dark [style*='font-size: 20px'] { font-size: 16px !important; }
+.legacy-dark [style*='font-size: 18px'] { font-size: 14px !important; }
+.legacy-dark [style*='font-size: 16px'] { font-size: 13px !important; }
+.legacy-dark [style*='font-size: 15px'] { font-size: 12.5px !important; }
+.legacy-dark [style*='font-size: 14px'] { font-size: 12px !important; }
+.legacy-dark [style*='font-size: 13px'] { font-size: 11.5px !important; }
+.legacy-dark [style*='font-size: 12px'] { font-size: 11px !important; }
+.legacy-dark [style*='margin-top: 32px'] { margin-top: 18px !important; }
+.legacy-dark [style*='margin-top: 24px'] { margin-top: 14px !important; }
+.legacy-dark [style*='margin-top: 16px'] { margin-top: 10px !important; }
+.legacy-dark [style*='margin-bottom: 16px'] { margin-bottom: 10px !important; }
+.legacy-dark [style*='margin-bottom: 12px'] { margin-bottom: 8px !important; }
+.legacy-dark div[style*='padding: 24px'],
+.legacy-dark div[style*='padding: 20px'],
+.legacy-dark div[style*='padding: 16px'] { padding: 12px 14px !important; }
+.legacy-dark div[style*='border: 1px solid'] { margin-bottom: 10px !important; }
+.legacy-dark p { margin-bottom: 0.35rem; }
+.legacy-dark textarea { line-height: 1.4; }
+.legacy-dark label { font-size: 12px; }
