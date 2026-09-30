@@ -484,8 +484,8 @@ export default function AutomationsPage() {
   const waDone = (key?: string) => Boolean(key && data?.purposes.find((p) => p.key === key)?.mapping)
   const emailOn = (key?: string) => Boolean(key && data?.emailTemplates.find((t) => t.key === key)?.enabled)
 
-  // Status marks: green bullet = set up. Green text = nothing else needed;
-  // red text = still needs its "send" box ticked (email tick, or post-stay switch).
+  // Status marks: green dot = set up. WhatsApp: red until a template is chosen.
+  // Email: red until "Send this email" is ticked. Post-stay: red while switched off in Settings.
   const GREEN = '#6ee7b7'
   const RED = '#fca5a5'
   const emailReady = (key?: string) => {
@@ -496,10 +496,13 @@ export default function AutomationsPage() {
     const postStayOff = c.key === 'post_stay' && !data?.postStayEnabled
     const list: { label: string; configured: boolean; textColor: string }[] = []
     if (c.maintenance) {
-      list.push({ label: 'WhatsApp template', configured: data?.maintenanceStatus === 'APPROVED', textColor: GREEN })
+      const ok = data?.maintenanceStatus === 'APPROVED'
+      list.push({ label: 'WhatsApp', configured: ok, textColor: ok ? GREEN : RED })
     }
     if (c.wa) {
-      list.push({ label: 'WhatsApp template', configured: waDone(c.wa), textColor: postStayOff ? RED : GREEN })
+      // Red until a template is chosen; then green with the green dot.
+      const ok = waDone(c.wa)
+      list.push({ label: 'WhatsApp', configured: ok, textColor: ok && !postStayOff ? GREEN : RED })
     }
     if (c.email) {
       list.push({ label: 'Email', configured: emailReady(c.email), textColor: emailOn(c.email) && !postStayOff ? GREEN : RED })
