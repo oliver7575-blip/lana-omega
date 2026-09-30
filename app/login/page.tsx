@@ -38,7 +38,7 @@ function LoginForm() {
       setError(error.message)
       return
     }
-    router.push('/')
+    router.push('/cloudbeds')
     router.refresh()
   }
 

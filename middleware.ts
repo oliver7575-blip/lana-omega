@@ -53,7 +53,7 @@ export async function middleware(request: NextRequest) {
 
   if (user && (isLoginPage || isSignupPage || isForgotPasswordPage || isResendConfirmationPage)) {
     const url = request.nextUrl.clone()
-    url.pathname = '/'
+    url.pathname = '/cloudbeds' // the Dashview is the start page after signing in
     return NextResponse.redirect(url)
   }
 

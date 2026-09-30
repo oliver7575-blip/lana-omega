@@ -40,6 +40,20 @@ async function cbPut(cb: CB, method: string, fields: Record<string, string>): Pr
   return json
 }
 
+async function cbPost(cb: CB, method: string, fields: Record<string, string>): Promise<Json> {
+  const res = await fetch(`${BASE}/${method}`, {
+    method: 'POST',
+    headers: { 'x-api-key': cb.apiKey, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ propertyID: cb.propertyId, ...fields }),
+    signal: AbortSignal.timeout(20000),
+  })
+  const json = (await res.json().catch(() => ({}))) as Json
+  if (!res.ok || json.success === false) {
+    throw new Error((json.message as string) ?? `Cloudbeds ${method} failed: ${res.status}`)
+  }
+  return json
+}
+
 /** All pages of getReservations (max 5 × 100). */
 async function listReservations(cb: CB, params: Record<string, string | number | boolean | undefined>): Promise<Json[]> {
   const out: Json[] = []
@@ -99,7 +113,7 @@ export interface ReservationDetail {
   endDate: string
   adults: number
   children: number
-  rooms: { subReservationID: string; roomTypeID: string; roomTypeName: string; roomName: string | null; startDate: string; endDate: string; adults: number; children: number }[]
+  rooms: { subReservationID: string; reservationRoomID: string | null; roomID: string | null; roomTypeID: string; roomTypeName: string; roomName: string | null; startDate: string; endDate: string; adults: number; children: number }[]
   total: number | null
   balance: number | null
   estimatedArrivalTime: string | null
@@ -110,6 +124,8 @@ export async function getReservationDetail(cb: CB, reservationID: string): Promi
   const d = (json.data ?? {}) as Json
   const assigned = ((d.assigned as Json[]) ?? []).map((r) => ({
     subReservationID: String(r.subReservationID ?? ''),
+    reservationRoomID: (r.reservationRoomID as string) ?? null,
+    roomID: (r.roomID as string) ?? null,
     roomTypeID: String(r.roomTypeID ?? ''),
     roomTypeName: String(r.roomTypeName ?? ''),
     roomName: (r.roomName as string) ?? null,
@@ -120,6 +136,8 @@ export async function getReservationDetail(cb: CB, reservationID: string): Promi
   }))
   const unassigned = ((d.unassigned as Json[]) ?? []).map((r) => ({
     subReservationID: String(r.subReservationID ?? ''),
+    reservationRoomID: (r.reservationRoomID as string) ?? null,
+    roomID: null,
     roomTypeID: String(r.roomTypeID ?? ''),
     roomTypeName: String(r.roomTypeName ?? ''),
     roomName: null,
@@ -146,8 +164,42 @@ export async function getReservationDetail(cb: CB, reservationID: string): Promi
   }
 }
 
+/**
+ * Checks a reservation in — but only if none of its rooms still has another
+ * guest checked in (they must be checked out first).
+ */
 export async function checkIn(cb: CB, reservationID: string) {
+  const r = await getReservationDetail(cb, reservationID)
+  for (const room of r.rooms) {
+    if (!room.roomID) continue
+    const occupants = await listReservations(cb, { roomID: room.roomID, status: 'checked_in' })
+    const other = occupants.find((o) => String(o.reservationID) !== reservationID)
+    if (other) {
+      throw new Error(
+        `Room ${room.roomName ?? room.roomID} still has ${other.guestName ?? 'another guest'} checked in (#${other.reservationID}). Check them out first.`
+      )
+    }
+  }
   await cbPut(cb, 'putReservation', { reservationID, status: 'checked_in' })
+}
+
+export async function setStatus(cb: CB, reservationID: string, status: 'checked_out' | 'confirmed' | 'canceled') {
+  await cbPut(cb, 'putReservation', { reservationID, status })
+}
+
+/** Takes the reservation out of one room (or all its rooms), back to "unassigned". */
+export async function unassignRoom(cb: CB, reservationID: string, roomID?: string) {
+  const r = await getReservationDetail(cb, reservationID)
+  const targets = r.rooms.filter((x) => x.roomID && (!roomID || x.roomID === roomID))
+  if (targets.length === 0) throw new Error('This reservation has no assigned room to remove')
+  for (const room of targets) {
+    await cbPost(cb, 'postRoomAssign', {
+      reservationID,
+      subReservationID: room.subReservationID,
+      reservationRoomID: room.reservationRoomID ?? '',
+      newRoomID: '',
+    })
+  }
 }
 
 export async function setArrivalTime(cb: CB, reservationID: string, time: string) {

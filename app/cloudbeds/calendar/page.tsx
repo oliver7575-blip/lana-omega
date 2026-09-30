@@ -58,8 +58,9 @@ function mergeChunk(prev: Chunk | null, next: Chunk, from: string, to: string): 
   }
 }
 
-function Bar({ start, end, viewStart, totalDays, label, color, onClick, title, dayW }: {
-  start: string; end: string; viewStart: string; totalDays: number; label: string; color: string; onClick?: () => void; title?: string; dayW: number
+function Bar({ start, end, viewStart, totalDays, label, color, onClick, onContextMenu, title, dayW }: {
+  start: string; end: string; viewStart: string; totalDays: number; label: string; color: string; onClick?: () => void
+  onContextMenu?: (e: React.MouseEvent) => void; title?: string; dayW: number
 }) {
   const from = diff(viewStart, start) + 0.5
   const to = diff(viewStart, end) + 0.5
@@ -69,6 +70,7 @@ function Bar({ start, end, viewStart, totalDays, label, color, onClick, title, d
   return (
     <button
       onClick={onClick}
+      onContextMenu={onContextMenu}
       title={title ?? label}
       className="absolute top-[3px] flex h-[15px] items-center overflow-hidden whitespace-nowrap pl-2.5 pr-2 text-left text-[9.5px] font-semibold leading-none text-white hover:brightness-95"
       style={{ left, width: right - left, background: color, clipPath: 'polygon(0 0, calc(100% - 6px) 0, 100% 50%, calc(100% - 6px) 100%, 0 100%, 6px 50%)' }}
@@ -86,6 +88,9 @@ export default function CalendarPage() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [open, setOpen] = useState<string | null>(null)
   const [dayW, setDayW] = useState(44)
+  const [menu, setMenu] = useState<{ x: number; y: number; reservationID: string; guestName: string; status: string; roomID: string | null } | null>(null)
+  const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null)
+  const [busy, setBusy] = useState(false)
   const scroller = useRef<HTMLDivElement>(null)
   const pendingShift = useRef(0) // columns added on the left, to keep the view still
   const scrollToDay = useRef<string | null>(null)
@@ -180,6 +185,55 @@ export default function CalendarPage() {
     return () => clearInterval(t)
   }, [refreshVisible])
 
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), toast.ok ? 6000 : 12000)
+    return () => clearTimeout(t)
+  }, [toast])
+
+  // Close the right-click menu on any outside click, scroll or Escape.
+  useEffect(() => {
+    if (!menu) return
+    const close = () => setMenu(null)
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close()
+    window.addEventListener('click', close)
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('click', close)
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [menu])
+
+  async function runAction(action: string, m: NonNullable<typeof menu>) {
+    setMenu(null)
+    if (action === 'cancel') {
+      const ok = confirm(
+        `Cancel reservation #${m.reservationID} (${m.guestName}) in Cloudbeds?\n\n` +
+          'NOTICE: this does NOT cancel the booking on third-party platforms (Booking.com, Expedia, Airbnb…). ' +
+          'If it came from one of them, cancel it there as well, or the guest may still arrive and the channel may still charge commission.'
+      )
+      if (!ok) return
+    }
+    if (action === 'unassign' && !confirm(`Remove ${m.guestName} from this room? The reservation stays, but without a room.`)) return
+    setBusy(true)
+    try {
+      await cbApi(`/api/cloudbeds/reservation/${m.reservationID}`, 'POST', { action, roomID: m.roomID ?? undefined })
+      const done: Record<string, string> = {
+        check_in: 'checked in', check_out: 'checked out', confirm: 'marked confirmed', unassign: 'room unassigned', cancel: 'cancelled in Cloudbeds',
+      }
+      setToast({
+        ok: true,
+        text: `${m.guestName}: ${done[action]}.${action === 'cancel' ? ' Remember to cancel it on the booking channel too, if it came from one.' : ''}`,
+      })
+      await refreshVisible()
+    } catch (e) {
+      setToast({ ok: false, text: e instanceof Error ? e.message : 'Cloudbeds error' })
+    }
+    setBusy(false)
+  }
+
   const scrollBy = (days: number) => scroller.current?.scrollBy({ left: days * dayW, behavior: 'smooth' })
   function jumpTo(day: string) {
     const cur = dataRef.current
@@ -201,7 +255,7 @@ export default function CalendarPage() {
           <div>
             <Link href="/cloudbeds" className="text-xs font-semibold text-[#3b6fe0] hover:underline">← Activity</Link>
             <h1 className="text-lg font-semibold leading-tight">Reservation calendar</h1>
-            <p className="text-[11px] text-gray-600">{roomCount} rooms · live assignments from Cloudbeds · scroll sideways to move through time</p>
+            <p className="text-[11px] text-gray-600">{roomCount} rooms · live assignments from Cloudbeds · scroll sideways to move through time · right-click a reservation for actions</p>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="mr-1 flex items-center gap-1.5 text-xs text-gray-600"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Updates automatically</span>
@@ -244,7 +298,7 @@ export default function CalendarPage() {
                   const firstOfMonth = dt.getUTCDate() === 1
                   return (
                     <div key={d}
-                      className={`border-r py-1 text-center leading-tight ${firstOfMonth ? 'border-l-2 border-l-gray-400' : ''} border-gray-200 ${isToday ? 'bg-sky-100 text-[#3b6fe0]' : ''}`}
+                      className={`border-r py-1 text-center leading-tight ${firstOfMonth ? 'border-l-2 border-l-gray-400' : ''} border-gray-200 ${isToday ? 'border-x border-x-[#8ec3ee] bg-[#c6e1f7] text-[#1f5fd6]' : ''}`}
                       style={{ width: dayW, minWidth: dayW }}>
                       {firstOfMonth ? dt.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' }) + ' ' : ''}
                       {dt.getUTCDate()}{' '}
@@ -268,7 +322,7 @@ export default function CalendarPage() {
                         <span className="mr-1 inline-block text-[10px] text-gray-500">{isCollapsed ? '›' : '⌄'}</span>{t.name}
                       </button>
                       {data.days.map((d) => (
-                        <div key={d} className={`flex items-center justify-center border-r border-gray-200 ${d === data.today ? 'bg-sky-50' : ''}`} style={{ width: dayW, minWidth: dayW }}>
+                        <div key={d} className={`flex items-center justify-center border-r border-gray-200 ${d === data.today ? 'border-x border-x-[#8ec3ee] bg-[#d6eafa] font-semibold text-[#1f5fd6]' : ''}`} style={{ width: dayW, minWidth: dayW }}>
                           {t.rates[d] ? Math.round(t.rates[d]) : ''}
                         </div>
                       ))}
@@ -286,7 +340,7 @@ export default function CalendarPage() {
                           </div>
                           <div className="relative flex" style={{ height: ROW_H }}>
                             {data.days.map((d) => (
-                              <div key={d} className={`border-r border-gray-100 ${d === data.today ? 'bg-sky-50' : ''}`} style={{ width: dayW, minWidth: dayW }} />
+                              <div key={d} className={`border-r border-gray-100 ${d === data.today ? 'border-x border-x-[#8ec3ee] bg-[#e4f1fc]' : ''}`} style={{ width: dayW, minWidth: dayW }} />
                             ))}
                             {blocks.map((b, i) => (
                               <Bar key={`b${i}`} start={b.start} end={addDays(b.end, 1)} viewStart={data.start} totalDays={totalDays} label={b.reason} color="#d9433f" title={`Blocked: ${b.reason}`} dayW={dayW} />
@@ -294,6 +348,11 @@ export default function CalendarPage() {
                             {stays.map((s) => (
                               <Bar key={`${s.reservationID}-${s.start}`} start={s.start} end={s.end} viewStart={data.start} totalDays={totalDays}
                                 label={s.guestName} color={statusColor(s.status).bar} onClick={() => setOpen(s.reservationID)} dayW={dayW}
+                                onContextMenu={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  setMenu({ x: e.clientX, y: e.clientY, reservationID: s.reservationID, guestName: s.guestName, status: s.status, roomID: isUnassigned ? null : room.id })
+                                }}
                                 title={`${s.guestName} · ${s.status.replace(/_/g, ' ')} · ${s.start} → ${s.end}`} />
                             ))}
                           </div>
@@ -313,6 +372,45 @@ export default function CalendarPage() {
           ))}
         </div>
       </div>
+
+      {menu && (
+        <div
+          className="fixed z-50 min-w-[190px] overflow-hidden rounded-lg border border-gray-200 bg-white py-1 text-[12.5px] text-[#14213d] shadow-xl"
+          style={{ left: Math.min(menu.x, window.innerWidth - 210), top: Math.min(menu.y, window.innerHeight - 230) }}
+          onClick={(e) => e.stopPropagation()}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          <p className="truncate border-b border-gray-100 px-3 py-1.5 text-[11px] font-semibold text-gray-500">
+            {menu.guestName} · {menu.status.replace(/_/g, ' ')}
+          </p>
+          {[
+            { a: 'open', label: 'Open reservation', show: true },
+            { a: 'check_in', label: 'Check in', show: ['confirmed', 'not_confirmed'].includes(menu.status) },
+            { a: 'check_out', label: 'Check out', show: menu.status === 'checked_in' },
+            { a: 'confirm', label: 'Mark confirmed', show: menu.status === 'not_confirmed' },
+            { a: 'unassign', label: 'Unassign room', show: Boolean(menu.roomID) && menu.status !== 'checked_out' },
+            { a: 'cancel', label: 'Cancel reservation…', show: !['checked_in', 'checked_out'].includes(menu.status), danger: true },
+          ]
+            .filter((i) => i.show)
+            .map((i) => (
+              <button
+                key={i.a}
+                disabled={busy}
+                onClick={() => (i.a === 'open' ? (setMenu(null), setOpen(menu.reservationID)) : runAction(i.a, menu))}
+                className={`block w-full px-3 py-1.5 text-left hover:bg-gray-100 disabled:opacity-50 ${'danger' in i && i.danger ? 'text-red-600' : ''}`}
+              >
+                {i.label}
+              </button>
+            ))}
+        </div>
+      )}
+
+      {toast && (
+        <div className={`fixed bottom-5 left-1/2 z-50 flex max-w-lg -translate-x-1/2 items-start gap-3 rounded-lg px-4 py-2.5 text-sm shadow-xl ${toast.ok ? 'bg-[#14213d] text-white' : 'bg-red-600 text-white'}`}>
+          <span>{toast.text}</span>
+          <button onClick={() => setToast(null)} className="opacity-70 hover:opacity-100">×</button>
+        </div>
+      )}
 
       {open && data && <ReservationModal id={open} today={data.today} onClose={() => setOpen(null)} onChanged={refreshVisible} />}
     </div>

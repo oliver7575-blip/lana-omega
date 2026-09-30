@@ -17,5 +17,5 @@ export async function GET(request: Request) {
     await supabase.auth.signOut()
     return back('no_access')
   }
-  return NextResponse.redirect(new URL('/', url.origin))
+  return NextResponse.redirect(new URL('/cloudbeds', url.origin))
 }
