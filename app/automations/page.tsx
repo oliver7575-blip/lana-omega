@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import MaintenanceTemplateCard from '@/components/MaintenanceTemplateCard'
 
 interface Field {
   key: string
@@ -504,6 +505,8 @@ export default function AutomationsPage() {
           ))}
         </>
       )}
+      <h2 style={{ fontSize: 18, marginTop: 32 }}>Maintenance reminders</h2>
+      <MaintenanceTemplateCard />
     </main>
   )
 }

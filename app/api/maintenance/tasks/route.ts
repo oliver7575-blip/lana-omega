@@ -1,105 +1,62 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { maintenanceCaller } from '@/lib/maintenance-auth'
+import { cleanTask, type TaskInput } from '@/lib/maintenance-tasks'
+import { loadEngineContext, logEvent, newTaskCode, scheduleReminder } from '@/lib/maintenance-engine'
+
+async function tenantTz(supabase: Awaited<ReturnType<typeof maintenanceCaller>> & object) {
+  if ('error' in supabase) return 'America/Mexico_City'
+  const { data } = await supabase.supabase.from('tenants').select('timezone').eq('id', supabase.tenantId).single()
+  return (data?.timezone as string) || 'America/Mexico_City'
+}
 
 export async function GET() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { data: tasks, error } = await supabase
-    .from('maintenance_tasks')
-    .select('*')
-    .order('created_at', { ascending: false })
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  // Split into two separate queries rather than a PostgREST embedded
-  // relationship — matches the established fix for the RLS-embedding
-  // gotcha found earlier in this project.
-  const { data: staff } = await supabase.from('maintenance_staff').select('id, name')
-  const staffMap = new Map((staff ?? []).map((s) => [s.id, s.name]))
-
-  const enriched = (tasks ?? []).map((t) => ({
-    ...t,
-    assigned_to_name: t.assigned_to ? staffMap.get(t.assigned_to) ?? null : null,
-  }))
-
-  return NextResponse.json({ tasks: enriched })
+  const c = await maintenanceCaller()
+  if ('error' in c) return c.error
+  const since = new Date(Date.now() - 60 * 86400000).toISOString()
+  const [{ data: active }, { data: recent }, { count: completedAll }] = await Promise.all([
+    c.supabase.from('maintenance_tasks').select('*').in('status', ['scheduled', 'waiting', 'in_progress']).order('due_at').limit(500),
+    c.supabase
+      .from('maintenance_tasks')
+      .select('*')
+      .in('status', ['done', 'cancelled'])
+      .gte('updated_at', since)
+      .order('updated_at', { ascending: false })
+      .limit(300),
+    c.supabase.from('maintenance_tasks').select('id', { count: 'exact', head: true }).eq('status', 'done'),
+  ])
+  const all = [...(active ?? []), ...(recent ?? [])]
+  return NextResponse.json({
+    tasks: all,
+    timezone: await tenantTz(c),
+    stats: {
+      open: (active ?? []).length,
+      inProgress: (active ?? []).filter((t) => t.status === 'in_progress').length,
+      needAttention: (active ?? []).filter((t) => t.escalation_status === 'required').length,
+      completed: completedAll ?? 0,
+    },
+  })
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const c = await maintenanceCaller()
+  if ('error' in c) return c.error
+  const tz = await tenantTz(c)
+  const { values, error } = cleanTask((await request.json()) as TaskInput, false, tz)
+  if (error) return NextResponse.json({ error }, { status: 400 })
 
-  const { data: staffRow } = await supabase
-    .from('staff_users')
-    .select('id, tenant_id')
-    .eq('auth_uid', user.id)
-    .single()
-  if (!staffRow) return NextResponse.json({ error: 'No tenant record found' }, { status: 404 })
-
-  const body = (await request.json()) as {
-    title?: string
-    description?: string
-    due_date?: string
-    assigned_to?: string
+  const ctx = await loadEngineContext(c.tenantId)
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { data, error: dbError } = await c.supabase
+      .from('maintenance_tasks')
+      .insert({ tenant_id: c.tenantId, task_code: newTaskCode(), status: 'scheduled', created_by: c.staffUserId, ...values })
+      .select()
+      .single()
+    if (dbError?.code === '23505') continue
+    if (dbError || !data) return NextResponse.json({ error: dbError?.message ?? 'Could not save' }, { status: 500 })
+    const due = new Date(data.due_at as string)
+    await scheduleReminder(ctx, data.id as string, due.getTime() > Date.now() ? due : new Date())
+    await logEvent(ctx, data.id as string, 'created', 'Task created from the dashboard')
+    return NextResponse.json({ task: data })
   }
-  if (!body.title?.trim()) {
-    return NextResponse.json({ error: 'title is required' }, { status: 400 })
-  }
-
-  const { data, error } = await supabase
-    .from('maintenance_tasks')
-    .insert({
-      tenant_id: staffRow.tenant_id,
-      title: body.title.trim(),
-      description: body.description?.trim() || null,
-      due_date: body.due_date || null,
-      assigned_to: body.assigned_to || null,
-      created_by: staffRow.id,
-    })
-    .select()
-    .single()
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ task: data })
-}
-
-export async function PATCH(request: Request) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const body = (await request.json()) as {
-    id?: string
-    status?: string
-    assigned_to?: string | null
-  }
-  if (!body.id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
-
-  const updates: { status?: string; assigned_to?: string | null } = {}
-  if (body.status) updates.status = body.status
-  if (body.assigned_to !== undefined) updates.assigned_to = body.assigned_to
-
-  if (Object.keys(updates).length === 0) {
-    return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
-  }
-
-  const { data, error } = await supabase
-    .from('maintenance_tasks')
-    .update(updates)
-    .eq('id', body.id)
-    .select()
-    .single()
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  if (!data) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
-  return NextResponse.json({ task: data })
+  return NextResponse.json({ error: 'Could not create a task code, try again' }, { status: 500 })
 }

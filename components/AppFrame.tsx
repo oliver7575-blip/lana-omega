@@ -20,7 +20,7 @@ import {
 const BARE = ['/login', '/signup', '/forgot-password', '/reset-password', '/resend-confirmation', '/widget-test']
 // Older pages not yet rebuilt in the dark design: shown in a white panel,
 // the way Beta shows its Cloudbeds pages.
-const LIGHT_PANEL = ['/settings', '/staff', '/waitlist', '/integrations', '/automations', '/maintenance']
+const LIGHT_PANEL = ['/settings', '/staff', '/waitlist', '/integrations', '/automations']
 
 interface ShellInfo {
   email: string
