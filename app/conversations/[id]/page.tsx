@@ -111,14 +111,14 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
 
   return (
     <main className="flex min-h-screen flex-col md:h-screen">
-      <header className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-5 py-5 md:px-10">
+      <header className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-5 py-4 md:px-8">
         <div className="min-w-0">
-          <Link href="/" className="text-sm text-navy/60 hover:text-navy">← Back to Inbox</Link>
-          <div className="mt-1 flex flex-wrap items-center gap-3">
-            <h1 className="truncate font-display text-3xl italic text-white">{name}</h1>
-            <span className={`rounded-full px-3 py-1 text-sm font-medium ${statusPill.cls}`}>{statusPill.label}</span>
+          <Link href="/" className="text-xs text-navy/60 hover:text-navy">← Back to Inbox</Link>
+          <div className="mt-1 flex flex-wrap items-center gap-2.5">
+            <h1 className="truncate font-display text-2xl italic text-white">{name}</h1>
+            <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusPill.cls}`}>{statusPill.label}</span>
           </div>
-          <p className="mt-1 text-navy/55">
+          <p className="mt-0.5 text-xs text-navy/55">
             {conversation.channel} · started {fmt(conversation.created_at as string, timezone, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}
             {guest?.phone ? ` · ${displayPhone(guest.phone)}` : ''}
           </p>
@@ -128,19 +128,19 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
 
       <div className="grid min-h-0 flex-1 lg:grid-cols-[1fr_360px]">
         <section className="flex min-h-0 flex-col">
-          <div className="flex-1 space-y-5 overflow-y-auto px-5 py-8 md:px-10">
+          <div className="flex-1 space-y-4 overflow-y-auto px-5 py-6 md:px-8">
             {(messages ?? []).map((m) => {
               const mine = m.sender_type !== 'guest'
               return (
                 <div key={m.id} className={`flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
                   <div
-                    className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-6 py-3.5 text-[17px] leading-relaxed text-navy sm:max-w-[70%] ${
+                    className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm leading-relaxed text-navy sm:max-w-[70%] ${
                       m.sender_type === 'guest' ? 'bg-surface' : m.sender_type === 'staff' ? 'bg-clay/15' : 'bg-[#1f2848]'
                     }`}
                   >
                     {m.content}
                   </div>
-                  <p className="mt-1.5 text-sm text-navy/45">
+                  <p className="mt-1 text-[11px] text-navy/45">
                     {SENDER[m.sender_type as string] ?? m.sender_type} ·{' '}
                     {fmt(m.created_at as string, timezone, { day: 'numeric', month: 'short' })} at{' '}
                     {fmt(m.created_at as string, timezone, { hour: '2-digit', minute: '2-digit', hour12: false })}
@@ -154,17 +154,17 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
           {conversation.status !== 'closed' && <Composer conversationId={id} channel={conversation.channel as string} />}
         </section>
 
-        <aside className="space-y-9 overflow-y-auto border-t border-line px-6 py-8 lg:border-l lg:border-t-0 lg:px-8">
+        <aside className="space-y-7 overflow-y-auto border-t border-line px-5 py-6 lg:border-l lg:border-t-0 lg:px-6">
           <div>
-            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-navy/50">Guest</h2>
-            <p className="text-lg font-semibold text-white">{guest?.name || '—'}</p>
-            {guest?.phone && <p className="text-lg text-navy/60">{displayPhone(guest.phone)}</p>}
-            {guest?.email && <p className="text-navy/60">{guest.email}</p>}
+            <h2 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-navy/50">Guest</h2>
+            <p className="text-sm font-semibold text-white">{guest?.name || '—'}</p>
+            {guest?.phone && <p className="text-sm text-navy/60">{displayPhone(guest.phone)}</p>}
+            {guest?.email && <p className="text-sm text-navy/60">{guest.email}</p>}
             {guest && <GuestEditor guestId={guest.id as string} name={guest.name as string | null} email={guest.email as string | null} />}
           </div>
 
           <div>
-            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-navy/50">Chat assignment</h2>
+            <h2 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-navy/50">Chat assignment</h2>
             <AssignmentSelect
               conversationId={id}
               value={conversation.assigned_staff_id as string | null}
@@ -173,40 +173,40 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
           </div>
 
           <div>
-            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-navy/50">Reservations</h2>
+            <h2 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-navy/50">Reservations</h2>
             {reservation?.found ? (
-              <div className="rounded-xl border border-line px-5 py-4">
-                <p className="text-lg font-semibold text-white">
+              <div className="rounded-xl border border-line px-4 py-3">
+                <p className="text-sm font-semibold text-white">
                   {[reservation.roomTypeName, reservation.roomName ? `Room ${reservation.roomName}` : null].filter(Boolean).join(' · ') || 'Reservation'}
                 </p>
-                <p className="text-navy/70">
+                <p className="text-xs text-navy/70">
                   {reservation.startDate} → {reservation.endDate}
                 </p>
-                <p className="text-navy/55">
+                <p className="text-xs text-navy/55">
                   {(reservation.status ?? '').replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase())} · #{saved?.confirmation_number}
                 </p>
                 {typeof reservation.balance === 'number' && reservation.balance > 0 && (
-                  <p className="mt-1 text-sm text-red-300">Balance due: {reservation.balance.toLocaleString('en-US')} MXN</p>
+                  <p className="mt-1 text-xs text-red-300">Balance due: {reservation.balance.toLocaleString('en-US')} MXN</p>
                 )}
               </div>
             ) : (
-              <p className="text-lg text-navy/60">None found.</p>
+              <p className="text-sm text-navy/60">None found.</p>
             )}
           </div>
 
           <div>
-            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-navy/50">Escalations</h2>
+            <h2 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-navy/50">Escalations</h2>
             {(escalations ?? []).length === 0 ? (
-              <p className="text-lg text-navy/60">None.</p>
+              <p className="text-sm text-navy/60">None.</p>
             ) : (
               <div className="space-y-3">
                 {(escalations ?? []).map((e) => (
-                  <Link key={e.id} href="/escalations" className="block rounded-xl border border-line px-4 py-3 hover:bg-white/[0.03]">
-                    <p className="text-sm">
+                  <Link key={e.id} href="/escalations" className="block rounded-xl border border-line px-3 py-2 hover:bg-white/[0.03]">
+                    <p className="text-xs">
                       <span className="text-clay">{e.category}</span>
                       <span className="ml-2 uppercase text-navy/45">{e.urgency}</span>
                     </p>
-                    <p className="text-navy/80">{e.summary}</p>
+                    <p className="text-sm text-navy/80">{e.summary}</p>
                   </Link>
                 ))}
               </div>
@@ -214,7 +214,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
           </div>
 
           <div>
-            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-navy/50">Notes</h2>
+            <h2 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-navy/50">Notes</h2>
             <NotesEditor conversationId={id} value={conversation.notes as string | null} />
           </div>
         </aside>

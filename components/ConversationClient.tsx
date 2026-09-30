@@ -24,7 +24,7 @@ export function TakeOverButton({ conversationId, status }: { conversationId: str
       <button
         disabled={busy}
         onClick={() => set('active')}
-        className="rounded-full bg-ink px-6 py-3 text-lg font-medium text-white transition hover:bg-clay disabled:opacity-60"
+        className="rounded-full bg-ink px-5 py-2 text-sm font-medium text-white transition hover:bg-clay disabled:opacity-60"
       >
         Reopen
       </button>
@@ -32,13 +32,13 @@ export function TakeOverButton({ conversationId, status }: { conversationId: str
   }
   return (
     <div className="flex items-center gap-4">
-      <button onClick={() => set('closed')} disabled={busy} className="text-sm text-navy/50 hover:text-navy">
+      <button onClick={() => set('closed')} disabled={busy} className="text-xs text-navy/50 hover:text-navy">
         Close
       </button>
       <button
         disabled={busy}
         onClick={() => set(status === 'human_takeover' ? 'active' : 'human_takeover')}
-        className={`rounded-full px-6 py-3 text-lg font-medium text-white transition disabled:opacity-60 ${
+        className={`rounded-full px-5 py-2 text-sm font-medium text-white transition disabled:opacity-60 ${
           status === 'human_takeover' ? 'bg-purple-500/30 hover:bg-purple-500/40' : 'bg-ink hover:bg-clay'
         }`}
       >
@@ -86,8 +86,8 @@ export function Composer({ conversationId, channel }: { conversationId: string; 
   }
 
   return (
-    <div className="border-t border-line px-5 py-5 md:px-10">
-      <div className="flex items-end gap-4">
+    <div className="border-t border-line px-5 py-4 md:px-8">
+      <div className="flex items-end gap-3">
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -96,12 +96,12 @@ export function Composer({ conversationId, channel }: { conversationId: string; 
           }}
           rows={2}
           placeholder={`Reply as staff (sends via ${channel === 'whatsapp' ? 'WhatsApp' : 'the website chat'})...`}
-          className="min-h-20 flex-1 resize-none rounded-2xl border border-line bg-paper px-5 py-4 text-navy outline-none placeholder:text-navy/40 focus:border-clay"
+          className="min-h-[64px] flex-1 resize-none rounded-2xl border border-line bg-paper px-4 py-3 text-sm text-navy outline-none placeholder:text-navy/40 focus:border-clay"
         />
         <button
           onClick={send}
           disabled={sending || !text.trim()}
-          className="rounded-full bg-surface px-7 py-3.5 text-lg font-medium text-navy transition hover:bg-clay hover:text-white disabled:text-navy/40 disabled:hover:bg-surface"
+          className="rounded-full bg-surface px-5 py-2.5 text-sm font-medium text-navy transition hover:bg-clay hover:text-white disabled:text-navy/40 disabled:hover:bg-surface"
         >
           {sending ? 'Sending…' : 'Send'}
         </button>
@@ -132,7 +132,7 @@ export function AssignmentSelect({
           body: JSON.stringify({ assigned_staff_id: e.target.value || null }),
         })
       }}
-      className="w-full rounded-md border border-line bg-paper px-3 py-1.5 text-lg text-navy outline-none focus:border-clay"
+      className="w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-sm text-navy outline-none focus:border-clay"
     >
       <option value="">Unassigned</option>
       {staff.map((s) => (
@@ -161,7 +161,7 @@ export function NotesEditor({ conversationId, value }: { conversationId: string;
 
   if (!editing) {
     return (
-      <button onClick={() => setEditing(true)} className="w-full text-left text-lg text-navy/60 hover:text-navy">
+      <button onClick={() => setEditing(true)} className="w-full text-left text-sm text-navy/60 hover:text-navy">
         {saved ? <span className="whitespace-pre-wrap text-navy/85">{saved}</span> : 'None.'}
       </button>
     )
@@ -173,7 +173,7 @@ export function NotesEditor({ conversationId, value }: { conversationId: string;
         value={text}
         onChange={(e) => setText(e.target.value)}
         rows={4}
-        className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-navy outline-none focus:border-clay"
+        className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-navy outline-none focus:border-clay"
       />
       <div className="mt-2 flex gap-3">
         <button onClick={save} className="rounded-full bg-ink px-4 py-1.5 text-sm text-white hover:bg-clay">

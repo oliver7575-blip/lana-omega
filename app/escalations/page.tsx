@@ -56,26 +56,26 @@ export default function EscalationsPage() {
   const allUnreadSelected = unread.length > 0 && unread.every((e) => selected.has(e.id))
 
   return (
-    <main className="px-5 py-7 md:px-8 xl:px-10">
-      <div className="mb-7 flex items-center justify-between">
-        <h1 className="font-display text-4xl italic text-white">Escalations</h1>
-        <p className="text-lg text-navy/60">{total} total</p>
+    <main className="px-5 py-6 md:px-8">
+      <div className="mb-5 flex items-center justify-between">
+        <h1 className="font-display text-2xl italic text-white sm:text-3xl">Escalations</h1>
+        <p className="text-sm text-navy/60">{total} total</p>
       </div>
 
-      <div className="mb-5 flex items-center justify-between rounded-2xl border border-line bg-surface px-6 py-4">
-        <label className="flex items-center gap-4 text-navy/80">
+      <div className="mb-4 flex items-center justify-between rounded-2xl border border-line bg-surface px-5 py-3">
+        <label className="flex items-center gap-3 text-sm text-navy/80">
           <input
             type="checkbox"
             checked={allUnreadSelected}
             onChange={() => setSelected(allUnreadSelected ? new Set() : new Set(unread.map((e) => e.id)))}
-            className="h-5 w-5 accent-clay"
+            className="h-4 w-4 accent-clay"
           />
           Select unread escalations
         </label>
         <button
           disabled={selected.size === 0}
           onClick={() => setStatus([...selected], 'read')}
-          className="rounded-lg border border-line px-4 py-2 text-navy/80 transition hover:bg-white/[0.05] disabled:text-navy/25"
+          className="rounded-lg border border-line px-3 py-1.5 text-xs text-navy/80 transition hover:bg-white/[0.05] disabled:text-navy/25"
         >
           Mark selected as read
         </button>
@@ -83,16 +83,16 @@ export default function EscalationsPage() {
 
       {items === null && <p className="text-navy/50">Loading…</p>}
       {items?.length === 0 && (
-        <p className="rounded-2xl border border-line bg-surface px-6 py-10 text-center text-navy/50">
+        <p className="rounded-2xl border border-line bg-surface px-6 py-10 text-center text-sm text-navy/50">
           No escalations yet. They appear here whenever Lana alerts staff.
         </p>
       )}
 
-      <div className="space-y-5">
+      <div className="space-y-3">
         {(items ?? []).map((e) => {
           const isNew = e.status === 'new'
           return (
-            <div key={e.id} className="flex items-start gap-5 rounded-2xl border border-line bg-surface px-6 py-5">
+            <div key={e.id} className="flex items-start gap-4 rounded-2xl border border-line bg-surface px-5 py-4">
               <input
                 type="checkbox"
                 checked={selected.has(e.id)}
@@ -102,28 +102,28 @@ export default function EscalationsPage() {
                   else next.add(e.id)
                   setSelected(next)
                 }}
-                className="mt-2 h-5 w-5 shrink-0 accent-clay"
+                className="mt-1 h-4 w-4 shrink-0 accent-clay"
               />
-              <span className={`mt-2 h-4 w-4 shrink-0 rounded-full ${isNew ? 'bg-[#ef4d3f]' : 'bg-[#35b876]'}`} />
+              <span className={`mt-1 h-3 w-3 shrink-0 rounded-full ${isNew ? 'bg-[#ef4d3f]' : 'bg-[#35b876]'}`} />
               <div className="min-w-0 flex-1">
-                <div className="mb-2 flex flex-wrap items-center gap-3">
+                <div className="mb-1.5 flex flex-wrap items-center gap-2.5">
                   <span
-                    className={`rounded-full px-3.5 py-1 text-sm font-medium capitalize ${
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${
                       isNew ? 'bg-[#fff0ed] text-[#b54434]' : 'bg-[#eaf8f2] text-[#176b4d]'
                     }`}
                   >
                     {e.category}
                   </span>
-                  <span className="text-sm uppercase tracking-wide text-navy/50">{e.urgency === 'urgent' ? 'high' : e.urgency}</span>
-                  {e.room && <span className="text-sm text-navy/50">Room {e.room}</span>}
-                  {!e.delivered && <span className="text-sm text-amber-300">alert not delivered</span>}
-                  <span className="ml-auto text-sm text-navy/50">{fmt(e.created_at)}</span>
+                  <span className="text-xs uppercase tracking-wide text-navy/50">{e.urgency === 'urgent' ? 'high' : e.urgency}</span>
+                  {e.room && <span className="text-xs text-navy/50">Room {e.room}</span>}
+                  {!e.delivered && <span className="text-xs text-amber-300">alert not delivered</span>}
+                  <span className="ml-auto text-xs text-navy/50">{fmt(e.created_at)}</span>
                 </div>
-                <p className="text-lg text-navy">{e.summary}</p>
-                <div className="mt-1 flex items-center gap-4">
+                <p className="text-sm text-navy">{e.summary}</p>
+                <div className="mt-1 flex items-center gap-4 text-xs">
                   <span className={isNew ? 'text-[#ef4d3f]' : 'text-[#35b876]'}>{isNew ? 'New' : 'Read'}</span>
                   {e.conversation_id && (
-                    <Link href={`/conversations/${e.conversation_id}`} className="text-sm text-navy/60 hover:text-clay">
+                    <Link href={`/conversations/${e.conversation_id}`} className="text-navy/60 hover:text-clay">
                       Open conversation →
                     </Link>
                   )}
@@ -131,7 +131,7 @@ export default function EscalationsPage() {
               </div>
               <button
                 onClick={() => setStatus([e.id], isNew ? 'read' : 'new')}
-                className="shrink-0 rounded-lg border border-line px-4 py-2 text-sm text-navy/80 hover:bg-white/[0.05]"
+                className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs text-navy/80 hover:bg-white/[0.05]"
               >
                 {isNew ? 'Mark read' : 'Mark unread'}
               </button>

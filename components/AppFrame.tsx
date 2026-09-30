@@ -85,14 +85,14 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
   const item = (href: string, label: string, Icon: typeof MailIcon, active: boolean, badge?: number) => (
     <Link
       href={href}
-      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-[17px] transition ${
+      className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition ${
         active ? 'bg-white/[0.05] text-white' : 'text-navy/80 hover:bg-white/[0.03] hover:text-navy'
       }`}
     >
       <Icon className="shrink-0 opacity-80" />
       <span className="flex-1">{label}</span>
       {badge ? (
-        <span className="min-w-[1.25rem] rounded-full bg-red-500 px-1.5 text-center text-xs font-semibold text-white">
+        <span className="min-w-[1.25rem] rounded-full bg-[#ef4d3f] px-1.5 text-center text-[11px] font-semibold leading-5 text-white">
           {badge}
         </span>
       ) : null}
@@ -102,13 +102,13 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
   const sub = (href: string, label: string, active: boolean, badge?: number) => (
     <Link
       href={href}
-      className={`flex items-center justify-between rounded-lg py-2 pl-4 pr-3 text-[15px] transition ${
+      className={`flex items-center justify-between rounded-lg py-1.5 pl-4 pr-3 text-[13px] transition ${
         active ? 'text-white' : 'text-navy/70 hover:text-navy'
       }`}
     >
       <span>{label}</span>
       {badge ? (
-        <span className="flex h-7 min-w-[1.75rem] items-center justify-center rounded-full bg-[#ef4d3f] px-2 text-xs font-semibold text-white">
+        <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[#ef4d3f] px-1.5 text-[11px] font-semibold text-white">
           {badge}
         </span>
       ) : null}
@@ -116,17 +116,17 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
   )
 
   const sidebar = (
-    <nav className="flex h-full flex-col px-4 py-7">
-      <div className="mb-10 text-center">
-        <p className="font-display text-xl italic text-clay">Lana · admin</p>
-        <p className="font-display text-3xl uppercase italic tracking-tight text-white">
+    <nav className="flex h-full flex-col px-3 py-6">
+      <div className="mb-8 text-center">
+        <p className="font-display text-base italic text-clay">Lana · admin</p>
+        <p className="font-display text-[23px] uppercase italic tracking-tight text-white">
           {info?.tenantName ?? '\u00a0'}
         </p>
       </div>
 
       <div className="space-y-1">
         {item('/', 'Messages', MailIcon, isInbox)}
-        <div className="ml-5 border-l border-line">
+        <div className="ml-5 border-l border-line pl-1">
           {sub('/reservations', 'Reservations', isReservations, info?.unreadReservations)}
         </div>
         {item('/escalations', 'Escalations', AlertIcon, pathname.startsWith('/escalations'), info?.newEscalations)}
@@ -135,7 +135,7 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
         {item('/maintenance', 'Maintenance', HammerIcon, pathname.startsWith('/maintenance'))}
       </div>
 
-      <div className="my-5 border-t border-line" />
+      <div className="my-4 border-t border-line" />
 
       <div className="space-y-1">
         {item('/waitlist', 'Waitlist', ListIcon, pathname.startsWith('/waitlist'))}
@@ -144,8 +144,8 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
       </div>
 
       <div className="mt-auto border-t border-line pt-5">
-        <p className="truncate text-sm text-navy/70">{info?.email ?? ''}</p>
-        <button onClick={signOut} className="mt-2 text-sm text-clay hover:underline">
+        <p className="truncate text-xs text-navy/70">{info?.email ?? ''}</p>
+        <button onClick={signOut} className="mt-1.5 text-xs text-clay hover:underline">
           Sign out
         </button>
       </div>
@@ -163,7 +163,7 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
       </div>
       {open && <div className="fixed inset-0 z-30 bg-black/60 md:hidden" onClick={() => setOpen(false)} />}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-72 border-r border-line bg-[#0d1222] transition-transform duration-200 md:sticky md:top-0 md:h-screen md:w-64 md:shrink-0 md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 w-72 border-r border-line bg-surface transition-transform duration-200 md:sticky md:top-0 md:h-screen md:w-52 md:shrink-0 md:translate-x-0 ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
