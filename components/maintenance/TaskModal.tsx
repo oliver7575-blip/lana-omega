@@ -13,7 +13,8 @@ export default function TaskModal({ task, staff, timezone, onClose, onSaved }: {
   onClose: () => void
   onSaved: () => void
 }) {
-  const defaultDue = localParts(new Date(Date.now() + 3600000).toISOString(), timezone).dateTime
+  // Defaults to now: the reminder goes out on the next run (within 5 minutes).
+  const defaultDue = localParts(new Date().toISOString(), timezone).dateTime
   const [f, setF] = useState({
     title: task?.title ?? '',
     description: task?.description ?? '',
@@ -84,7 +85,7 @@ export default function TaskModal({ task, staff, timezone, onClose, onSaved }: {
             </select>
           </div>
           <div>
-            <label className={labelCls}>Due (hotel time)</label>
+            <label className={labelCls}>Due (hotel time) — reminder is sent at this time</label>
             <input type="datetime-local" className={inputCls} value={f.due_local} onChange={(e) => set('due_local', e.target.value)} />
           </div>
           <div>
