@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import ReservationModal from '@/components/cloudbeds/ReservationModal'
 import SearchBar from '@/components/cloudbeds/SearchBar'
@@ -17,10 +17,10 @@ interface Cal {
   blocks: { roomID: string; start: string; end: string; reason: string }[]
 }
 
-const DAY_W = 78 // px per night
-const LEFT_W = 190
-const ROW_H = 38
+const LEFT_W = 150
+const ROW_H = 24
 const DAYS = 19
+const MIN_DAY_W = 36
 
 function addDays(d: string, n: number) {
   const x = new Date(`${d}T12:00:00Z`)
@@ -30,9 +30,10 @@ function addDays(d: string, n: number) {
 const diff = (a: string, b: string) => Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86400000)
 
 /** A stay bar from mid-check-in day to mid-check-out day, arrow-shaped like Beta's. */
-function Bar({ start, end, viewStart, label, color, onClick, title }: {
-  start: string; end: string; viewStart: string; label: string; color: string; onClick?: () => void; title?: string
+function Bar({ start, end, viewStart, label, color, onClick, title, dayW }: {
+  start: string; end: string; viewStart: string; label: string; color: string; onClick?: () => void; title?: string; dayW: number
 }) {
+  const DAY_W = dayW
   const from = diff(viewStart, start) + 0.5
   const to = diff(viewStart, end) + 0.5
   const left = Math.max(0, from) * DAY_W
@@ -42,12 +43,12 @@ function Bar({ start, end, viewStart, label, color, onClick, title }: {
     <button
       onClick={onClick}
       title={title ?? label}
-      className="absolute top-1 flex h-[30px] items-center overflow-hidden whitespace-nowrap pl-5 pr-4 text-left text-[11px] font-semibold text-white hover:brightness-95"
+      className="absolute top-[3px] flex h-[18px] items-center overflow-hidden whitespace-nowrap pl-3 pr-2.5 text-left text-[10px] font-semibold text-white hover:brightness-95"
       style={{
         left,
         width: right - left,
         background: color,
-        clipPath: 'polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%, 12px 50%)',
+        clipPath: 'polygon(0 0, calc(100% - 7px) 0, 100% 50%, calc(100% - 7px) 100%, 0 100%, 7px 50%)',
       }}
     >
       <span className="truncate">{label}</span>
@@ -62,6 +63,19 @@ export default function CalendarPage() {
   const [error, setError] = useState<string | null>(null)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [open, setOpen] = useState<string | null>(null)
+  // Days stretch to fill the screen so the whole grid fits without scrolling.
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const [dayW, setDayW] = useState(52)
+  useEffect(() => {
+    const measure = () => {
+      const w = wrapRef.current?.clientWidth ?? 0
+      if (w) setDayW(Math.max(MIN_DAY_W, Math.floor((w - LEFT_W - 2) / DAYS)))
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [data])
+  const DAY_W = dayW
 
   const load = useCallback(async () => {
     try {
@@ -87,23 +101,23 @@ export default function CalendarPage() {
   const gridW = LEFT_W + DAYS * DAY_W
 
   return (
-    <div className="p-3 md:p-4">
-      <div className="min-h-[calc(100vh-2rem)] rounded-2xl bg-[#f7f9fb] p-5 text-[#14213d] md:p-6">
-        <Link href="/cloudbeds" className="text-lg font-semibold text-[#3b6fe0] hover:underline">← Activity</Link>
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+    <div className="p-2 md:p-3">
+      <div className="min-h-[calc(100vh-1.5rem)] rounded-2xl bg-[#f7f9fb] p-4 text-[#14213d]">
+        <Link href="/cloudbeds" className="text-sm font-semibold text-[#3b6fe0] hover:underline">← Activity</Link>
+        <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold">Reservation calendar</h1>
-            <p className="text-sm text-gray-600">{roomCount} rooms · live assignments from Cloudbeds</p>
+            <h1 className="text-xl font-semibold">Reservation calendar</h1>
+            <p className="text-xs text-gray-600">{roomCount} rooms · live assignments from Cloudbeds</p>
           </div>
           <div className="flex items-center gap-2">
             <span className="mr-1 flex items-center gap-2 text-sm text-gray-600"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Updates automatically</span>
-            <button onClick={() => shift(-7)} className="rounded-full border border-gray-200 bg-white px-3 py-2 hover:bg-gray-50" aria-label="Previous week">←</button>
-            <button onClick={() => data && setStart(addDays(data.today, -1))} className="rounded-full border border-gray-200 bg-white px-4 py-2 font-semibold hover:bg-gray-50">Today</button>
-            <button onClick={() => shift(7)} className="rounded-full border border-gray-200 bg-white px-3 py-2 hover:bg-gray-50" aria-label="Next week">→</button>
+            <button onClick={() => shift(-7)} className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-sm hover:bg-gray-50" aria-label="Previous week">←</button>
+            <button onClick={() => data && setStart(addDays(data.today, -1))} className="rounded-full border border-gray-200 bg-white px-3 py-1 text-sm font-semibold hover:bg-gray-50">Today</button>
+            <button onClick={() => shift(7)} className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-sm hover:bg-gray-50" aria-label="Next week">→</button>
           </div>
         </div>
 
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-2 py-1.5">
           <SearchBar onOpen={setOpen} />
           <div className="flex items-center gap-2 text-sm">
             {data && (
@@ -121,17 +135,17 @@ export default function CalendarPage() {
         {!data && !error && <p className="py-10 text-center text-sm text-gray-500">Loading the calendar…</p>}
 
         {data && (
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+          <div ref={wrapRef} className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
             <div style={{ width: gridW }}>
               {/* Day header */}
-              <div className="sticky top-0 z-20 flex border-b-2 border-gray-200 bg-gray-50 text-sm font-semibold">
-                <div className="sticky left-0 z-10 border-r-2 border-gray-200 bg-gray-50 px-4 py-2.5" style={{ width: LEFT_W, minWidth: LEFT_W }}>Room type / room</div>
+              <div className="sticky top-0 z-20 flex border-b-2 border-gray-200 bg-gray-50 text-[11px] font-semibold">
+                <div className="sticky left-0 z-10 border-r-2 border-gray-200 bg-gray-50 px-3 py-1.5" style={{ width: LEFT_W, minWidth: LEFT_W }}>Room type / room</div>
                 {data.days.map((d) => {
                   const dt = new Date(`${d}T12:00:00Z`)
                   const isToday = d === data.today
                   return (
-                    <div key={d} className={`border-r border-gray-200 py-2.5 text-center ${isToday ? 'bg-sky-100 text-[#3b6fe0]' : ''}`} style={{ width: DAY_W, minWidth: DAY_W }}>
-                      {dt.getUTCDate()} {dt.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })}
+                    <div key={d} className={`border-r border-gray-200 py-1.5 text-center leading-tight ${isToday ? 'bg-sky-100 text-[#3b6fe0]' : ''}`} style={{ width: DAY_W, minWidth: DAY_W }}>
+                      {dt.getUTCDate()} {dt.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }).slice(0, 2)}
                     </div>
                   )
                 })}
@@ -141,12 +155,12 @@ export default function CalendarPage() {
                 const isCollapsed = collapsed.has(t.id)
                 const unassigned = data.unassigned.filter((u) => u.roomTypeID === t.id)
                 return (
-                  <div key={t.id} className="border-b-2 border-gray-200">
+                  <div key={t.id} className="border-b border-gray-300">
                     {/* Room type row with nightly rates */}
-                    <div className="flex bg-gray-50 text-[11px] text-gray-500">
+                    <div className="flex bg-gray-50 text-[9.5px] text-gray-500">
                       <button
                         onClick={() => { const n = new Set(collapsed); if (n.has(t.id)) n.delete(t.id); else n.add(t.id); setCollapsed(n) }}
-                        className="sticky left-0 z-10 border-r-2 border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm font-semibold text-[#14213d]"
+                        className="sticky left-0 z-10 truncate border-r-2 border-gray-200 bg-gray-50 px-2.5 py-0.5 text-left text-[11px] font-semibold text-[#14213d]"
                         style={{ width: LEFT_W, minWidth: LEFT_W }}
                       >
                         <span className="mr-1 inline-block text-xs text-gray-500">{isCollapsed ? '›' : '⌄'}</span>{t.name}
@@ -166,7 +180,7 @@ export default function CalendarPage() {
                       const blocks = data.blocks.filter((b) => b.roomID === room.id)
                       return (
                         <div key={room.id} className="flex border-t border-gray-100">
-                          <div className={`sticky left-0 z-10 border-r-2 border-gray-200 bg-white px-4 text-sm font-semibold ${isUnassigned ? 'italic text-amber-700' : ''}`}
+                          <div className={`sticky left-0 z-10 border-r-2 border-gray-200 bg-white px-3 text-[11px] font-semibold ${isUnassigned ? 'italic text-amber-700' : ''}`}
                             style={{ width: LEFT_W, minWidth: LEFT_W, height: ROW_H, lineHeight: `${ROW_H}px` }}>
                             {room.name}
                           </div>
@@ -175,11 +189,11 @@ export default function CalendarPage() {
                               <div key={d} className={`border-r border-gray-100 ${d === data.today ? 'bg-sky-50' : ''}`} style={{ width: DAY_W, minWidth: DAY_W }} />
                             ))}
                             {blocks.map((b, i) => (
-                              <Bar key={`b${i}`} start={b.start} end={addDays(b.end, 1)} viewStart={data.start} label={b.reason} color="#d9433f" title={`Blocked: ${b.reason}`} />
+                              <Bar key={`b${i}`} start={b.start} end={addDays(b.end, 1)} viewStart={data.start} label={b.reason} color="#d9433f" title={`Blocked: ${b.reason}`} dayW={DAY_W} />
                             ))}
                             {stays.map((s) => (
                               <Bar key={`${s.reservationID}-${s.start}`} start={s.start} end={s.end} viewStart={data.start}
-                                label={s.guestName} color={statusColor(s.status).bar} onClick={() => setOpen(s.reservationID)} />
+                                label={s.guestName} color={statusColor(s.status).bar} onClick={() => setOpen(s.reservationID)} dayW={DAY_W} title={`${s.guestName} · ${s.status.replace(/_/g, ' ')}`} />
                             ))}
                           </div>
                         </div>
@@ -192,7 +206,7 @@ export default function CalendarPage() {
           </div>
         )}
 
-        <div className="mt-3 flex flex-wrap gap-4 text-xs text-gray-600">
+        <div className="mt-2 flex flex-wrap gap-4 text-[11px] text-gray-600">
           {[['#7fc0e4', 'Confirmed'], ['#f3c46b', 'Not confirmed'], ['#6ab77a', 'Checked in'], ['#b8c1cc', 'Checked out'], ['#d9433f', 'Blocked']].map(([c, l]) => (
             <span key={l} className="flex items-center gap-1.5"><span className="h-3 w-5 rounded-sm" style={{ background: c }} />{l}</span>
           ))}

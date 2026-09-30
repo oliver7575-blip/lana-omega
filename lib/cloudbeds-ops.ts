@@ -74,6 +74,15 @@ export function addDays(date: string, days: number): string {
 const nightsBetween = (a?: string, b?: string) =>
   a && b ? Math.max(0, Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86400000)) : 0
 
+/** Cloudbeds reports room statuses in its own words ("in_house", "not_checked_in"…). */
+function stayStatus(roomStatus: unknown, reservationStatus: unknown): string {
+  const rs = String(roomStatus ?? '').toLowerCase().replace(/[\s-]+/g, '_')
+  const res = String(reservationStatus ?? '').toLowerCase()
+  if (rs === 'in_house' || rs === 'checked_in' || rs === 'inhouse') return 'checked_in'
+  if (rs === 'checked_out' || rs === 'checkedout') return 'checked_out'
+  return res || 'confirmed'
+}
+
 const ACTIVE = (s: unknown) => !['canceled', 'cancelled', 'no_show'].includes(String(s ?? '').toLowerCase())
 
 // ---------------------------------------------------------------------------
@@ -340,7 +349,7 @@ export async function calendar(cb: CB, start: string, dayCount: number): Promise
       const s = String(room.roomCheckIn ?? r.startDate)
       const e = String(room.roomCheckOut ?? r.endDate)
       if (room.roomID) {
-        bookings.push({ reservationID: String(r.reservationID), guestName: String(room.guestName ?? r.guestName ?? ''), status: String(room.roomStatus ?? r.status), roomID: String(room.roomID), start: s, end: e })
+        bookings.push({ reservationID: String(r.reservationID), guestName: String(room.guestName ?? r.guestName ?? ''), status: stayStatus(room.roomStatus, r.status), roomID: String(room.roomID), start: s, end: e })
       } else {
         unassigned.push({ reservationID: String(r.reservationID), guestName: String(r.guestName ?? ''), roomTypeID: String(room.roomTypeID ?? ''), start: s, end: e, status: String(r.status) })
       }

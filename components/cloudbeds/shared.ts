@@ -12,7 +12,8 @@ export const statusLabel = (s: string) => s.replace(/_/g, ' ')
 
 /** Colours used by Beta's Cloudbeds pages. */
 export function statusColor(status: string) {
-  switch (status) {
+  switch (status.toLowerCase()) {
+    case 'in_house':
     case 'checked_in':
       return { bar: '#6ab77a', head: '#6ab77a' }
     case 'checked_out':
