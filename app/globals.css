@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background: #0a0e1a;
+  color: #e7e9f0;
+}
+::selection {
+  background: #c0574a;
+  color: #fff;
+}
+:focus-visible {
+  outline: 2px solid #c0574a;
+  outline-offset: 2px;
+}
+
+/* Older Omega pages sit in a white panel (like Beta's Cloudbeds pages)
+   until each one is rebuilt in the dark design. */
+.legacy-panel {
+  color: #14213d;
+}
+.legacy-panel main {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+.legacy-panel a {
+  color: #2859d9;
+}
+.legacy-panel input,
+.legacy-panel textarea,
+.legacy-panel select {
+  border: 1px solid #c5ced8;
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: #fff;
+  color: #14213d;
+}
+.legacy-panel button {
+  border: 1px solid #c5ced8;
+  border-radius: 6px;
+  padding: 6px 12px;
+  background: #fff;
+  color: #14213d;
+}
+.legacy-panel h1 {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+.legacy-panel h2 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+.legacy-panel p {
+  margin-bottom: 0.5rem;
+}

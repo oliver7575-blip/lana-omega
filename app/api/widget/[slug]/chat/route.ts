@@ -244,7 +244,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
             if (!phoneNumberId) {
               return { success: false, error: 'No phone_number_id configured for WhatsApp' }
             }
-            return notifyStaff(
+            const result = await notifyStaff(
               phoneNumberId,
               whatsappForEscalation.credentials,
               staffNumber,
@@ -252,6 +252,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
               input,
               tenant.message_templates
             )
+            await supabase.from('escalations').insert({
+              tenant_id: tenantId,
+              conversation_id: conversationId,
+              guest_id: guest.id,
+              category: input.category,
+              urgency: input.urgency ?? 'normal',
+              summary: input.summary,
+              room: input.roomNumber ?? null,
+              delivered: result.success,
+            })
+            return result
           },
         }
       : undefined

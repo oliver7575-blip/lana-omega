@@ -485,7 +485,7 @@ async function processInbound(msg: ExtractedMessage) {
             if (!contact) {
               return { success: false, error: `No ${input.category} contact configured` }
             }
-            return notifyStaff(
+            const result = await notifyStaff(
               phoneNumberId,
               credentials,
               contact.phone,
@@ -494,6 +494,17 @@ async function processInbound(msg: ExtractedMessage) {
               messageTemplates,
               guestName
             )
+            await supabase.from('escalations').insert({
+              tenant_id: tenantId,
+              conversation_id: conversationId,
+              guest_id: guest.id,
+              category: input.category,
+              urgency: input.urgency ?? 'normal',
+              summary: input.summary,
+              room: input.roomNumber ?? null,
+              delivered: result.success,
+            })
+            return result
           },
         }
       : undefined
