@@ -402,9 +402,12 @@ export async function processReminder(
     await ctx.db.from('maintenance_reminders').update({ status: 'cancelled' }).eq('id', reminder.id)
     return { taskId: reminder.task_id, result: 'cancelled' }
   }
-  if (!ctx.whatsapp || !(await templateReady(ctx))) {
-    return { taskId: task.id, result: 'skipped', detail: 'WhatsApp template not approved yet' }
+  if (!ctx.whatsapp) {
+    return { taskId: task.id, result: 'skipped', detail: 'WhatsApp is not connected' }
   }
+  // Until Meta approves the template, reminders go out as plain text (only
+  // delivered if the staff member messaged the number in the last 24 hours).
+  const useTemplate = await templateReady(ctx)
 
   // Assign if nobody has it yet.
   const staffList = await loadStaff(ctx)
@@ -463,19 +466,33 @@ export async function processReminder(
     }
   }
 
-  const send = await sendMaintenanceTemplate(
-    ctx.whatsapp.phoneNumberId,
-    ctx.whatsapp.credentials,
-    staff.phone,
-    {
-      firstName: staff.name.split(' ')[0],
-      task: `#${task.task_code} ${task.title}`,
-      location: task.location ?? '—',
-      due: formatDue(task.due_at, ctx.tz),
-    },
-    task.id,
-    ctx.choice
-  )
+  const send = useTemplate
+    ? await sendMaintenanceTemplate(
+        ctx.whatsapp.phoneNumberId,
+        ctx.whatsapp.credentials,
+        staff.phone,
+        {
+          firstName: staff.name.split(' ')[0],
+          task: `#${task.task_code} ${task.title}`,
+          location: task.location ?? '—',
+          due: formatDue(task.due_at, ctx.tz),
+        },
+        task.id,
+        ctx.choice
+      )
+    : await sendWhatsAppMessage(
+        ctx.whatsapp.phoneNumberId,
+        ctx.whatsapp.credentials,
+        staff.phone,
+        [
+          `🔧 Hola ${staff.name.split(' ')[0]}, tienes una tarea:`,
+          `*#${task.task_code} ${task.title}*`,
+          `📍 ${task.location ?? '—'}`,
+          `🕒 ${formatDue(task.due_at, ctx.tz)}`,
+          '',
+          `Responde: *${task.task_code} ACEPTO*, *${task.task_code} TERMINADO* o *${task.task_code} AYUDA*`,
+        ].join('\n')
+      )
 
   await ctx.db.from('maintenance_messages').insert({
     tenant_id: ctx.tenantId,
@@ -509,7 +526,7 @@ export async function processReminder(
       updated_at: new Date().toISOString(),
     })
     .eq('id', task.id)
-  await logEvent(ctx, task.id, 'reminder_sent', `WhatsApp reminder sent to ${staff.name}`)
+  await logEvent(ctx, task.id, 'reminder_sent', `WhatsApp reminder sent to ${staff.name}${useTemplate ? '' : ' (plain text — template not approved yet)'}`)
 
   if (count >= MAX_REMINDERS && task.status !== 'in_progress') {
     await ctx.db

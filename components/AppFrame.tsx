@@ -58,6 +58,8 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
 
   useEffect(() => setOpen(false), [pathname])
 
+  if (pathname.startsWith('/login')) return <>{children}</>
+
   if (bare) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-paper px-6 py-10">

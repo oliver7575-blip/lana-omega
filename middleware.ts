@@ -34,6 +34,7 @@ export async function middleware(request: NextRequest) {
   const isResendConfirmationPage = request.nextUrl.pathname.startsWith('/resend-confirmation')
   const isWidgetTestPage = request.nextUrl.pathname.startsWith('/widget-test')
   const isApiRoute = request.nextUrl.pathname.startsWith('/api')
+  const isAuthCallback = request.nextUrl.pathname.startsWith('/auth/callback')
 
   const isPublicPage =
     isLoginPage ||
@@ -41,7 +42,8 @@ export async function middleware(request: NextRequest) {
     isForgotPasswordPage ||
     isResetPasswordPage ||
     isResendConfirmationPage ||
-    isWidgetTestPage
+    isWidgetTestPage ||
+    isAuthCallback
 
   if (!user && !isPublicPage && !isApiRoute) {
     const url = request.nextUrl.clone()
