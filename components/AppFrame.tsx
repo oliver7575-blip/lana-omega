@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import LiveRefresh from './LiveRefresh'
 import {
   AlertIcon,
+  DollarIcon,
   BedIcon,
   HammerIcon,
   ListIcon,
@@ -136,6 +137,7 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
         {item('/escalations', 'Escalations', AlertIcon, pathname.startsWith('/escalations'), info?.newEscalations)}
         {item('/automations', 'Templates', TemplateIcon, pathname.startsWith('/automations'))}
         {item('/integrations', 'Integrations', ShareIcon, pathname.startsWith('/integrations'))}
+        {item('/costs', 'Costs', DollarIcon, pathname.startsWith('/costs'))}
         {item('/maintenance', 'Maintenance', HammerIcon, pathname.startsWith('/maintenance'))}
       </div>
 
