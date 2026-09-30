@@ -11,6 +11,7 @@ import {
   ScrollToBottom,
   TakeOverButton,
 } from '@/components/ConversationClient'
+import LiveRefresh from '@/components/LiveRefresh'
 
 export const dynamic = 'force-dynamic'
 
@@ -111,6 +112,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
 
   return (
     <main className="flex min-h-screen flex-col md:h-screen">
+      <LiveRefresh tables={['messages', 'conversations', 'escalations']} pollMs={15000} />
       <header className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-5 py-4 md:px-8">
         <div className="min-w-0">
           <Link href="/" className="text-xs text-navy/60 hover:text-navy">← Back to Inbox</Link>
@@ -149,7 +151,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
                 </div>
               )
             })}
-            <ScrollToBottom />
+            <ScrollToBottom key={(messages ?? []).length} />
           </div>
           {conversation.status !== 'closed' && <Composer conversationId={id} channel={conversation.channel as string} />}
         </section>

@@ -5,6 +5,7 @@ import {
   daysUntil,
   isActiveReservation,
   loadMessagingContext,
+  recordReservation,
   sendGuestMessage,
 } from './guest-messages'
 
@@ -52,7 +53,22 @@ export async function processNewReservation(tenantId: string, reservationID: str
     roomTypeName: lookup.roomTypeName,
   }
 
+  // Show the booking in the panel straight away (guest, reservation, conversation).
+  const conversationId = await recordReservation(tenantId, { ...reservation, status: lookup.status })
+
   const newReservation = await sendGuestMessage(ctx, 'new_reservation', reservation)
+
+  // Nothing was sent (no template chosen yet) — leave a note so the booking still appears.
+  if (conversationId && !newReservation.whatsapp.sent && !newReservation.email.sent) {
+    const { logLanaMessage } = await import('./guest-records')
+    const { createServiceClient } = await import('./supabase/service')
+    await logLanaMessage(
+      createServiceClient(),
+      tenantId,
+      conversationId,
+      `[New reservation #${reservation.reservationID} · ${reservation.startDate} → ${reservation.endDate}${reservation.roomTypeName ? ` · ${reservation.roomTypeName}` : ''} — no welcome message sent: ${newReservation.whatsapp.skipped ?? newReservation.whatsapp.error ?? 'WhatsApp not sent'}]`
+    )
+  }
 
   const days = daysUntil(lookup.startDate)
   const arrival =

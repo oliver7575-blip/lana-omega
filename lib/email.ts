@@ -51,6 +51,7 @@ export function renderEmailTemplate(
 
 function htmlToText(html: string): string {
   return html
+    .replace(/\s*\n\s*/g, ' ')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/p>/gi, '\n\n')
     .replace(/<a [^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/gi, '$2 ($1)')

@@ -155,13 +155,13 @@ export default function IntegrationsPage() {
         return (
           <div
             key={def.type}
-            style={{ border: '1px solid #ccc', borderRadius: 8, padding: 16, marginBottom: 16 }}
+            style={{ border: '1px solid #232a40', borderRadius: 8, padding: 16, marginBottom: 16 }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <strong>{def.label}</strong>
                 <br />
-                <span style={{ color: isConnected ? 'green' : '#888' }}>
+                <span style={{ color: isConnected ? 'green' : 'rgba(231,233,240,0.55)' }}>
                   {isConnected ? 'Connected' : 'Not connected'}
                 </span>
               </div>
@@ -190,8 +190,8 @@ export default function IntegrationsPage() {
                   padding: 8,
                   borderRadius: 6,
                   fontSize: 13,
-                  background: healthy ? '#f0fdf4' : '#fef2f2',
-                  color: healthy ? '#166534' : '#991b1b',
+                  background: healthy ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)',
+                  color: healthy ? '#6ee7b7' : '#fca5a5',
                 }}
               >
                 {healthy ? '✓ Last check passed' : '✗ Last check failed'} ·{' '}
@@ -203,7 +203,7 @@ export default function IntegrationsPage() {
               </div>
             )}
             {canTest && !checked && (
-              <p style={{ fontSize: 12, color: '#888', marginBottom: 0 }}>Not tested yet.</p>
+              <p style={{ fontSize: 12, color: 'rgba(231,233,240,0.55)', marginBottom: 0 }}>Not tested yet.</p>
             )}
 
             {openForm === def.type && (

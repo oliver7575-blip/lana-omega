@@ -43,22 +43,22 @@ interface PickerTemplate {
 }
 
 const card: React.CSSProperties = {
-  border: '1px solid #e5e7eb',
+  border: '1px solid #232a40',
   borderRadius: 8,
   padding: 20,
   marginBottom: 16,
-  background: '#fff',
+  background: '#141a2e',
 }
-const muted: React.CSSProperties = { color: '#6b7280', fontSize: 14 }
+const muted: React.CSSProperties = { color: 'rgba(231,233,240,0.55)', fontSize: 14 }
 const button: React.CSSProperties = {
   padding: '8px 14px',
   borderRadius: 6,
-  border: '1px solid #d1d5db',
-  background: '#fff',
+  border: '1px solid #232a40',
+  background: '#141a2e',
   cursor: 'pointer',
   fontSize: 14,
 }
-const primary: React.CSSProperties = { ...button, background: '#111827', color: '#fff', border: '1px solid #111827' }
+const primary: React.CSSProperties = { ...button, background: '#e0806f', color: '#fff', border: '1px solid #e0806f' }
 
 // Sample values for previews.
 const SAMPLE: Record<string, string> = {
@@ -81,6 +81,19 @@ function fillVars(text: string | undefined, keys: string[]): string {
     const key = keys[Number(n) - 1]
     return key ? `[${SAMPLE[key] ?? key}]` : m
   })
+}
+
+/**
+ * Puts each paragraph / line break on its own line so the HTML is easy to
+ * read and edit. Whitespace between tags doesn't change how an email looks.
+ */
+function formatHtml(html: string): string {
+  return html
+    .replace(/>\s*\n\s*</g, '><')
+    .replace(/(<\/(p|div|h[1-6]|li|ul|ol|table|tr)>)\s*/gi, '$1\n')
+    .replace(/(<br\s*\/?>)\s*/gi, '$1\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }
 
 function renderEmail(text: string): string {
@@ -168,7 +181,7 @@ function TemplateCard({
             next[index] = e.target.value
             set(next)
           }}
-          style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db' }}
+          style={{ padding: 6, borderRadius: 6, border: '1px solid #232a40' }}
         >
           {purpose.fields.map((f) => (
             <option key={f.key} value={f.key}>
@@ -200,7 +213,7 @@ function TemplateCard({
               ))}
             </div>
           ) : (
-            <p style={{ fontSize: 14, color: '#b45309', margin: '0 0 12px' }}>
+            <p style={{ fontSize: 14, color: '#fcd34d', margin: '0 0 12px' }}>
               {purpose.key === 'staff_escalation'
                 ? 'No template chosen — staff alerts go out as plain text, which WhatsApp only delivers if that staff member messaged the hotel number in the last 24 hours.'
                 : 'No template chosen — this WhatsApp message is not sent.'}
@@ -229,7 +242,7 @@ function TemplateCard({
               <select
                 value={selected}
                 onChange={(e) => pick(e.target.value)}
-                style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #d1d5db', marginBottom: 12 }}
+                style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #232a40', marginBottom: 12 }}
               >
                 <option value="">Select an approved template…</option>
                 {list.map((t) => (
@@ -244,7 +257,7 @@ function TemplateCard({
                 <>
                   <div
                     style={{
-                      background: '#e7fce3',
+                      background: '#1f3b2d',
                       borderRadius: 8,
                       padding: 12,
                       fontSize: 14,
@@ -255,7 +268,7 @@ function TemplateCard({
                     {chosen.headerText && <strong>{fillVars(chosen.headerText, header)}{'\n'}</strong>}
                     {fillVars(chosen.body, body)}
                     {chosen.buttons.length > 0 && (
-                      <div style={{ marginTop: 8, color: '#2563eb' }}>{chosen.buttons.join('  ·  ')}</div>
+                      <div style={{ marginTop: 8, color: '#93c5fd' }}>{chosen.buttons.join('  ·  ')}</div>
                     )}
                   </div>
                   {chosen.headerVars + chosen.bodyVars > 0 && (
@@ -283,7 +296,7 @@ function TemplateCard({
           </div>
         </div>
       )}
-      {error && <p style={{ color: '#b91c1c', fontSize: 14, marginTop: 8 }}>{error}</p>}
+      {error && <p style={{ color: '#fca5a5', fontSize: 14, marginTop: 8 }}>{error}</p>}
     </div>
   )
 }
@@ -301,7 +314,7 @@ function EmailCard({
 }) {
   const [enabled, setEnabled] = useState(tpl.enabled)
   const [subject, setSubject] = useState(tpl.subject)
-  const [body, setBody] = useState(tpl.body_html)
+  const [body, setBody] = useState(formatHtml(tpl.body_html))
   const [testTo, setTestTo] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -342,7 +355,7 @@ function EmailCard({
         value={subject}
         onChange={(e) => setSubject(e.target.value)}
         disabled={!canEdit}
-        style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #d1d5db', margin: '4px 0 12px' }}
+        style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #232a40', margin: '4px 0 12px' }}
       />
       <label style={{ fontSize: 14, fontWeight: 600 }}>Message (HTML)</label>
       <textarea
@@ -354,7 +367,7 @@ function EmailCard({
           width: '100%',
           padding: 8,
           borderRadius: 6,
-          border: '1px solid #d1d5db',
+          border: '1px solid #232a40',
           fontFamily: 'monospace',
           fontSize: 13,
           margin: '4px 0 4px',
@@ -368,8 +381,8 @@ function EmailCard({
         {showPreview ? 'Hide preview' : 'Preview'}
       </button>
       {showPreview && (
-        <div style={{ border: '1px solid #e5e7eb', borderRadius: 6, marginBottom: 12 }}>
-          <div style={{ padding: '8px 12px', borderBottom: '1px solid #e5e7eb', fontSize: 14 }}>
+        <div style={{ border: '1px solid #232a40', borderRadius: 6, marginBottom: 12 }}>
+          <div style={{ padding: '8px 12px', borderBottom: '1px solid #232a40', fontSize: 14 }}>
             <strong>{renderEmail(subject)}</strong>
           </div>
           <iframe
@@ -396,7 +409,7 @@ function EmailCard({
             placeholder="you@example.com"
             value={testTo}
             onChange={(e) => setTestTo(e.target.value)}
-            style={{ padding: 8, borderRadius: 6, border: '1px solid #d1d5db', minWidth: 200 }}
+            style={{ padding: 8, borderRadius: 6, border: '1px solid #232a40', minWidth: 200 }}
           />
           <button
             style={button}
@@ -408,7 +421,7 @@ function EmailCard({
         </div>
       )}
       {message && (
-        <p style={{ fontSize: 14, marginTop: 8, color: message.startsWith('Error') ? '#b91c1c' : '#047857' }}>
+        <p style={{ fontSize: 14, marginTop: 8, color: message.startsWith('Error') ? '#fca5a5' : '#6ee7b7' }}>
           {message}
         </p>
       )}
@@ -428,6 +441,7 @@ export default function AutomationsPage() {
   } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [templateCache, setTemplateCache] = useState<PickerTemplate[] | null>(null)
+  const [tab, setTab] = useState('new_reservation')
 
   async function load() {
     const res = await fetch('/api/automations')
@@ -449,64 +463,98 @@ export default function AutomationsPage() {
     load()
   }, [])
 
+  const categories: { key: string; label: string; help: string; wa?: string; email?: string; maintenance?: boolean }[] = [
+    { key: 'new_reservation', label: 'New reservation', help: 'Sent as soon as a new booking arrives from Cloudbeds.', wa: 'new_reservation', email: 'new_reservation' },
+    { key: 'arrival', label: 'Arrival information', help: 'Sent 2 days before check-in, or right away for last-minute bookings.', wa: 'arrival_reminder', email: 'arrival_reminder' },
+    { key: 'post_stay', label: 'Post-stay feedback', help: 'Sent the day after check-out, when post-stay messages are on in Settings.', wa: 'post_stay', email: 'post_stay' },
+    { key: 'staff', label: 'Staff alerts', help: 'Sent to staff when Lana escalates a guest issue.', wa: 'staff_escalation' },
+    { key: 'maintenance', label: 'Maintenance reminders', help: 'Sent to maintenance staff for each task, with Acepto / Necesito ayuda / Terminado buttons.', maintenance: true },
+  ]
+  const current = categories.find((c) => c.key === tab) ?? categories[0]
+  const waDone = (key?: string) => Boolean(key && data?.purposes.find((p) => p.key === key)?.mapping)
+  const emailOn = (key?: string) => Boolean(key && data?.emailTemplates.find((t) => t.key === key)?.enabled)
+
   return (
-    <main style={{ maxWidth: 820, margin: '0 auto', padding: 24, fontFamily: 'system-ui, sans-serif' }}>
-      <p>
-        <Link href="/">← Dashboard</Link>
-      </p>
-      <h1 style={{ fontSize: 24 }}>Automated messages</h1>
+    <main>
+      <h1>Templates</h1>
       <p style={muted}>
-        Messages the concierge sends on its own. WhatsApp only delivers messages that start a
-        conversation if they use a template Meta has approved, so each one needs a template chosen here.
+        Messages Lana sends on her own, grouped by when they go out. WhatsApp only delivers messages that start a
+        conversation if they use a template Meta has approved.
       </p>
-      {error && <p style={{ color: '#b91c1c' }}>{error}</p>}
+      {error && <p style={{ color: '#fca5a5' }}>{error}</p>}
       {!data && !error && <p>Loading…</p>}
 
       {data && (
-        <>
-          {!data.postStayEnabled && (
-            <p style={{ ...muted, background: '#f9fafb', padding: 12, borderRadius: 6 }}>
-              Post-stay messages are turned off. Turn them on in <Link href="/settings">Settings</Link>.
-            </p>
-          )}
+        <div className="mt-5 flex flex-col gap-6 lg:flex-row">
+          <nav className="flex shrink-0 gap-1 overflow-x-auto lg:w-56 lg:flex-col">
+            {categories.map((c) => {
+              const active = c.key === current.key
+              return (
+                <a
+                  key={c.key}
+                  href={`#${c.key}`}
+                  onClick={(e) => { e.preventDefault(); setTab(c.key) }}
+                  className={`block shrink-0 rounded-lg px-3 py-2 text-sm no-underline ${active ? 'bg-surface text-white' : 'text-navy/70 hover:bg-white/[0.03]'}`}
+                  style={{ color: active ? '#fff' : undefined, textDecoration: 'none' }}
+                >
+                  <span className="block">{c.label}</span>
+                  <span className="mt-0.5 block text-[11px] text-navy/45">
+                    {c.maintenance
+                      ? 'WhatsApp'
+                      : [c.wa ? (waDone(c.wa) ? 'WhatsApp ✓' : 'WhatsApp —') : null, c.email ? (emailOn(c.email) ? 'Email on' : 'Email off') : null]
+                          .filter(Boolean)
+                          .join(' · ')}
+                  </span>
+                </a>
+              )
+            })}
+          </nav>
 
-          <h2 style={{ fontSize: 18, marginTop: 24 }}>WhatsApp templates</h2>
-          {!data.whatsappReady && (
-            <p style={{ color: '#b45309', fontSize: 14 }}>
-              Connect WhatsApp (with its WhatsApp Business Account ID) under{' '}
-              <Link href="/integrations">Integrations</Link> to choose templates.
-            </p>
-          )}
-          {data.purposes.map((p) => (
-            <TemplateCard
-              key={p.key}
-              purpose={p}
-              canEdit={data.canEdit}
-              whatsappReady={data.whatsappReady}
-              loadList={loadList}
-              onSaved={load}
-            />
-          ))}
+          <section className="min-w-0 flex-1">
+            <h2 style={{ fontSize: 18 }}>{current.label}</h2>
+            <p style={muted}>{current.help}</p>
+            {current.key === 'post_stay' && !data.postStayEnabled && (
+              <p style={{ ...muted, background: '#141a2e', padding: 12, borderRadius: 6 }}>
+                Post-stay messages are turned off. Turn them on in <Link href="/settings">Settings</Link>.
+              </p>
+            )}
 
-          <h2 style={{ fontSize: 18, marginTop: 32 }}>Guest emails</h2>
-          {!data.smtpConnected && (
-            <p style={{ color: '#b45309', fontSize: 14 }}>
-              Connect Email (SMTP) under <Link href="/integrations">Integrations</Link> before turning emails on.
-            </p>
-          )}
-          {data.emailTemplates.map((t) => (
-            <EmailCard
-              key={t.key}
-              tpl={t}
-              canEdit={data.canEdit}
-              variables={data.emailVariables}
-              onSaved={load}
-            />
-          ))}
-        </>
+            {current.wa && (
+              <>
+                <h3 className="mb-2 mt-5 text-xs font-semibold uppercase tracking-wider text-navy/50">WhatsApp</h3>
+                {!data.whatsappReady && (
+                  <p style={{ color: '#fcd34d', fontSize: 14 }}>
+                    Connect WhatsApp (with its WhatsApp Business Account ID) under <Link href="/integrations">Integrations</Link> to choose templates.
+                  </p>
+                )}
+                {data.purposes.filter((p) => p.key === current.wa).map((p) => (
+                  <TemplateCard key={p.key} purpose={p} canEdit={data.canEdit} whatsappReady={data.whatsappReady} loadList={loadList} onSaved={load} />
+                ))}
+              </>
+            )}
+
+            {current.email && (
+              <>
+                <h3 className="mb-2 mt-5 text-xs font-semibold uppercase tracking-wider text-navy/50">Email</h3>
+                {!data.smtpConnected && (
+                  <p style={{ color: '#fcd34d', fontSize: 14 }}>
+                    Connect Email (SMTP) under <Link href="/integrations">Integrations</Link> before turning emails on.
+                  </p>
+                )}
+                {data.emailTemplates.filter((t) => t.key === current.email).map((t) => (
+                  <EmailCard key={t.key} tpl={t} canEdit={data.canEdit} variables={data.emailVariables} onSaved={load} />
+                ))}
+              </>
+            )}
+
+            {current.maintenance && (
+              <div className="mt-4">
+                <MaintenanceTemplateCard />
+              </div>
+            )}
+          </section>
+        </div>
       )}
-      <h2 style={{ fontSize: 18, marginTop: 32 }}>Maintenance reminders</h2>
-      <MaintenanceTemplateCard />
     </main>
   )
 }

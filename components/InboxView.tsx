@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { requireStaff } from '@/lib/staff-context'
 import { displayPhone, loadInbox, timeAgo } from '@/lib/inbox'
+import LiveRefresh from './LiveRefresh'
 
 const INTEGRATION_LABELS: Record<string, string> = {
   whatsapp: 'WhatsApp',
@@ -37,6 +38,7 @@ export default async function InboxView({
 
   return (
     <main className="px-5 py-6 md:px-8">
+      <LiveRefresh tables={['messages', 'conversations']} />
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="font-display text-2xl italic text-white sm:text-3xl">{title}</h1>
         <form method="get" action={basePath} className="w-full sm:w-auto sm:flex-1 sm:px-10">
@@ -87,7 +89,7 @@ export default async function InboxView({
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                  {name && <span className="text-[15px] font-semibold text-white">{name}</span>}
+                  {name && <span className="text-[14px] font-semibold text-white">{name}</span>}
                   <span className="text-[11px] uppercase tracking-wider text-navy/45">{r.channel}</span>
                   {r.reservationStatus && (
                     <span className="rounded-full bg-clay/15 px-2 py-0.5 text-[11px] text-clay">

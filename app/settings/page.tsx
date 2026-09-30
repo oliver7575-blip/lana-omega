@@ -343,12 +343,12 @@ export default function SettingsPage() {
         <Link href="/">← Back home</Link>
       </p>
       <h1>Settings</h1>
-      <p style={{ color: '#888' }}>Status: {status}</p>
+      <p style={{ color: 'rgba(231,233,240,0.55)' }}>Status: {status}</p>
 
       {status === 'onboarding' && canEdit && (
         <div
           style={{
-            background: '#eff6ff',
+            background: 'rgba(59,130,246,0.12)',
             border: '1px solid #bfdbfe',
             borderRadius: 8,
             padding: 16,
@@ -362,12 +362,12 @@ export default function SettingsPage() {
           <button onClick={handleActivate} disabled={activating}>
             {activating ? 'Activating...' : 'Activate hotel'}
           </button>
-          {activateError && <p style={{ color: 'red' }}>{activateError}</p>}
+          {activateError && <p style={{ color: '#fca5a5' }}>{activateError}</p>}
         </div>
       )}
 
       {!canEdit && (
-        <p style={{ color: '#b45309' }}>
+        <p style={{ color: '#fcd34d' }}>
           Your role ({role}) can view these settings but only an owner or admin can edit them.
         </p>
       )}
@@ -391,7 +391,7 @@ export default function SettingsPage() {
           <strong>AI persona &amp; policies</strong>
         </label>
         <br />
-        <span style={{ fontSize: 13, color: '#888' }}>
+        <span style={{ fontSize: 13, color: 'rgba(231,233,240,0.55)' }}>
           This is the full system prompt guiding your AI concierge — persona, tone, policies, and
           key facts, all in one place.
         </span>
@@ -422,7 +422,7 @@ export default function SettingsPage() {
           <strong>Knowledge base</strong>
         </label>
         <br />
-        <span style={{ fontSize: 13, color: '#888' }}>
+        <span style={{ fontSize: 13, color: 'rgba(231,233,240,0.55)' }}>
           Your hotel's reference manual: facts, policies, prices, contacts, local tips (parking,
           Wi-Fi, restaurants, taxis, tours, house rules...). The concierge treats this as the
           source of truth. Keep tone and behaviour rules in the persona box above. Plain text or
@@ -436,7 +436,7 @@ export default function SettingsPage() {
           rows={24}
           style={{ width: '100%', padding: 8, marginTop: 4, fontFamily: 'monospace', fontSize: 13 }}
         />
-        <span style={{ fontSize: 12, color: knowledgeBase.length > 60000 ? 'red' : '#888' }}>
+        <span style={{ fontSize: 12, color: knowledgeBase.length > 60000 ? 'red' : 'rgba(231,233,240,0.55)' }}>
           {knowledgeBase.length.toLocaleString('en-US')} / 60,000 characters
         </span>
       </div>
@@ -448,9 +448,9 @@ export default function SettingsPage() {
       {kbMessage && <p>{kbMessage}</p>}
 
       {canEdit && (
-        <div style={{ marginTop: 32, border: '1px solid #ddd', borderRadius: 8, padding: 16 }}>
+        <div style={{ marginTop: 32, border: '1px solid #232a40', borderRadius: 8, padding: 16 }}>
           <h2 style={{ marginTop: 0, fontSize: 18 }}>Staff escalation contacts</h2>
-          <p style={{ fontSize: 13, color: '#888', marginTop: 0 }}>
+          <p style={{ fontSize: 13, color: 'rgba(231,233,240,0.55)', marginTop: 0 }}>
             WhatsApp numbers your AI concierge will message directly when a guest needs staff
             attention. Each contact is a category the concierge can choose — the description tells
             it when. Include the country code, e.g. +52 958 128 5454. A contact called
@@ -460,7 +460,7 @@ export default function SettingsPage() {
           {contacts.map((c, i) => (
             <div
               key={i}
-              style={{ border: '1px solid #eee', borderRadius: 6, padding: 10, marginBottom: 8 }}
+              style={{ border: '1px solid #232a40', borderRadius: 6, padding: 10, marginBottom: 8 }}
             >
               <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
                 <input
@@ -505,9 +505,9 @@ export default function SettingsPage() {
       )}
 
       {canEdit && (
-        <div style={{ marginTop: 32, border: '1px solid #ddd', borderRadius: 8, padding: 16 }}>
+        <div style={{ marginTop: 32, border: '1px solid #232a40', borderRadius: 8, padding: 16 }}>
           <h2 style={{ marginTop: 0, fontSize: 18 }}>Post-stay messages</h2>
-          <p style={{ fontSize: 13, color: '#888', marginTop: 0 }}>
+          <p style={{ fontSize: 13, color: 'rgba(231,233,240,0.55)', marginTop: 0 }}>
             When on, guests get a feedback message (WhatsApp and/or email) the day after
             check-out. Set up the message under <Link href="/automations">Automated messages</Link>.
           </p>
@@ -525,9 +525,9 @@ export default function SettingsPage() {
       )}
 
       {canEdit && (
-        <div style={{ marginTop: 32, border: '1px solid #ddd', borderRadius: 8, padding: 16 }}>
+        <div style={{ marginTop: 32, border: '1px solid #232a40', borderRadius: 8, padding: 16 }}>
           <h2 style={{ marginTop: 0, fontSize: 18 }}>Booking link</h2>
-          <p style={{ fontSize: 13, color: '#888', marginTop: 0 }}>
+          <p style={{ fontSize: 13, color: 'rgba(231,233,240,0.55)', marginTop: 0 }}>
             Lets your AI concierge send guests a real link to check availability and book, using
             your Cloudbeds booking engine. Find your booking engine code in Cloudbeds under
             Booking Engine settings — it's the short code in your booking engine's own URL.
@@ -560,9 +560,9 @@ export default function SettingsPage() {
       )}
 
       {canEdit && (
-        <div style={{ marginTop: 32, border: '1px solid #ddd', borderRadius: 8, padding: 16 }}>
+        <div style={{ marginTop: 32, border: '1px solid #232a40', borderRadius: 8, padding: 16 }}>
           <h2 style={{ marginTop: 0, fontSize: 18 }}>Test your concierge</h2>
-          <p style={{ fontSize: 13, color: '#888', marginTop: 0 }}>
+          <p style={{ fontSize: 13, color: 'rgba(231,233,240,0.55)', marginTop: 0 }}>
             Chats using the persona and knowledge base boxes above, even if you haven't saved them. Nothing here is
             stored, and reservation lookups aren't simulated. Each message is a real AI call. Note:
             escalation, the waitlist, and the booking link are NOT simulated here either — testing
@@ -571,7 +571,7 @@ export default function SettingsPage() {
 
           <div
             style={{
-              border: '1px solid #eee',
+              border: '1px solid #232a40',
               borderRadius: 8,
               minHeight: 120,
               maxHeight: 320,
@@ -581,7 +581,7 @@ export default function SettingsPage() {
             }}
           >
             {pgMessages.length === 0 && (
-              <p style={{ color: '#aaa', margin: 0 }}>
+              <p style={{ color: 'rgba(231,233,240,0.55)', margin: 0 }}>
                 Ask something a guest would, e.g. "What's the Wi-Fi password?"
               </p>
             )}
@@ -593,7 +593,7 @@ export default function SettingsPage() {
                     padding: '8px 12px',
                     borderRadius: 8,
                     maxWidth: '85%',
-                    background: m.role === 'user' ? '#dbeafe' : '#f0f0f0',
+                    background: m.role === 'user' ? '#1f2848' : '#141a2e',
                     whiteSpace: 'pre-wrap',
                     textAlign: 'left',
                   }}
@@ -602,10 +602,10 @@ export default function SettingsPage() {
                 </div>
               </div>
             ))}
-            {pgLoading && <p style={{ color: '#888', margin: 0 }}>Thinking...</p>}
+            {pgLoading && <p style={{ color: 'rgba(231,233,240,0.55)', margin: 0 }}>Thinking...</p>}
           </div>
 
-          {pgError && <p style={{ color: 'red', marginTop: 0 }}>{pgError}</p>}
+          {pgError && <p style={{ color: '#fca5a5', marginTop: 0 }}>{pgError}</p>}
 
           <form onSubmit={handlePlaygroundSend} style={{ display: 'flex', gap: 8 }}>
             <input
@@ -630,7 +630,7 @@ export default function SettingsPage() {
         </div>
       )}
 
-      <div style={{ marginTop: 48, borderTop: '1px solid #eee', paddingTop: 16 }}>
+      <div style={{ marginTop: 48, borderTop: '1px solid #232a40', paddingTop: 16 }}>
         <h2>Your account</h2>
         <form onSubmit={handleChangePassword}>
           <div style={{ marginBottom: 8 }}>
@@ -653,8 +653,8 @@ export default function SettingsPage() {
               style={{ width: '100%', padding: 8 }}
             />
           </div>
-          {passwordError && <p style={{ color: 'red' }}>{passwordError}</p>}
-          {passwordMessage && <p style={{ color: 'green' }}>{passwordMessage}</p>}
+          {passwordError && <p style={{ color: '#fca5a5' }}>{passwordError}</p>}
+          {passwordMessage && <p style={{ color: '#6ee7b7' }}>{passwordMessage}</p>}
           <button type="submit" disabled={changingPassword}>
             {changingPassword ? 'Updating...' : 'Change password'}
           </button>
@@ -663,9 +663,9 @@ export default function SettingsPage() {
 
       {canDelete && (
         <div style={{ marginTop: 48, borderTop: '1px solid #f0c0c0', paddingTop: 16 }}>
-          <h2 style={{ color: '#b91c1c' }}>Danger zone</h2>
+          <h2 style={{ color: '#fca5a5' }}>Danger zone</h2>
           {!showDeleteForm ? (
-            <button onClick={() => setShowDeleteForm(true)} style={{ color: '#b91c1c' }}>
+            <button onClick={() => setShowDeleteForm(true)} style={{ color: '#fca5a5' }}>
               Delete this hotel account
             </button>
           ) : (
@@ -682,11 +682,11 @@ export default function SettingsPage() {
                 onChange={(e) => setConfirmName(e.target.value)}
                 style={{ width: '100%', padding: 8, marginBottom: 8 }}
               />
-              {deleteError && <p style={{ color: 'red' }}>{deleteError}</p>}
+              {deleteError && <p style={{ color: '#fca5a5' }}>{deleteError}</p>}
               <button
                 onClick={handleDelete}
                 disabled={deleting || confirmName !== name}
-                style={{ color: '#b91c1c' }}
+                style={{ color: '#fca5a5' }}
               >
                 {deleting ? 'Deleting...' : 'Permanently delete'}
               </button>

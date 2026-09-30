@@ -12,6 +12,7 @@ import { buildRoomPhotosTool } from '@/lib/room-photos'
 import { buildBookingLinkInstruction } from '@/lib/booking-link'
 import { buildKnowledgeBaseSection } from '@/lib/knowledge-base'
 import { processMaintenanceButtonReply } from '@/lib/maintenance-reply'
+import { findGuestByPhone } from '@/lib/guest-records'
 
 // Meta must get a fast 200. All real work runs in after(), which keeps the
 // function alive (up to maxDuration) after the response has been sent.
@@ -88,9 +89,11 @@ function extractMessage(body: Record<string, unknown>): ExtractedMessage | null 
     }
     if (type === 'interactive') {
       const inter = message.interactive as
-        | { button_reply?: { title?: string }; list_reply?: { title?: string } }
+        | { button_reply?: { id?: string; title?: string }; list_reply?: { id?: string; title?: string } }
         | undefined
-      return { ...base, text: inter?.button_reply?.title ?? inter?.list_reply?.title ?? '' }
+      // Maintenance task buttons carry the task in their id (mt:<task>:<action>).
+      const reply = inter?.button_reply ?? inter?.list_reply
+      return { ...base, text: reply?.id?.startsWith('mt:') ? reply.id : reply?.title ?? '' }
     }
     if (type === 'reaction') {
       const reaction = message.reaction as { emoji?: string } | undefined
@@ -284,11 +287,15 @@ async function processInbound(msg: ExtractedMessage) {
 
   // ---- Guest + conversation -------------------------------------------------
 
-  const { data: guest, error: guestError } = await supabase
-    .from('guests')
-    .upsert({ tenant_id: tenantId, phone: from }, { onConflict: 'tenant_id,phone' })
-    .select()
-    .single()
+  // Same person as a guest created from a Cloudbeds booking (phones can be formatted differently).
+  const knownGuest = await findGuestByPhone(supabase, tenantId, from)
+  const { data: guest, error: guestError } = knownGuest
+    ? { data: knownGuest, error: null }
+    : await supabase
+        .from('guests')
+        .upsert({ tenant_id: tenantId, phone: from }, { onConflict: 'tenant_id,phone' })
+        .select()
+        .single()
 
   if (guestError || !guest) {
     console.error('[whatsapp-inbound] guest upsert failed', guestError?.message)

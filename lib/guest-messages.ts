@@ -1,6 +1,7 @@
 import { createServiceClient } from './supabase/service'
 import type { EncryptedPayload } from './crypto'
-import { getMapping, reservationValues, sendMappedTemplate } from './message-templates'
+import { getMapping, renderMappedTemplateText, reservationValues, sendMappedTemplate } from './message-templates'
+import { ensureConversation, findOrCreateGuest, logLanaMessage } from './guest-records'
 import { renderEmailTemplate, sendTenantEmail } from './email'
 
 export type GuestPurpose = 'new_reservation' | 'arrival_reminder' | 'post_stay'
@@ -26,7 +27,7 @@ export interface MessagingContext {
   tenantId: string
   tenantName: string
   messageTemplates: unknown
-  whatsapp: { phoneNumberId: string; credentials: EncryptedPayload } | null
+  whatsapp: { phoneNumberId: string; credentials: EncryptedPayload; wabaId?: string } | null
 }
 
 export async function loadMessagingContext(tenantId: string): Promise<MessagingContext | null> {
@@ -45,6 +46,7 @@ export async function loadMessagingContext(tenantId: string): Promise<MessagingC
     .eq('integration_type', 'whatsapp')
     .maybeSingle()
   const phoneNumberId = (wa?.config as { phone_number_id?: string } | null)?.phone_number_id
+  const wabaId = (wa?.config as { waba_id?: string } | null)?.waba_id
 
   return {
     tenantId,
@@ -52,7 +54,7 @@ export async function loadMessagingContext(tenantId: string): Promise<MessagingC
     messageTemplates: tenant.message_templates,
     whatsapp:
       wa?.status === 'connected' && wa.credentials && phoneNumberId
-        ? { phoneNumberId, credentials: wa.credentials as EncryptedPayload }
+        ? { phoneNumberId, credentials: wa.credentials as EncryptedPayload, wabaId }
         : null,
   }
 }
@@ -109,7 +111,13 @@ export async function sendGuestMessage(
       mapping,
       values
     )
-    if (res.success) await markSent(ctx.tenantId, r.reservationID, waType)
+    if (res.success) {
+      await markSent(ctx.tenantId, r.reservationID, waType)
+      const text = ctx.whatsapp.wabaId
+        ? await renderMappedTemplateText(ctx.whatsapp.wabaId, ctx.whatsapp.credentials, mapping, values)
+        : null
+      await recordInConversation(ctx, r, text ?? `[WhatsApp template sent: ${mapping.name}]`)
+    }
     whatsapp = { sent: res.success, error: res.error }
   }
 
@@ -135,7 +143,10 @@ export async function sendGuestMessage(
       renderEmailTemplate(tpl.subject, values, false),
       renderEmailTemplate(tpl.body_html, values, true)
     )
-    if (res.success) await markSent(ctx.tenantId, r.reservationID, emailType)
+    if (res.success) {
+      await markSent(ctx.tenantId, r.reservationID, emailType)
+      await recordInConversation(ctx, r, `[Email sent to ${r.guestEmail}: ${renderEmailTemplate(tpl.subject, values, false)}]`)
+    }
     email = { sent: res.success, error: res.error }
   }
 
@@ -154,4 +165,40 @@ export function daysUntil(date: string | undefined): number | null {
 const INACTIVE_STATUSES = new Set(['canceled', 'cancelled', 'no_show'])
 export function isActiveReservation(status: string | undefined): boolean {
   return !INACTIVE_STATUSES.has((status ?? '').toLowerCase())
+}
+
+/** Shows an automated message in the guest's conversation in the panel. */
+async function recordInConversation(ctx: MessagingContext, r: GuestReservation, text: string) {
+  if (!r.guestPhone) return
+  const db = createServiceClient()
+  const guest = await findOrCreateGuest(db, ctx.tenantId, r.guestPhone, { name: r.guestName, email: r.guestEmail })
+  if (!guest) return
+  const conversationId = await ensureConversation(db, ctx.tenantId, guest.id as string)
+  if (conversationId) await logLanaMessage(db, ctx.tenantId, conversationId, text)
+}
+
+/**
+ * Files a reservation against the guest (matched by phone), so it shows in
+ * the panel's Reservations view and Lana knows about it when they write in.
+ */
+export async function recordReservation(tenantId: string, r: GuestReservation & { status?: string }) {
+  if (!r.guestPhone) return
+  const db = createServiceClient()
+  const guest = await findOrCreateGuest(db, tenantId, r.guestPhone, { name: r.guestName, email: r.guestEmail })
+  if (!guest) return
+  await db.from('guest_reservations').upsert(
+    {
+      tenant_id: tenantId,
+      guest_id: guest.id,
+      confirmation_number: r.reservationID,
+      status: r.status ?? null,
+      start_date: r.startDate ?? null,
+      end_date: r.endDate ?? null,
+      room_label: r.roomTypeName ?? null,
+      synced_at: new Date().toISOString(),
+    },
+    { onConflict: 'tenant_id,guest_id' }
+  )
+  const conversationId = await ensureConversation(db, tenantId, guest.id as string)
+  return conversationId
 }

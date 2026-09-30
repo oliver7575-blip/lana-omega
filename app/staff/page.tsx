@@ -90,7 +90,7 @@ export default function StaffPage() {
         <div
           key={s.id}
           style={{
-            border: '1px solid #ccc',
+            border: '1px solid #232a40',
             borderRadius: 8,
             padding: 12,
             marginBottom: 8,
@@ -102,7 +102,7 @@ export default function StaffPage() {
           <div>
             <strong>{s.full_name || s.email}</strong> — {s.role}
             <br />
-            <span style={{ color: '#888', fontSize: 13 }}>{s.email}</span>
+            <span style={{ color: 'rgba(231,233,240,0.55)', fontSize: 13 }}>{s.email}</span>
           </div>
           <button onClick={() => handleRemove(s.id, s.email)}>Remove</button>
         </div>
@@ -113,7 +113,7 @@ export default function StaffPage() {
           + Invite staff member
         </button>
       ) : (
-        <div style={{ marginTop: 16, border: '1px solid #ccc', borderRadius: 8, padding: 16 }}>
+        <div style={{ marginTop: 16, border: '1px solid #232a40', borderRadius: 8, padding: 16 }}>
           <div style={{ marginBottom: 8 }}>
             <label>Full name</label>
             <br />

@@ -19,12 +19,12 @@ interface TemplateListItem extends TemplateInfo {
 }
 
 const STATUS_STYLE: Record<string, { bg: string; fg: string; label: string }> = {
-  APPROVED: { bg: '#dcfce7', fg: '#166534', label: 'Approved — reminders are sent with this template' },
-  PENDING: { bg: '#fef9c3', fg: '#854d0e', label: 'Waiting for Meta review' },
-  IN_APPEAL: { bg: '#fef9c3', fg: '#854d0e', label: 'In appeal' },
-  REJECTED: { bg: '#fee2e2', fg: '#991b1b', label: 'Rejected by Meta' },
-  PAUSED: { bg: '#fee2e2', fg: '#991b1b', label: 'Paused by Meta' },
-  DISABLED: { bg: '#fee2e2', fg: '#991b1b', label: 'Disabled by Meta' },
+  APPROVED: { bg: 'rgba(16,185,129,0.15)', fg: '#6ee7b7', label: 'Approved — reminders are sent with this template' },
+  PENDING: { bg: 'rgba(245,158,11,0.15)', fg: '#fcd34d', label: 'Waiting for Meta review' },
+  IN_APPEAL: { bg: 'rgba(245,158,11,0.15)', fg: '#fcd34d', label: 'In appeal' },
+  REJECTED: { bg: 'rgba(239,68,68,0.15)', fg: '#fca5a5', label: 'Rejected by Meta' },
+  PAUSED: { bg: 'rgba(239,68,68,0.15)', fg: '#fca5a5', label: 'Paused by Meta' },
+  DISABLED: { bg: 'rgba(239,68,68,0.15)', fg: '#fca5a5', label: 'Disabled by Meta' },
 }
 
 async function readJson(res: Response): Promise<Record<string, unknown> | null> {
@@ -49,7 +49,7 @@ function Bubble({ body, buttons }: { body: string; buttons: string[] }) {
     <>
       <div
         style={{
-          background: '#dcf8c6',
+          background: '#1f3b2d',
           borderRadius: 8,
           padding: 10,
           whiteSpace: 'pre-wrap',
@@ -64,11 +64,11 @@ function Bubble({ body, buttons }: { body: string; buttons: string[] }) {
           <span
             key={`${b}-${i}`}
             style={{
-              border: '1px solid #ccc',
+              border: '1px solid #232a40',
               borderRadius: 6,
               padding: '4px 10px',
               fontSize: 13,
-              color: '#0369a1',
+              color: '#93c5fd',
             }}
           >
             {b}
@@ -207,20 +207,20 @@ export default function MaintenanceTemplateCard() {
   const inReview = template?.exists && (template.status === 'PENDING' || template.status === 'IN_APPEAL')
 
   return (
-    <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 16, marginBottom: 24 }}>
+    <div style={{ border: '1px solid #232a40', borderRadius: 8, padding: 16, marginBottom: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 style={{ marginTop: 0, fontSize: 18 }}>WhatsApp reminder template</h2>
         <button onClick={load} disabled={loading || saving}>
           {loading ? 'Checking...' : 'Refresh'}
         </button>
       </div>
-      <p style={{ fontSize: 13, color: '#888', marginTop: 0 }}>
+      <p style={{ fontSize: 13, color: 'rgba(231,233,240,0.55)', marginTop: 0 }}>
         Staff reminders are sent with a Meta-approved message, so they arrive even if the staff
         member hasn't written to you recently. Use Omega's own template below, or pick one your
         WhatsApp account already has approved.
       </p>
 
-      {error && <p style={{ color: '#991b1b' }}>{error}</p>}
+      {error && <p style={{ color: '#fca5a5' }}>{error}</p>}
 
       {!loading && template && (
         <>
@@ -237,8 +237,8 @@ export default function MaintenanceTemplateCard() {
               borderRadius: 6,
               fontSize: 14,
               marginBottom: 12,
-              background: style?.bg ?? '#f3f4f6',
-              color: style?.fg ?? '#374151',
+              background: style?.bg ?? '#1f2848',
+              color: style?.fg ?? 'rgba(231,233,240,0.8)',
             }}
           >
             {template.exists ? (
@@ -261,9 +261,9 @@ export default function MaintenanceTemplateCard() {
 
           {usingCustom ? (
             <>
-              <div style={{ fontSize: 12, color: '#888', margin: '8px 0 4px' }}>Preview</div>
+              <div style={{ fontSize: 12, color: 'rgba(231,233,240,0.55)', margin: '8px 0 4px' }}>Preview</div>
               <Bubble body={template.body ?? ''} buttons={buttons} />
-              <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
+              <div style={{ fontSize: 12, color: 'rgba(231,233,240,0.55)', marginTop: 4 }}>
                 Buttons are used by position: 1st = accept, 2nd = need help, 3rd = done. Edit this
                 template in WhatsApp Manager if needed.
               </div>
@@ -283,7 +283,7 @@ export default function MaintenanceTemplateCard() {
               <label>
                 <strong>Message text</strong>
               </label>
-              <div style={{ fontSize: 12, color: '#888', margin: '4px 0' }}>
+              <div style={{ fontSize: 12, color: 'rgba(231,233,240,0.55)', margin: '4px 0' }}>
                 Must keep all four placeholders exactly once: {'{{1}}'} staff first name ·{' '}
                 {'{{2}}'} task · {'{{3}}'} location · {'{{4}}'} due.
               </div>
@@ -295,13 +295,13 @@ export default function MaintenanceTemplateCard() {
                 style={{ width: '100%', padding: 8, fontFamily: 'monospace', fontSize: 13 }}
               />
 
-              <div style={{ fontSize: 12, color: '#888', margin: '8px 0 4px' }}>Preview</div>
+              <div style={{ fontSize: 12, color: 'rgba(231,233,240,0.55)', margin: '8px 0 4px' }}>Preview</div>
               <Bubble body={body} buttons={buttons} />
-              <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
+              <div style={{ fontSize: 12, color: 'rgba(231,233,240,0.55)', marginTop: 4 }}>
                 The three buttons are fixed — they drive the task updates.
               </div>
               {inReview && (
-                <div style={{ fontSize: 13, color: '#854d0e', marginTop: 8 }}>
+                <div style={{ fontSize: 13, color: '#fcd34d', marginTop: 8 }}>
                   Editing is locked while Meta reviews this template. Once it's approved or
                   rejected you can edit and resubmit it.
                 </div>
@@ -328,33 +328,33 @@ export default function MaintenanceTemplateCard() {
               )}
             </>
           )}
-          {message && <p style={{ color: '#166534' }}>{message}</p>}
+          {message && <p style={{ color: '#6ee7b7' }}>{message}</p>}
         </>
       )}
 
       {pickerOpen && (
-        <div style={{ marginTop: 16, borderTop: '1px solid #eee', paddingTop: 12 }}>
+        <div style={{ marginTop: 16, borderTop: '1px solid #232a40', paddingTop: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <strong>Templates in your WhatsApp account</strong>
             <button onClick={() => setPickerOpen(false)} type="button">
               Close
             </button>
           </div>
-          <div style={{ fontSize: 12, color: '#888', margin: '4px 0 8px' }}>
+          <div style={{ fontSize: 12, color: 'rgba(231,233,240,0.55)', margin: '4px 0 8px' }}>
             Usable templates are approved and have {'{{1}}'} name · {'{{2}}'} task · {'{{3}}'}{' '}
             location · {'{{4}}'} due, plus 3 quick-reply buttons (accept, need help, done — in that
             order).
           </div>
-          {pickerLoading && <p style={{ color: '#888' }}>Loading templates...</p>}
-          {pickerError && <p style={{ color: '#991b1b' }}>{pickerError}</p>}
+          {pickerLoading && <p style={{ color: 'rgba(231,233,240,0.55)' }}>Loading templates...</p>}
+          {pickerError && <p style={{ color: '#fca5a5' }}>{pickerError}</p>}
           {!pickerLoading && !pickerError && list.length === 0 && (
-            <p style={{ color: '#888' }}>No templates found in this WhatsApp account.</p>
+            <p style={{ color: 'rgba(231,233,240,0.55)' }}>No templates found in this WhatsApp account.</p>
           )}
           {list.map((t) => (
             <div
               key={`${t.name}-${t.language}`}
               style={{
-                border: '1px solid #eee',
+                border: '1px solid #232a40',
                 borderRadius: 8,
                 padding: 12,
                 marginBottom: 8,
@@ -364,7 +364,7 @@ export default function MaintenanceTemplateCard() {
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                 <div>
                   <strong>{t.name}</strong>{' '}
-                  <span style={{ fontSize: 12, color: '#888' }}>
+                  <span style={{ fontSize: 12, color: 'rgba(231,233,240,0.55)' }}>
                     {t.language} · {t.status}
                   </span>
                 </div>
@@ -375,15 +375,15 @@ export default function MaintenanceTemplateCard() {
                 )}
               </div>
               {!t.compatible && (
-                <div style={{ fontSize: 12, color: '#991b1b', marginTop: 4 }}>{t.reason}</div>
+                <div style={{ fontSize: 12, color: '#fca5a5', marginTop: 4 }}>{t.reason}</div>
               )}
               {t.body && (
-                <div style={{ fontSize: 13, whiteSpace: 'pre-wrap', marginTop: 6, color: '#444' }}>
+                <div style={{ fontSize: 13, whiteSpace: 'pre-wrap', marginTop: 6, color: 'rgba(231,233,240,0.8)' }}>
                   {t.body}
                 </div>
               )}
               {t.compatible && t.buttons && (
-                <div style={{ fontSize: 12, color: '#0369a1', marginTop: 6 }}>
+                <div style={{ fontSize: 12, color: '#93c5fd', marginTop: 6 }}>
                   {t.buttons.map((b, i) => `${b} ${ROLE_LABELS[i] ?? ''}`).join(' · ')}
                 </div>
               )}

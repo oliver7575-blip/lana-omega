@@ -72,19 +72,19 @@ export default function ConversationControls({
 
   if (status === 'closed') {
     return (
-      <div style={{ marginTop: 16, borderTop: '1px solid #eee', paddingTop: 16 }}>
-        <p style={{ color: '#888' }}>This conversation is closed.</p>
+      <div style={{ marginTop: 16, borderTop: '1px solid #232a40', paddingTop: 16 }}>
+        <p style={{ color: 'rgba(231,233,240,0.55)' }}>This conversation is closed.</p>
         <button onClick={handleReopen}>Reopen</button>
       </div>
     )
   }
 
   return (
-    <div style={{ marginTop: 16, borderTop: '1px solid #eee', paddingTop: 16 }}>
+    <div style={{ marginTop: 16, borderTop: '1px solid #232a40', paddingTop: 16 }}>
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         <button
           onClick={toggleTakeover}
-          style={{ background: status === 'human_takeover' ? '#fee2e2' : '#f0f0f0' }}
+          style={{ background: status === 'human_takeover' ? 'rgba(239,68,68,0.15)' : '#141a2e' }}
         >
           {status === 'human_takeover'
             ? '✓ You have taken over — click to hand back to AI'
@@ -104,9 +104,9 @@ export default function ConversationControls({
           {sending ? 'Sending...' : 'Send'}
         </button>
       </form>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+      {error && <p style={{ color: '#fca5a5' }}>{error}</p>}
       {status !== 'human_takeover' && (
-        <p style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
+        <p style={{ fontSize: 12, color: 'rgba(231,233,240,0.55)', marginTop: 4 }}>
           Sending a reply here does not automatically pause the AI — take over first if you want
           the AI to stop auto-replying.
         </p>

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import LiveRefresh from './LiveRefresh'
 import {
   AlertIcon,
   HammerIcon,
@@ -18,9 +19,8 @@ import {
 
 // Pages shown without the sidebar.
 const BARE = ['/login', '/signup', '/forgot-password', '/reset-password', '/resend-confirmation', '/widget-test']
-// Older pages not yet rebuilt in the dark design: shown in a white panel,
-// the way Beta shows its Cloudbeds pages.
-const LIGHT_PANEL = ['/settings', '/staff', '/waitlist', '/integrations', '/automations']
+// Older pages with plain markup get Beta's dark theme through .legacy-dark.
+const LEGACY = ['/settings', '/staff', '/waitlist', '/integrations', '/automations']
 
 interface ShellInfo {
   email: string
@@ -34,6 +34,7 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const [info, setInfo] = useState<ShellInfo | null>(null)
   const [open, setOpen] = useState(false)
+  const [tick, setTick] = useState(0)
 
   const bare = BARE.some((p) => pathname.startsWith(p))
 
@@ -54,7 +55,7 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
       stop = true
       clearInterval(t)
     }
-  }, [bare, pathname])
+  }, [bare, pathname, tick])
 
   useEffect(() => setOpen(false), [pathname])
 
@@ -76,7 +77,7 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
 
   const isInbox = pathname === '/' || pathname.startsWith('/conversations')
   const isReservations = pathname.startsWith('/reservations')
-  const light = LIGHT_PANEL.some((p) => pathname.startsWith(p))
+  const legacy = LEGACY.some((p) => pathname.startsWith(p))
 
   async function signOut() {
     await createClient().auth.signOut()
@@ -104,7 +105,7 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
   const sub = (href: string, label: string, active: boolean, badge?: number) => (
     <Link
       href={href}
-      className={`flex items-center justify-between rounded-lg py-1.5 pl-4 pr-3 text-[13px] transition ${
+      className={`flex items-center justify-between rounded-lg py-1 pl-3 pr-3 text-[12px] transition ${
         active ? 'text-white' : 'text-navy/70 hover:text-navy'
       }`}
     >
@@ -128,7 +129,7 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
 
       <div className="space-y-1">
         {item('/', 'Messages', MailIcon, isInbox)}
-        <div className="ml-5 border-l border-line pl-1">
+        <div className="ml-8 border-l border-line pl-2">
           {sub('/reservations', 'Reservations', isReservations, info?.unreadReservations)}
         </div>
         {item('/escalations', 'Escalations', AlertIcon, pathname.startsWith('/escalations'), info?.newEscalations)}
@@ -156,6 +157,7 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-paper md:flex">
+      <LiveRefresh tables={['messages', 'escalations']} onChange={() => setTick((t) => t + 1)} pollMs={60000} />
       {/* Mobile top bar */}
       <div className="flex items-center justify-between border-b border-line px-4 py-3 md:hidden">
         <p className="font-display text-lg italic text-clay">Lana · admin</p>
@@ -173,10 +175,8 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="min-w-0 flex-1">
-        {light ? (
-          <div className="p-3 md:p-4">
-            <div className="legacy-panel min-h-[calc(100vh-2rem)] rounded-2xl bg-[#f4f7fa] p-5 md:p-8">{children}</div>
-          </div>
+        {legacy ? (
+          <div className="legacy-dark px-5 py-6 md:px-8">{children}</div>
         ) : (
           children
         )}

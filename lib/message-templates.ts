@@ -229,3 +229,26 @@ export function reservationValues(
     property_name: propertyName,
   }
 }
+
+/** The template's text with its variables filled in, for the conversation log. */
+export async function renderMappedTemplateText(
+  wabaId: string,
+  credentials: EncryptedPayload,
+  mapping: TemplateMapping,
+  values: Record<string, string | undefined>
+): Promise<string | null> {
+  try {
+    const all = await fetchTemplates(wabaId, credentials, mapping.name)
+    const t = all.find((x) => x.name === mapping.name && x.language === mapping.language)
+    if (!t) return null
+    const fill = (text: string | undefined, keys: string[]) =>
+      (text ?? '').replace(/\{\{(\d+)\}\}/g, (m, n: string) => values[keys[Number(n) - 1]] ?? m)
+    const header = t.components?.find((c) => c.type === 'HEADER')
+    const body = t.components?.find((c) => c.type === 'BODY')?.text
+    return [header?.format === 'TEXT' ? fill(header.text, mapping.header) : null, fill(body, mapping.body)]
+      .filter(Boolean)
+      .join('\n\n')
+  } catch {
+    return null
+  }
+}

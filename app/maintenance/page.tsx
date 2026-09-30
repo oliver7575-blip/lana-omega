@@ -5,6 +5,7 @@ import StaffModal from '@/components/maintenance/StaffModal'
 import TaskModal from '@/components/maintenance/TaskModal'
 import TaskDrawer from '@/components/maintenance/TaskDrawer'
 import PreviewModal from '@/components/maintenance/PreviewModal'
+import LiveRefresh from '@/components/LiveRefresh'
 import { api, fmtDateTime, localParts, recurrenceLabel, STATUS_LABEL, titleCase, type Staff, type Task } from '@/components/maintenance/shared'
 
 interface Stats { open: number; inProgress: number; needAttention: number; completed: number }
@@ -79,8 +80,6 @@ export default function MaintenancePage() {
 
   useEffect(() => {
     load()
-    const t = setInterval(load, 30000)
-    return () => clearInterval(t)
   }, [load])
 
   const staffName = (id: string | null) => (id ? staff.find((s) => s.id === id)?.name ?? '—' : 'Unassigned')
@@ -140,6 +139,7 @@ export default function MaintenancePage() {
 
   return (
     <main className="px-5 py-6 md:px-8">
+      <LiveRefresh tables={['maintenance_tasks', 'maintenance_task_events']} onChange={load} pollMs={30000} />
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-3">
@@ -246,7 +246,7 @@ export default function MaintenancePage() {
               </p>
             )}
             {visible.map((t) => (
-              <div key={t.id} className={`${cols} border-b border-line px-5 py-3.5 last:border-b-0 hover:bg-white/[0.02]`}>
+              <div key={t.id} className={`${cols} border-b border-line px-5 py-3 last:border-b-0 ${t.status === 'in_progress' ? 'border-l-2 border-l-emerald-400 bg-emerald-500/[0.08] hover:bg-emerald-500/[0.12]' : t.escalation_status === 'required' ? 'bg-clay/[0.06] hover:bg-clay/[0.1]' : 'hover:bg-white/[0.02]'}`}>
                 <input
                   type="checkbox"
                   checked={selected.has(t.id)}
@@ -260,8 +260,8 @@ export default function MaintenancePage() {
                 />
                 <button onClick={() => setDrawerId(t.id)} className="min-w-0 text-left">
                   <p className="truncate">
-                    <span className="mr-2 font-mono text-[10px] text-navy/40">#{t.task_code}</span>
-                    <span className="text-[15px] text-white">{t.title}</span>
+                    <span className="mr-2 rounded bg-clay/10 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-clay">#{t.task_code}</span>
+                    <span className="text-[14px] text-white">{t.title}</span>
                     {t.priority === 'urgent' && <span className="ml-2 text-xs text-red-300">🚨 Urgent</span>}
                   </p>
                   <p className="truncate text-xs text-navy/50">
@@ -279,7 +279,13 @@ export default function MaintenancePage() {
                 <select
                   value={t.status}
                   onChange={(e) => setStatus(t, e.target.value)}
-                  className="w-fit rounded-md border border-line bg-paper px-2 py-1 text-sm text-navy outline-none"
+                  className={`w-fit rounded-md border px-2 py-1 text-sm outline-none ${
+                    t.status === 'in_progress'
+                      ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200'
+                      : t.status === 'waiting'
+                        ? 'border-amber-400/30 bg-amber-500/10 text-amber-200'
+                        : 'border-line bg-paper text-navy'
+                  }`}
                 >
                   {Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                 </select>

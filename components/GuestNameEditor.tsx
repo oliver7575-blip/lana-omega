@@ -68,7 +68,7 @@ export default function GuestNameEditor({
         <button type="button" onClick={() => setEditing(false)} style={{ fontSize: 13, marginLeft: 6 }}>
           Cancel
         </button>
-        {error && <div style={{ color: 'red', fontSize: 13 }}>{error}</div>}
+        {error && <div style={{ color: '#fca5a5', fontSize: 13 }}>{error}</div>}
       </form>
     )
   }
@@ -78,12 +78,12 @@ export default function GuestNameEditor({
       {initialName || fallbackLabel}{' '}
       <button
         onClick={() => setEditing(true)}
-        style={{ fontSize: 12, color: '#888', background: 'none', border: 'none', cursor: 'pointer' }}
+        style={{ fontSize: 12, color: 'rgba(231,233,240,0.55)', background: 'none', border: 'none', cursor: 'pointer' }}
       >
         edit
       </button>
       {initialEmail && (
-        <div style={{ fontSize: 13, color: '#888', fontWeight: 'normal' }}>{initialEmail}</div>
+        <div style={{ fontSize: 13, color: 'rgba(231,233,240,0.55)', fontWeight: 'normal' }}>{initialEmail}</div>
       )}
     </span>
   )

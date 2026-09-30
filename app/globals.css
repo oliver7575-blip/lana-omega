@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+  /* Denser than the browser default, like Beta's panel. */
+  font-size: 14px;
+}
 body {
   background: #0a0e1a;
   color: #e7e9f0;
@@ -55,4 +59,104 @@ body {
 }
 .legacy-panel p {
   margin-bottom: 0.5rem;
+}
+
+/* Older Omega pages (Settings, Staff, Waitlist, Integrations, Templates):
+   Beta's dark theme applied to their plain markup. */
+.legacy-dark {
+  color: #e7e9f0;
+  font-size: 0.95rem;
+}
+.legacy-dark main {
+  max-width: 880px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  font-family: inherit !important;
+}
+.legacy-dark h1 {
+  font-family: var(--font-playfair), serif;
+  font-style: italic;
+  font-size: 1.9rem;
+  color: #fff;
+  margin-bottom: 0.5rem;
+}
+.legacy-dark h2 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 0.4rem;
+}
+.legacy-dark h3 {
+  font-weight: 600;
+  color: #fff;
+}
+.legacy-dark p {
+  margin-bottom: 0.5rem;
+}
+.legacy-dark a {
+  color: #e0806f;
+}
+.legacy-dark a:hover {
+  text-decoration: underline;
+}
+.legacy-dark label {
+  color: rgba(231, 233, 240, 0.8);
+}
+.legacy-dark [style*='border: 1px solid'],
+.legacy-dark [style*='border-radius: 8'] {
+  background-color: #141a2e;
+  border-color: #232a40 !important;
+}
+.legacy-dark input:not([type='checkbox']):not([type='radio']),
+.legacy-dark textarea,
+.legacy-dark select {
+  background: #0a0e1a !important;
+  color: #e7e9f0 !important;
+  border: 1px solid #232a40 !important;
+  border-radius: 8px;
+  padding: 7px 10px;
+  outline: none;
+}
+.legacy-dark input:focus,
+.legacy-dark textarea:focus,
+.legacy-dark select:focus {
+  border-color: #e0806f !important;
+}
+.legacy-dark input::placeholder,
+.legacy-dark textarea::placeholder {
+  color: rgba(231, 233, 240, 0.35);
+}
+.legacy-dark input[type='checkbox'],
+.legacy-dark input[type='radio'] {
+  accent-color: #e0806f;
+}
+.legacy-dark button {
+  background: #1b2340;
+  color: #e7e9f0;
+  border: 1px solid #232a40;
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.legacy-dark button:hover:not(:disabled) {
+  background: #e0806f;
+  border-color: #e0806f;
+  color: #fff;
+}
+.legacy-dark button:disabled {
+  opacity: 0.5;
+}
+.legacy-dark table {
+  border-collapse: collapse;
+}
+.legacy-dark th,
+.legacy-dark td {
+  border-bottom: 1px solid #232a40;
+  padding: 6px 10px;
+  text-align: left;
+}
+.legacy-dark pre,
+.legacy-dark code {
+  background: #0a0e1a;
+  color: #e7e9f0;
 }

@@ -174,3 +174,43 @@ export async function sendWhatsAppImage(
     return { success: false, error: err instanceof Error ? err.message : 'Unknown error' }
   }
 }
+
+/**
+ * A message with up to 3 reply buttons. Each button carries an id, so a tap
+ * tells us exactly which item it belongs to. Only delivered inside the
+ * 24-hour window (use an approved template otherwise).
+ */
+export async function sendWhatsAppButtons(
+  phoneNumberId: string,
+  encryptedCredentials: EncryptedPayload,
+  to: string,
+  body: string,
+  buttons: { id: string; title: string }[]
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { access_token } = decryptCredentials<WhatsAppCredentials>(encryptedCredentials)
+    const response = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to,
+        type: 'interactive',
+        interactive: {
+          type: 'button',
+          body: { text: body.slice(0, 1024) },
+          action: {
+            buttons: buttons.slice(0, 3).map((b) => ({ type: 'reply', reply: { id: b.id, title: b.title.slice(0, 20) } })),
+          },
+        },
+      }),
+      signal: AbortSignal.timeout(15000),
+    })
+    if (!response.ok) {
+      return { success: false, error: `WhatsApp buttons send failed: ${response.status} ${await response.text()}` }
+    }
+    return { success: true }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unknown error' }
+  }
+}

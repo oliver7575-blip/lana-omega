@@ -15,7 +15,7 @@
  */
 import { createServiceClient } from './supabase/service'
 import type { EncryptedPayload } from './crypto'
-import { sendWhatsAppMessage } from './whatsapp-send'
+import { sendWhatsAppButtons, sendWhatsAppMessage } from './whatsapp-send'
 import {
   getMaintenanceTemplate,
   resolveTemplateChoice,
@@ -53,6 +53,8 @@ export interface TaskRow {
   season_lead_days: number
   season_within_frequency: string | null
   parent_task_id: string | null
+  series_due_at: string | null
+  carried_over_count: number
   next_spawned: boolean
   reminder_count: number
   last_reminded_at: string | null
@@ -162,7 +164,7 @@ function inSeason(month: number, start: number, end: number): boolean {
   return start <= end ? month >= start && month <= end : month >= start || month <= end
 }
 
-function stepOnce(task: TaskRow, from: Date, tz: string): Date | null {
+export function stepOnce(task: TaskRow, from: Date, tz: string): Date | null {
   switch (task.recurrence_rule) {
     case 'daily':
       return addLocalDays(from, 1, tz)
@@ -214,8 +216,9 @@ function stepOnce(task: TaskRow, from: Date, tz: string): Date | null {
 
 /** The next occurrence after this one, never in the past. */
 export function nextOccurrence(task: TaskRow, tz: string): Date | null {
-  if (!task.due_at || task.recurrence_rule === 'none') return null
-  let next = stepOnce(task, new Date(task.due_at), tz)
+  const base = task.series_due_at ?? task.due_at
+  if (!base || task.recurrence_rule === 'none') return null
+  let next = stepOnce(task, new Date(base), tz)
   let guard = 0
   while (next && next.getTime() <= Date.now() && guard++ < 500) next = stepOnce(task, next, tz)
   return next
@@ -480,18 +483,24 @@ export async function processReminder(
         task.id,
         ctx.choice
       )
-    : await sendWhatsAppMessage(
+    : await sendWhatsAppButtons(
         ctx.whatsapp.phoneNumberId,
         ctx.whatsapp.credentials,
         staff.phone,
         [
           `🔧 Hola ${staff.name.split(' ')[0]}, tienes una tarea:`,
-          `*#${task.task_code} ${task.title}*`,
+          '',
+          `*#${task.task_code}* · ${task.title}`,
           `📍 ${task.location ?? '—'}`,
           `🕒 ${formatDue(task.due_at, ctx.tz)}`,
           '',
-          `Responde: *${task.task_code} ACEPTO*, *${task.task_code} TERMINADO* o *${task.task_code} AYUDA*`,
-        ].join('\n')
+          `Tarea *#${task.task_code}* — usa los botones de abajo.`,
+        ].join('\n'),
+        [
+          { id: `mt:${task.id}:accept`, title: 'Acepto' },
+          { id: `mt:${task.id}:help`, title: 'Necesito ayuda' },
+          { id: `mt:${task.id}:done`, title: 'Terminado' },
+        ]
       )
 
   await ctx.db.from('maintenance_messages').insert({
@@ -526,7 +535,7 @@ export async function processReminder(
       updated_at: new Date().toISOString(),
     })
     .eq('id', task.id)
-  await logEvent(ctx, task.id, 'reminder_sent', `WhatsApp reminder sent to ${staff.name}${useTemplate ? '' : ' (plain text — template not approved yet)'}`)
+  await logEvent(ctx, task.id, 'reminder_sent', `WhatsApp reminder sent to ${staff.name}${useTemplate ? '' : ' (with buttons — template not approved yet)'}`)
 
   if (count >= MAX_REMINDERS && task.status !== 'in_progress') {
     await ctx.db
@@ -632,21 +641,53 @@ export async function runTenantTick(tenantId: string) {
   const ctx = await loadEngineContext(tenantId)
   const today = localDate(new Date(), ctx.tz)
 
-  // 1) Roll forward recurring occurrences not finished by the end of their day.
+  // 1) Unfinished work from earlier days (checked every run, so it happens right after midnight):
+  //    - daily / every-X-hours tasks: that occurrence is closed as missed and the
+  //      next one runs at its normal time (tomorrow's occurrence);
+  //    - one-off, weekly, monthly and seasonal tasks are re-run: the same task
+  //      moves to the same time today, with a fresh set of reminders.
+  //    Every-X-hours tasks also roll forward as soon as their next slot starts.
   const { data: open } = await ctx.db
     .from('maintenance_tasks')
     .select('*')
     .eq('tenant_id', tenantId)
     .in('status', ACTIVE_STATUSES as unknown as string[])
-    .neq('recurrence_rule', 'none')
     .lt('due_at', new Date().toISOString())
   let rolled = 0
   for (const t of (open ?? []) as TaskRow[]) {
-    if (!t.due_at || localDate(new Date(t.due_at), ctx.tz) >= today) continue
-    await ctx.db.from('maintenance_tasks').update({ status: 'cancelled', updated_at: new Date().toISOString() }).eq('id', t.id)
-    await cancelPendingReminders(ctx, t.id)
-    await logEvent(ctx, t.id, 'missed_rolled_forward', 'Not completed by the end of its scheduled day; rolled forward to the next occurrence at its normal time')
-    await spawnNext(ctx, t)
+    if (!t.due_at) continue
+    const dueDay = localDate(new Date(t.due_at), ctx.tz)
+    const nextSlotStarted =
+      t.recurrence_rule === 'interval' && (stepOnce(t, new Date(t.due_at), ctx.tz)?.getTime() ?? Infinity) <= Date.now()
+    if (dueDay >= today && !nextSlotStarted) continue
+
+    if (t.recurrence_rule === 'daily' || t.recurrence_rule === 'interval') {
+      await ctx.db.from('maintenance_tasks').update({ status: 'cancelled', updated_at: new Date().toISOString() }).eq('id', t.id)
+      await cancelPendingReminders(ctx, t.id)
+      await logEvent(ctx, t.id, 'missed_rolled_forward', 'Not completed in time; the next occurrence runs at its normal time')
+      await spawnNext(ctx, t)
+    } else {
+      // Re-run today at the same local time.
+      const days = Math.max(1, Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${dueDay}T00:00:00Z`)) / 86400000))
+      const newDue = addLocalDays(new Date(t.due_at), days, ctx.tz)
+      await cancelPendingReminders(ctx, t.id)
+      await ctx.db
+        .from('maintenance_tasks')
+        .update({
+          due_at: newDue.toISOString(),
+          series_due_at: t.series_due_at ?? t.due_at,
+          status: 'scheduled',
+          reminder_count: 0,
+          last_reminded_at: null,
+          escalation_status: 'none',
+          carried_over_count: (t.carried_over_count ?? 0) + 1,
+          assigned_to: t.lock_assignee ? t.assigned_to : t.assigned_to,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', t.id)
+      await scheduleReminder(ctx, t.id, newDue.getTime() > Date.now() ? newDue : new Date())
+      await logEvent(ctx, t.id, 'carried_over', `Not completed on ${dueDay}; re-run today at the same time`)
+    }
     rolled++
   }
 
@@ -748,13 +789,13 @@ export async function handleStaffReply(ctx: EngineContext, staff: StaffRow, text
   const first = staff.name.split(' ')[0]
   if (parsed.action === 'done') {
     await completeTask(ctx, task, { source: 'whatsapp', text: label })
-    await sendStaffText(ctx, staff, task.id, `✅ Anotado, gracias ${first}`)
+    await sendStaffText(ctx, staff, task.id, `✅ #${task.task_code} ${task.title} — anotado como terminado. Gracias ${first}`)
   } else if (parsed.action === 'accept') {
     await acknowledgeTask(ctx, task, label)
-    await sendStaffText(ctx, staff, task.id, 'Entendido')
+    await sendStaffText(ctx, staff, task.id, `👍 Entendido: #${task.task_code} ${task.title} en proceso.`)
   } else {
     await requestHelp(ctx, task, staff, label)
-    await sendStaffText(ctx, staff, task.id, `Entiendo ${first}. Tomo nota y pido que alguien nos ayude con la tarea.`)
+    await sendStaffText(ctx, staff, task.id, `Entiendo ${first}. Tomo nota y pido que alguien nos ayude con #${task.task_code} ${task.title}.`)
   }
   return true
 }
