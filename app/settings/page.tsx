@@ -340,7 +340,7 @@ export default function SettingsPage() {
   return (
     <main style={{ maxWidth: 640, margin: '80px auto', fontFamily: 'sans-serif' }}>
       <p>
-        <Link href="/">← Back home</Link>
+        <Link href="/cloudbeds">← Dashboard</Link>
       </p>
       <h1>Settings</h1>
       <p style={{ color: 'rgba(231,233,240,0.55)' }}>Status: {status}</p>

@@ -81,7 +81,7 @@ export default function StaffPage() {
   return (
     <main style={{ maxWidth: 640, margin: '80px auto', fontFamily: 'sans-serif' }}>
       <p>
-        <Link href="/">← Back home</Link>
+        <Link href="/cloudbeds">← Dashboard</Link>
       </p>
       <h1>Staff</h1>
       {message && <p>{message}</p>}

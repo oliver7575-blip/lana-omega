@@ -98,15 +98,15 @@ export default function DashviewPage() {
     ? new Date(`${summary.today}T12:00:00Z`).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
     : ''
   const act = summary ? (activity === 'cancellations' ? summary.cancellations : summary.sales) : null
-  const th = 'px-2 py-1 text-left text-[10.5px] font-semibold uppercase text-[#14213d]'
+  const th = 'px-3 py-1.5 text-left text-[10.5px] font-semibold uppercase tracking-wide text-[#14213d]'
 
   return (
     <div className="p-2 md:p-3">
       <div className="min-h-[calc(100vh-1.5rem)] rounded-2xl bg-[#f7f9fb] p-3.5 text-[12.5px] text-[#14213d]">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-lg font-semibold">{todayLabel || 'Dashview'}</h1>
+          <h1 className="text-lg font-semibold">{todayLabel || 'Dashboard'}</h1>
           <div className="flex flex-wrap items-center gap-2">
-            <Link href="/cloudbeds/calendar" title="Reservation calendar" className="rounded-md border border-gray-200 bg-white px-2 py-1 text-gray-600 hover:text-[#3b6fe0]">
+            <Link href="/cloudbeds/calendar" title="Reservation calendar" className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-gray-600 hover:text-[#3b6fe0]">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M3 9h18M8 2v4M16 2v4" /></svg>
             </Link>
             <span className="flex items-center gap-2 rounded-md border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-600">
@@ -145,7 +145,7 @@ export default function DashviewPage() {
             <div className="mb-1.5 mt-1 flex gap-3 border-b border-gray-200 text-[12px]">
               {(['today', 'tomorrow'] as const).map((d) => (
                 <button key={d} onClick={() => setDay(d)}
-                  className={`-mb-px border-b-2 px-2 py-1 capitalize ${day === d ? 'border-[#3b6fe0] text-[#3b6fe0]' : 'border-transparent text-gray-700'}`}>
+                  className={`-mb-px border-b-2 px-3 py-1.5 capitalize ${day === d ? 'border-[#3b6fe0] text-[#3b6fe0]' : 'border-transparent text-gray-700'}`}>
                   {d}
                 </button>
               ))}
@@ -155,16 +155,16 @@ export default function DashviewPage() {
                 <thead className="bg-gray-100">
                   <tr><th className={th}>Guest</th><th className={th}>Conf #</th><th className={th}>Room</th><th className={th}>Arrival time</th><th className={th}>Status</th></tr>
                 </thead>
-                <tbody>
+                <tbody className="[&>tr:first-child>td]:pt-2.5">
                   {rows === null && <tr><td colSpan={5} className="py-5 text-center text-gray-500">Loading…</td></tr>}
                   {rows?.length === 0 && <tr><td colSpan={5} className="py-5 text-center text-gray-500">{listError ?? 'No reservations'}</td></tr>}
                   {rows?.map((r) => (
                     <tr key={r.reservationID} onClick={() => setOpen(r.reservationID)} className="cursor-pointer border-b border-gray-100 hover:bg-gray-50">
-                      <td className="px-2 py-1 font-medium">{r.guestName}</td>
-                      <td className="px-2 py-1 text-gray-600">{r.reservationID}</td>
-                      <td className="px-2 py-1">{r.room}</td>
-                      <td className="px-2 py-1">{r.arrivalTime ?? '—'}</td>
-                      <td className="px-2 py-1 capitalize">{statusLabel(r.status)}</td>
+                      <td className="px-3 py-1.5 font-medium">{r.guestName}</td>
+                      <td className="px-3 py-1.5 text-gray-600">{r.reservationID}</td>
+                      <td className="px-3 py-1.5">{r.room}</td>
+                      <td className="px-3 py-1.5">{r.arrivalTime ?? '—'}</td>
+                      <td className="px-3 py-1.5 capitalize">{statusLabel(r.status)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -187,14 +187,14 @@ export default function DashviewPage() {
                 </div>
                 <table className="w-full text-[12px]">
                   <thead className="bg-gray-100"><tr><th className={th}>Guest</th><th className={th}>Revenue</th><th className={th}>Check-in</th><th className={th}>Nights</th></tr></thead>
-                  <tbody>
+                  <tbody className="[&>tr:first-child>td]:pt-2.5">
                     {act?.rows.length === 0 && <tr><td colSpan={4} className="py-5 text-center text-gray-500">Nothing yet today</td></tr>}
                     {act?.rows.map((r) => (
                       <tr key={r.reservationID} onClick={() => setOpen(r.reservationID)} className="cursor-pointer border-b border-gray-100 hover:bg-gray-50">
-                        <td className="px-2 py-1 font-medium">{r.guestName}</td>
-                        <td className="px-2 py-1">{mxn(r.revenue)}</td>
-                        <td className="px-2 py-1">{r.checkIn}</td>
-                        <td className="px-2 py-1">{r.nights}</td>
+                        <td className="px-3 py-1.5 font-medium">{r.guestName}</td>
+                        <td className="px-3 py-1.5">{mxn(r.revenue)}</td>
+                        <td className="px-3 py-1.5">{r.checkIn}</td>
+                        <td className="px-3 py-1.5">{r.nights}</td>
                       </tr>
                     ))}
                   </tbody>

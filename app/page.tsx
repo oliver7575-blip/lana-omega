@@ -1,8 +1,6 @@
-import InboxView from '@/components/InboxView'
+import { redirect } from 'next/navigation'
 
-export const dynamic = 'force-dynamic'
-
-export default async function InboxPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
-  const { q } = await searchParams
-  return <InboxView title="Inbox" basePath="/" q={q} />
+// The panel always opens on the Dashboard; the Inbox lives at /inbox.
+export default function Home() {
+  redirect('/cloudbeds')
 }

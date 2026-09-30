@@ -18,6 +18,7 @@ import {
   sendTenantEmail,
   type EmailPurpose,
 } from '@/lib/email'
+import { getMaintenanceTemplate, resolveTemplateChoice } from '@/lib/maintenance-template'
 
 export const maxDuration = 30
 
@@ -77,7 +78,7 @@ export async function GET(request: Request) {
   }
 
   const [{ data: tenant }, { data: emails }, { data: smtp }] = await Promise.all([
-    ctx.supabase.from('tenants').select('message_templates, post_stay_enabled').eq('id', ctx.tenantId).single(),
+    ctx.supabase.from('tenants').select('message_templates, post_stay_enabled, maintenance_template').eq('id', ctx.tenantId).single(),
     ctx.supabase.from('email_templates').select('purpose, enabled, subject, body_html'),
     ctx.supabase
       .from('tenant_integrations')
@@ -104,7 +105,19 @@ export async function GET(request: Request) {
     }
   })
 
+  // Maintenance reminder template status, live from Meta.
+  let maintenanceStatus: string | null = null
+  if (ctx.wa) {
+    try {
+      const info = await getMaintenanceTemplate(ctx.wa.wabaId, ctx.wa.credentials, resolveTemplateChoice(tenant?.maintenance_template))
+      maintenanceStatus = info.exists ? (info.status ?? null) : 'NOT_SUBMITTED'
+    } catch {
+      maintenanceStatus = null
+    }
+  }
+
   return NextResponse.json({
+    maintenanceStatus,
     purposes,
     emailTemplates,
     emailVariables: EMAIL_VARIABLES,

@@ -38,7 +38,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
   if (!conversation || !staff) {
     return (
       <main className="px-10 py-10">
-        <Link href="/" className="text-navy/60 hover:text-navy">← Back to Inbox</Link>
+        <Link href="/inbox" className="text-navy/60 hover:text-navy">← Back to Inbox</Link>
         <p className="mt-6 text-navy/70">Conversation not found.</p>
       </main>
     )
@@ -115,7 +115,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
       <LiveRefresh tables={['messages', 'conversations', 'escalations']} pollMs={15000} />
       <header className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-5 py-4 md:px-8">
         <div className="min-w-0">
-          <Link href="/" className="text-xs text-navy/60 hover:text-navy">← Back to Inbox</Link>
+          <Link href="/inbox" className="text-xs text-navy/60 hover:text-navy">← Back to Inbox</Link>
           <div className="mt-1 flex flex-wrap items-center gap-2.5">
             <h1 className="truncate font-display text-2xl italic text-white">{name}</h1>
             <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusPill.cls}`}>{statusPill.label}</span>

@@ -429,12 +429,22 @@ function EmailCard({
   )
 }
 
+function Dot({ on }: { on: boolean }) {
+  return (
+    <span
+      className="inline-block h-2 w-2 shrink-0 rounded-full"
+      style={on ? { background: '#34d399', boxShadow: '0 0 4px #34d399' } : { border: '1px solid rgba(231,233,240,0.3)' }}
+    />
+  )
+}
+
 export default function AutomationsPage() {
   const [data, setData] = useState<{
     purposes: Purpose[]
     emailTemplates: EmailTemplate[]
     emailVariables: string[]
     postStayEnabled: boolean
+    maintenanceStatus: string | null
     whatsappReady: boolean
     smtpConnected: boolean
     canEdit: boolean
@@ -474,6 +484,29 @@ export default function AutomationsPage() {
   const waDone = (key?: string) => Boolean(key && data?.purposes.find((p) => p.key === key)?.mapping)
   const emailOn = (key?: string) => Boolean(key && data?.emailTemplates.find((t) => t.key === key)?.enabled)
 
+  // Status marks: green bullet = set up. Green text = nothing else needed;
+  // red text = still needs its "send" box ticked (email tick, or post-stay switch).
+  const GREEN = '#6ee7b7'
+  const RED = '#fca5a5'
+  const emailReady = (key?: string) => {
+    const t = data?.emailTemplates.find((x) => x.key === key)
+    return Boolean(t && t.subject.trim() && t.body_html.trim())
+  }
+  function itemsFor(c: (typeof categories)[number]) {
+    const postStayOff = c.key === 'post_stay' && !data?.postStayEnabled
+    const list: { label: string; configured: boolean; textColor: string }[] = []
+    if (c.maintenance) {
+      list.push({ label: 'WhatsApp template', configured: data?.maintenanceStatus === 'APPROVED', textColor: GREEN })
+    }
+    if (c.wa) {
+      list.push({ label: 'WhatsApp template', configured: waDone(c.wa), textColor: postStayOff ? RED : GREEN })
+    }
+    if (c.email) {
+      list.push({ label: 'Email', configured: emailReady(c.email), textColor: emailOn(c.email) && !postStayOff ? GREEN : RED })
+    }
+    return list
+  }
+
   return (
     <main>
       <h1>Templates</h1>
@@ -497,13 +530,14 @@ export default function AutomationsPage() {
                   className={`block shrink-0 rounded-lg px-3 py-2 text-sm no-underline ${active ? 'bg-surface text-white' : 'text-navy/70 hover:bg-white/[0.03]'}`}
                   style={{ color: active ? '#fff' : undefined, textDecoration: 'none' }}
                 >
-                  <span className="block">{c.label}</span>
-                  <span className="mt-0.5 block text-[11px] text-navy/45">
-                    {c.maintenance
-                      ? 'WhatsApp'
-                      : [c.wa ? (waDone(c.wa) ? 'WhatsApp ✓' : 'WhatsApp —') : null, c.email ? (emailOn(c.email) ? 'Email on' : 'Email off') : null]
-                          .filter(Boolean)
-                          .join(' · ')}
+                  <span className="block font-semibold">{c.label}</span>
+                  <span className="mt-0.5 block space-y-0.5">
+                    {itemsFor(c).map((it) => (
+                      <span key={it.label} className="flex items-center gap-1.5 text-[11.5px]" style={{ color: it.textColor }}>
+                        <Dot on={it.configured} />
+                        {it.label}
+                      </span>
+                    ))}
                   </span>
                 </a>
               )

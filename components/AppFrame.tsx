@@ -77,7 +77,7 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
     )
   }
 
-  const isInbox = pathname === '/' || pathname.startsWith('/conversations')
+  const isInbox = pathname.startsWith('/inbox') || pathname.startsWith('/conversations')
   const isReservations = pathname.startsWith('/reservations')
   const legacy = LEGACY.some((p) => pathname.startsWith(p))
 
@@ -132,7 +132,7 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
       <div className="space-y-1">
         {item('/cloudbeds', 'Cloudbeds', BedIcon, pathname.startsWith('/cloudbeds'))}
         <div className="ml-8 border-l border-line pl-2">
-          {sub('/cloudbeds', 'Dashview', pathname === '/cloudbeds')}
+          {sub('/cloudbeds', 'Dashboard', pathname === '/cloudbeds')}
           {sub('/cloudbeds/calendar', 'Calendar', pathname.startsWith('/cloudbeds/calendar'))}
         </div>
       </div>
@@ -140,7 +140,7 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
       <div className="my-4 border-t border-line" />
 
       <div className="space-y-1">
-        {item('/', 'Messages', MailIcon, isInbox)}
+        {item('/inbox', 'Messages', MailIcon, isInbox)}
         <div className="ml-8 border-l border-line pl-2">
           {sub('/reservations', 'Reservations', isReservations, info?.unreadReservations)}
         </div>

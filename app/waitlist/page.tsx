@@ -30,7 +30,7 @@ export default function WaitlistPage() {
   return (
     <main style={{ maxWidth: 720, margin: '80px auto', fontFamily: 'sans-serif' }}>
       <p>
-        <Link href="/">← Back home</Link>
+        <Link href="/cloudbeds">← Dashboard</Link>
       </p>
       <h1>Waitlist</h1>
 
