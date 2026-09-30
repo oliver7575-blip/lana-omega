@@ -312,7 +312,19 @@ export async function calendar(cb: CB, start: string, dayCount: number): Promise
   const [roomsJson, reservations, blocksJson, ratesJson] = await Promise.all([
     cbGet(cb, 'getRooms', { propertyIDs: cb.propertyId, pageSize: 100 }),
     listReservations(cb, { checkInTo: end, checkOutFrom: start, includeAllRooms: true }),
-    cbGet(cb, 'getRoomBlocks', { propertyID: cb.propertyId, startDate: start, endDate: addDays(start, Math.min(dayCount, 34)) }).catch(() => ({ data: {} })),
+    (async () => {
+      const all: Json[] = []
+      for (let offset = 0; offset < dayCount; offset += 34) {
+        const j = await cbGet(cb, 'getRoomBlocks', {
+          propertyID: cb.propertyId,
+          startDate: addDays(start, offset),
+          endDate: addDays(start, Math.min(offset + 33, dayCount)),
+        }).catch(() => ({ data: {} }))
+        all.push(...((((j.data ?? {}) as Json).roomBlocks as Json[]) ?? []))
+      }
+      const seen = new Set<string>()
+      return { data: { roomBlocks: all.filter((b) => { const k = String(b.roomBlockID); if (seen.has(k)) return false; seen.add(k); return true }) } }
+    })(),
     cbGet(cb, 'getRatePlans', { propertyIDs: cb.propertyId, startDate: start, endDate: end, detailedRates: true }).catch(() => ({ data: [] })),
   ])
 

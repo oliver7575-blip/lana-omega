@@ -4,6 +4,7 @@ export const INTEGRATION_TYPES = [
   'email',
   'pms_cloudbeds',
   'transcription_deepgram',
+  'costs_anthropic',
 ] as const
 export type IntegrationType = (typeof INTEGRATION_TYPES)[number]
 
@@ -63,5 +64,13 @@ export const INTEGRATIONS: IntegrationDef[] = [
     label: 'Voice notes (Deepgram)',
     credentialFields: [{ key: 'api_key', label: 'Deepgram API Key', type: 'password' }],
     configFields: [],
+  },
+  {
+    // Powers the Claude figures on the Costs page. Needs an Admin key
+    // (sk-ant-admin…) from Claude Console → Settings → Admin keys.
+    type: 'costs_anthropic',
+    label: 'Claude costs (Anthropic Admin key)',
+    credentialFields: [{ key: 'admin_key', label: 'Admin API key (sk-ant-admin…)', type: 'password' }],
+    configFields: [{ key: 'workspace_id', label: 'Workspace ID (optional — leave blank for the whole account)', type: 'text' }],
   },
 ]

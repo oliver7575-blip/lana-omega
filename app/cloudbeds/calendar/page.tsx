@@ -1,26 +1,32 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import ReservationModal from '@/components/cloudbeds/ReservationModal'
 import SearchBar from '@/components/cloudbeds/SearchBar'
 import { cbApi, statusColor } from '@/components/cloudbeds/shared'
 
-interface Cal {
+interface Booking { reservationID: string; guestName: string; status: string; roomID: string; start: string; end: string }
+interface Unassigned { reservationID: string; guestName: string; roomTypeID: string; start: string; end: string; status: string }
+interface Block { roomID: string; start: string; end: string; reason: string }
+interface RoomType { id: string; name: string; rates: Record<string, number>; rooms: { id: string; name: string }[] }
+interface Chunk {
   today: string
   start: string
   days: string[]
   links: { newReservation: string }
-  roomTypes: { id: string; name: string; rates: Record<string, number>; rooms: { id: string; name: string }[] }[]
-  bookings: { reservationID: string; guestName: string; status: string; roomID: string; start: string; end: string }[]
-  unassigned: { reservationID: string; guestName: string; roomTypeID: string; start: string; end: string; status: string }[]
-  blocks: { roomID: string; start: string; end: string; reason: string }[]
+  roomTypes: RoomType[]
+  bookings: Booking[]
+  unassigned: Unassigned[]
+  blocks: Block[]
 }
 
-const LEFT_W = 150
-const ROW_H = 24
-const DAYS = 19
-const MIN_DAY_W = 36
+const LEFT_W = 128
+const ROW_H = 21
+const VISIBLE_DAYS = 21 // how many days fit on screen
+const MIN_DAY_W = 30
+const CHUNK = 28 // days loaded each time you scroll near an edge
+const EDGE_PX = 400
 
 function addDays(d: string, n: number) {
   const x = new Date(`${d}T12:00:00Z`)
@@ -28,28 +34,44 @@ function addDays(d: string, n: number) {
   return x.toISOString().slice(0, 10)
 }
 const diff = (a: string, b: string) => Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86400000)
+const overlaps = (s: string, e: string, from: string, to: string) => s < to && e > from
 
-/** A stay bar from mid-check-in day to mid-check-out day, arrow-shaped like Beta's. */
-function Bar({ start, end, viewStart, label, color, onClick, title, dayW }: {
-  start: string; end: string; viewStart: string; label: string; color: string; onClick?: () => void; title?: string; dayW: number
+/** Merges a freshly loaded date range into what's already shown. */
+function mergeChunk(prev: Chunk | null, next: Chunk, from: string, to: string): Chunk {
+  if (!prev) return next
+  const days = [...new Set([...prev.days, ...next.days])].sort()
+  const roomTypes = prev.roomTypes.map((t) => {
+    const n = next.roomTypes.find((x) => x.id === t.id)
+    return n ? { ...t, rates: { ...t.rates, ...n.rates } } : t
+  })
+  for (const n of next.roomTypes) if (!roomTypes.find((t) => t.id === n.id)) roomTypes.push(n)
+  const keep = <T extends { start: string; end: string }>(list: T[]) => list.filter((b) => !overlaps(b.start, b.end, from, to))
+  const dedupe = <T,>(list: T[], key: (x: T) => string) => [...new Map(list.map((x) => [key(x), x])).values()]
+  return {
+    ...next,
+    start: days[0],
+    days,
+    roomTypes,
+    bookings: dedupe([...keep(prev.bookings), ...next.bookings], (b) => `${b.reservationID}|${b.roomID}|${b.start}`),
+    unassigned: dedupe([...keep(prev.unassigned), ...next.unassigned], (b) => `${b.reservationID}|${b.roomTypeID}|${b.start}`),
+    blocks: dedupe([...keep(prev.blocks), ...next.blocks], (b) => `${b.roomID}|${b.start}|${b.end}`),
+  }
+}
+
+function Bar({ start, end, viewStart, totalDays, label, color, onClick, title, dayW }: {
+  start: string; end: string; viewStart: string; totalDays: number; label: string; color: string; onClick?: () => void; title?: string; dayW: number
 }) {
-  const DAY_W = dayW
   const from = diff(viewStart, start) + 0.5
   const to = diff(viewStart, end) + 0.5
-  const left = Math.max(0, from) * DAY_W
-  const right = Math.min(DAYS, to) * DAY_W
+  const left = Math.max(0, from) * dayW
+  const right = Math.min(totalDays, to) * dayW
   if (right <= left) return null
   return (
     <button
       onClick={onClick}
       title={title ?? label}
-      className="absolute top-[3px] flex h-[18px] items-center overflow-hidden whitespace-nowrap pl-3 pr-2.5 text-left text-[10px] font-semibold text-white hover:brightness-95"
-      style={{
-        left,
-        width: right - left,
-        background: color,
-        clipPath: 'polygon(0 0, calc(100% - 7px) 0, 100% 50%, calc(100% - 7px) 100%, 0 100%, 7px 50%)',
-      }}
+      className="absolute top-[3px] flex h-[15px] items-center overflow-hidden whitespace-nowrap pl-2.5 pr-2 text-left text-[9.5px] font-semibold leading-none text-white hover:brightness-95"
+      style={{ left, width: right - left, background: color, clipPath: 'polygon(0 0, calc(100% - 6px) 0, 100% 50%, calc(100% - 6px) 100%, 0 100%, 6px 50%)' }}
     >
       <span className="truncate">{label}</span>
     </button>
@@ -57,95 +79,176 @@ function Bar({ start, end, viewStart, label, color, onClick, title, dayW }: {
 }
 
 export default function CalendarPage() {
-  const [data, setData] = useState<Cal | null>(null)
-  const [start, setStart] = useState<string | null>(null)
-  const [goTo, setGoTo] = useState('')
+  const [data, setData] = useState<Chunk | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState<'past' | 'future' | null>(null)
+  const [goTo, setGoTo] = useState('')
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [open, setOpen] = useState<string | null>(null)
-  // Days stretch to fill the screen so the whole grid fits without scrolling.
-  const wrapRef = useRef<HTMLDivElement>(null)
-  const [dayW, setDayW] = useState(52)
+  const [dayW, setDayW] = useState(44)
+  const scroller = useRef<HTMLDivElement>(null)
+  const pendingShift = useRef(0) // columns added on the left, to keep the view still
+  const scrollToDay = useRef<string | null>(null)
+  const dataRef = useRef<Chunk | null>(null)
+  dataRef.current = data
+
+  const fetchRange = (start: string, days: number) => cbApi<Chunk>(`/api/cloudbeds/calendar?start=${start}&days=${days}`)
+
+  // Initial load: 3 weeks back, 5 weeks ahead, opened at today.
+  const reset = useCallback(async (center?: string) => {
+    setError(null)
+    try {
+      const probe = center ?? (await fetchRange(addDays(new Date().toISOString().slice(0, 10), -1), 7)).today
+      const start = addDays(probe, -21)
+      const chunk = await fetchRange(start, 56)
+      scrollToDay.current = addDays(center ?? chunk.today, -2)
+      setData(chunk)
+      if (!goTo) setGoTo(center ?? chunk.today)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load the calendar')
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => { reset() }, [reset])
+
+  // Days size themselves so about three weeks fit on screen.
   useEffect(() => {
     const measure = () => {
-      const w = wrapRef.current?.clientWidth ?? 0
-      if (w) setDayW(Math.max(MIN_DAY_W, Math.floor((w - LEFT_W - 2) / DAYS)))
+      const w = scroller.current?.clientWidth ?? 0
+      if (w) setDayW(Math.max(MIN_DAY_W, Math.floor((w - LEFT_W) / VISIBLE_DAYS)))
     }
     measure()
     window.addEventListener('resize', measure)
     return () => window.removeEventListener('resize', measure)
-  }, [data])
-  const DAY_W = dayW
+  }, [data !== null]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const load = useCallback(async () => {
-    try {
-      const j = await cbApi<Cal>(`/api/cloudbeds/calendar?days=${DAYS}${start ? `&start=${start}` : ''}`)
-      setData(j)
-      setError(null)
-      if (!start) setStart(j.start)
-      if (!goTo) setGoTo(j.start)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load the calendar')
+  // Keep the view steady when days are added on the left, and jump to requested days.
+  useLayoutEffect(() => {
+    const el = scroller.current
+    if (!el || !data) return
+    if (pendingShift.current) {
+      el.scrollLeft += pendingShift.current * dayW
+      pendingShift.current = 0
     }
-  }, [start]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (scrollToDay.current) {
+      el.scrollLeft = Math.max(0, diff(data.start, scrollToDay.current)) * dayW
+      scrollToDay.current = null
+    }
+  }, [data, dayW])
 
-  useEffect(() => { load() }, [load])
+  const loadMore = useCallback(async (dir: 'past' | 'future') => {
+    const cur = dataRef.current
+    if (!cur || loading) return
+    setLoading(dir)
+    try {
+      const last = cur.days[cur.days.length - 1]
+      const start = dir === 'past' ? addDays(cur.days[0], -CHUNK) : addDays(last, 1)
+      const chunk = await fetchRange(start, CHUNK)
+      if (dir === 'past') pendingShift.current = CHUNK
+      setData((prev) => mergeChunk(prev, chunk, start, addDays(start, CHUNK)))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load more days')
+    }
+    setLoading(null)
+  }, [loading])
+
+  function onScroll() {
+    const el = scroller.current
+    if (!el || loading) return
+    if (el.scrollLeft < EDGE_PX) loadMore('past')
+    else if (el.scrollLeft + el.clientWidth > el.scrollWidth - EDGE_PX) loadMore('future')
+  }
+
+  // Live refresh of the part on screen (and a week either side).
+  const refreshVisible = useCallback(async () => {
+    const el = scroller.current
+    const cur = dataRef.current
+    if (!el || !cur) return
+    const firstIdx = Math.max(0, Math.floor(el.scrollLeft / dayW) - 7)
+    const start = cur.days[Math.min(firstIdx, cur.days.length - 1)]
+    const days = Math.min(VISIBLE_DAYS + 14, 62)
+    try {
+      const chunk = await fetchRange(start, days)
+      setData((prev) => mergeChunk(prev, { ...chunk, days: prev?.days ?? chunk.days, start: prev?.start ?? chunk.start }, start, addDays(start, days)))
+    } catch {
+      // Keep showing what we have.
+    }
+  }, [dayW])
+
   useEffect(() => {
-    const t = setInterval(load, 60000)
+    const t = setInterval(refreshVisible, 60000)
     return () => clearInterval(t)
-  }, [load])
+  }, [refreshVisible])
+
+  const scrollBy = (days: number) => scroller.current?.scrollBy({ left: days * dayW, behavior: 'smooth' })
+  function jumpTo(day: string) {
+    const cur = dataRef.current
+    if (cur && day >= cur.days[0] && day <= cur.days[cur.days.length - 1]) {
+      scroller.current?.scrollTo({ left: Math.max(0, diff(cur.start, addDays(day, -2))) * dayW, behavior: 'smooth' })
+    } else {
+      reset(day)
+    }
+  }
 
   const roomCount = useMemo(() => data?.roomTypes.reduce((s, t) => s + t.rooms.length, 0) ?? 0, [data])
-  const viewStart = data?.start ?? start ?? ''
-  const shift = (n: number) => setStart(addDays(viewStart, n))
-  const gridW = LEFT_W + DAYS * DAY_W
+  const totalDays = data?.days.length ?? 0
+  const gridW = LEFT_W + totalDays * dayW
 
   return (
     <div className="p-2 md:p-3">
-      <div className="min-h-[calc(100vh-1.5rem)] rounded-2xl bg-[#f7f9fb] p-4 text-[#14213d]">
-        <Link href="/cloudbeds" className="text-sm font-semibold text-[#3b6fe0] hover:underline">← Activity</Link>
-        <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
+      <div className="min-h-[calc(100vh-1.5rem)] rounded-2xl bg-[#f7f9fb] p-3.5 text-[#14213d]">
+        <div className="mb-2 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-xl font-semibold">Reservation calendar</h1>
-            <p className="text-xs text-gray-600">{roomCount} rooms · live assignments from Cloudbeds</p>
+            <Link href="/cloudbeds" className="text-xs font-semibold text-[#3b6fe0] hover:underline">← Activity</Link>
+            <h1 className="text-lg font-semibold leading-tight">Reservation calendar</h1>
+            <p className="text-[11px] text-gray-600">{roomCount} rooms · live assignments from Cloudbeds · scroll sideways to move through time</p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="mr-1 flex items-center gap-2 text-sm text-gray-600"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Updates automatically</span>
-            <button onClick={() => shift(-7)} className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-sm hover:bg-gray-50" aria-label="Previous week">←</button>
-            <button onClick={() => data && setStart(addDays(data.today, -1))} className="rounded-full border border-gray-200 bg-white px-3 py-1 text-sm font-semibold hover:bg-gray-50">Today</button>
-            <button onClick={() => shift(7)} className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-sm hover:bg-gray-50" aria-label="Next week">→</button>
+          <div className="flex items-center gap-1.5">
+            <span className="mr-1 flex items-center gap-1.5 text-xs text-gray-600"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Updates automatically</span>
+            <button onClick={() => scrollBy(-7)} className="rounded-full border border-gray-200 bg-white px-2.5 py-0.5 text-sm hover:bg-gray-50" aria-label="Back a week">←</button>
+            <button onClick={() => data && jumpTo(data.today)} className="rounded-full border border-gray-200 bg-white px-3 py-0.5 text-sm font-semibold hover:bg-gray-50">Today</button>
+            <button onClick={() => scrollBy(7)} className="rounded-full border border-gray-200 bg-white px-2.5 py-0.5 text-sm hover:bg-gray-50" aria-label="Forward a week">→</button>
           </div>
         </div>
 
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-2 py-1.5">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-2 py-1">
           <SearchBar onOpen={setOpen} />
-          <div className="flex items-center gap-2 text-sm">
+          <div className="flex items-center gap-2 text-xs">
             {data && (
               <a href={data.links.newReservation} target="_blank" rel="noreferrer" title="New reservation"
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-[#3b6fe0] text-lg text-white hover:bg-[#2f5fcc]">+</a>
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-[#3b6fe0] text-base text-white hover:bg-[#2f5fcc]">+</a>
             )}
             <span className="text-gray-700">Go to date</span>
             <input type="date" value={goTo} onChange={(e) => setGoTo(e.target.value)}
-              className="rounded-md border border-gray-300 px-2 py-1.5 outline-none focus:border-[#3b6fe0]" />
-            <button onClick={() => goTo && setStart(addDays(goTo, 0))} className="rounded-full bg-[#3b6fe0] px-4 py-1.5 font-semibold text-white hover:bg-[#2f5fcc]">Go</button>
+              className="rounded-md border border-gray-300 px-2 py-1 text-xs outline-none focus:border-[#3b6fe0]" />
+            <button onClick={() => goTo && jumpTo(goTo)} className="rounded-full bg-[#3b6fe0] px-3 py-1 text-xs font-semibold text-white hover:bg-[#2f5fcc]">Go</button>
           </div>
         </div>
 
-        {error && <p className="mb-4 rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>}
+        {error && <p className="mb-2 rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>}
         {!data && !error && <p className="py-10 text-center text-sm text-gray-500">Loading the calendar…</p>}
 
         {data && (
-          <div ref={wrapRef} className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+          <div ref={scroller} onScroll={onScroll} className="relative overflow-x-auto rounded-xl border border-gray-200 bg-white">
+            {loading && (
+              <div className={`pointer-events-none sticky top-0 z-30 ${loading === 'past' ? 'left-0' : 'left-0'} h-0`}>
+                <span className="absolute left-2 top-1 rounded bg-white/90 px-2 py-0.5 text-[10px] text-gray-500 shadow">Loading {loading === 'past' ? 'earlier' : 'later'} days…</span>
+              </div>
+            )}
             <div style={{ width: gridW }}>
-              {/* Day header */}
-              <div className="sticky top-0 z-20 flex border-b-2 border-gray-200 bg-gray-50 text-[11px] font-semibold">
-                <div className="sticky left-0 z-10 border-r-2 border-gray-200 bg-gray-50 px-3 py-1.5" style={{ width: LEFT_W, minWidth: LEFT_W }}>Room type / room</div>
+              <div className="sticky top-0 z-20 flex border-b-2 border-gray-200 bg-gray-50 text-[10px] font-semibold">
+                <div className="sticky left-0 z-10 border-r-2 border-gray-200 bg-gray-50 px-2.5 py-1" style={{ width: LEFT_W, minWidth: LEFT_W }}>Room type / room</div>
                 {data.days.map((d) => {
                   const dt = new Date(`${d}T12:00:00Z`)
                   const isToday = d === data.today
+                  const firstOfMonth = dt.getUTCDate() === 1
                   return (
-                    <div key={d} className={`border-r border-gray-200 py-1.5 text-center leading-tight ${isToday ? 'bg-sky-100 text-[#3b6fe0]' : ''}`} style={{ width: DAY_W, minWidth: DAY_W }}>
-                      {dt.getUTCDate()} {dt.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }).slice(0, 2)}
+                    <div key={d}
+                      className={`border-r py-1 text-center leading-tight ${firstOfMonth ? 'border-l-2 border-l-gray-400' : ''} border-gray-200 ${isToday ? 'bg-sky-100 text-[#3b6fe0]' : ''}`}
+                      style={{ width: dayW, minWidth: dayW }}>
+                      {firstOfMonth ? dt.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' }) + ' ' : ''}
+                      {dt.getUTCDate()}{' '}
+                      <span className="font-normal text-gray-500">{dt.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }).slice(0, 2)}</span>
                     </div>
                   )
                 })}
@@ -156,17 +259,16 @@ export default function CalendarPage() {
                 const unassigned = data.unassigned.filter((u) => u.roomTypeID === t.id)
                 return (
                   <div key={t.id} className="border-b border-gray-300">
-                    {/* Room type row with nightly rates */}
-                    <div className="flex bg-gray-50 text-[9.5px] text-gray-500">
+                    <div className="flex bg-gray-50 text-[9px] text-gray-500">
                       <button
                         onClick={() => { const n = new Set(collapsed); if (n.has(t.id)) n.delete(t.id); else n.add(t.id); setCollapsed(n) }}
-                        className="sticky left-0 z-10 truncate border-r-2 border-gray-200 bg-gray-50 px-2.5 py-0.5 text-left text-[11px] font-semibold text-[#14213d]"
+                        className="sticky left-0 z-10 truncate border-r-2 border-gray-200 bg-gray-50 px-2 py-0 text-left text-[10.5px] font-semibold leading-[17px] text-[#14213d]"
                         style={{ width: LEFT_W, minWidth: LEFT_W }}
                       >
-                        <span className="mr-1 inline-block text-xs text-gray-500">{isCollapsed ? '›' : '⌄'}</span>{t.name}
+                        <span className="mr-1 inline-block text-[10px] text-gray-500">{isCollapsed ? '›' : '⌄'}</span>{t.name}
                       </button>
                       {data.days.map((d) => (
-                        <div key={d} className={`flex items-center justify-center border-r border-gray-200 ${d === data.today ? 'bg-sky-50' : ''}`} style={{ width: DAY_W, minWidth: DAY_W }}>
+                        <div key={d} className={`flex items-center justify-center border-r border-gray-200 ${d === data.today ? 'bg-sky-50' : ''}`} style={{ width: dayW, minWidth: dayW }}>
                           {t.rates[d] ? Math.round(t.rates[d]) : ''}
                         </div>
                       ))}
@@ -174,26 +276,25 @@ export default function CalendarPage() {
 
                     {!isCollapsed && [...t.rooms, ...(unassigned.length ? [{ id: `unassigned-${t.id}`, name: 'Unassigned' }] : [])].map((room) => {
                       const isUnassigned = room.id.startsWith('unassigned-')
-                      const stays = isUnassigned
-                        ? unassigned.map((u) => ({ ...u, roomID: room.id }))
-                        : data.bookings.filter((b) => b.roomID === room.id)
+                      const stays = isUnassigned ? unassigned.map((u) => ({ ...u, roomID: room.id })) : data.bookings.filter((b) => b.roomID === room.id)
                       const blocks = data.blocks.filter((b) => b.roomID === room.id)
                       return (
                         <div key={room.id} className="flex border-t border-gray-100">
-                          <div className={`sticky left-0 z-10 border-r-2 border-gray-200 bg-white px-3 text-[11px] font-semibold ${isUnassigned ? 'italic text-amber-700' : ''}`}
+                          <div className={`sticky left-0 z-10 border-r-2 border-gray-200 bg-white px-2.5 text-[10.5px] font-semibold ${isUnassigned ? 'italic text-amber-700' : ''}`}
                             style={{ width: LEFT_W, minWidth: LEFT_W, height: ROW_H, lineHeight: `${ROW_H}px` }}>
                             {room.name}
                           </div>
                           <div className="relative flex" style={{ height: ROW_H }}>
                             {data.days.map((d) => (
-                              <div key={d} className={`border-r border-gray-100 ${d === data.today ? 'bg-sky-50' : ''}`} style={{ width: DAY_W, minWidth: DAY_W }} />
+                              <div key={d} className={`border-r border-gray-100 ${d === data.today ? 'bg-sky-50' : ''}`} style={{ width: dayW, minWidth: dayW }} />
                             ))}
                             {blocks.map((b, i) => (
-                              <Bar key={`b${i}`} start={b.start} end={addDays(b.end, 1)} viewStart={data.start} label={b.reason} color="#d9433f" title={`Blocked: ${b.reason}`} dayW={DAY_W} />
+                              <Bar key={`b${i}`} start={b.start} end={addDays(b.end, 1)} viewStart={data.start} totalDays={totalDays} label={b.reason} color="#d9433f" title={`Blocked: ${b.reason}`} dayW={dayW} />
                             ))}
                             {stays.map((s) => (
-                              <Bar key={`${s.reservationID}-${s.start}`} start={s.start} end={s.end} viewStart={data.start}
-                                label={s.guestName} color={statusColor(s.status).bar} onClick={() => setOpen(s.reservationID)} dayW={DAY_W} title={`${s.guestName} · ${s.status.replace(/_/g, ' ')}`} />
+                              <Bar key={`${s.reservationID}-${s.start}`} start={s.start} end={s.end} viewStart={data.start} totalDays={totalDays}
+                                label={s.guestName} color={statusColor(s.status).bar} onClick={() => setOpen(s.reservationID)} dayW={dayW}
+                                title={`${s.guestName} · ${s.status.replace(/_/g, ' ')} · ${s.start} → ${s.end}`} />
                             ))}
                           </div>
                         </div>
@@ -206,14 +307,14 @@ export default function CalendarPage() {
           </div>
         )}
 
-        <div className="mt-2 flex flex-wrap gap-4 text-[11px] text-gray-600">
+        <div className="mt-1.5 flex flex-wrap gap-4 text-[10.5px] text-gray-600">
           {[['#7fc0e4', 'Confirmed'], ['#f3c46b', 'Not confirmed'], ['#6ab77a', 'Checked in'], ['#b8c1cc', 'Checked out'], ['#d9433f', 'Blocked']].map(([c, l]) => (
-            <span key={l} className="flex items-center gap-1.5"><span className="h-3 w-5 rounded-sm" style={{ background: c }} />{l}</span>
+            <span key={l} className="flex items-center gap-1.5"><span className="h-2.5 w-4 rounded-sm" style={{ background: c }} />{l}</span>
           ))}
         </div>
       </div>
 
-      {open && data && <ReservationModal id={open} today={data.today} onClose={() => setOpen(null)} onChanged={load} />}
+      {open && data && <ReservationModal id={open} today={data.today} onClose={() => setOpen(null)} onChanged={refreshVisible} />}
     </div>
   )
 }

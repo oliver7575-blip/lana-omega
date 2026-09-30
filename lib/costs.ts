@@ -17,14 +17,19 @@ const sum = (d: DailyCosts) => Object.values(d).reduce((a, b) => a + b, 0)
  * Claude: Anthropic Admin API cost report (needs ANTHROPIC_ADMIN_KEY, an
  * "sk-ant-admin…" key). Amounts are reported in cents.
  */
-export async function claudeDaily(startIso: string, endIso: string): Promise<DailyCosts> {
-  const key = process.env.ANTHROPIC_ADMIN_KEY
-  if (!key) throw new Error('Add ANTHROPIC_ADMIN_KEY in Vercel to show Claude costs')
+export async function claudeDaily(
+  startIso: string,
+  endIso: string,
+  opts: { adminKey?: string; workspaceId?: string } = {}
+): Promise<DailyCosts> {
+  const key = opts.adminKey || process.env.ANTHROPIC_ADMIN_KEY
+  const workspace = opts.workspaceId || process.env.ANTHROPIC_WORKSPACE_ID
+  if (!key) throw new Error('Connect "Claude costs" under Integrations to show Claude costs')
   const out: DailyCosts = {}
   let page: string | undefined
   for (let i = 0; i < 5; i++) {
     const qs = new URLSearchParams({ starting_at: startIso, ending_at: endIso, bucket_width: '1d', limit: '31' })
-    if (process.env.ANTHROPIC_WORKSPACE_ID) qs.append('group_by[]', 'workspace_id')
+    if (workspace) qs.append('group_by[]', 'workspace_id')
     if (page) qs.set('page', page)
     const res = await fetch(`https://api.anthropic.com/v1/organizations/cost_report?${qs}`, {
       headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' },
@@ -40,7 +45,7 @@ export async function claudeDaily(startIso: string, endIso: string): Promise<Dai
     for (const bucket of json.data ?? []) {
       const day = bucket.starting_at.slice(0, 10)
       const cents = (bucket.results ?? [])
-        .filter((r) => !process.env.ANTHROPIC_WORKSPACE_ID || r.workspace_id === process.env.ANTHROPIC_WORKSPACE_ID)
+        .filter((r) => !workspace || r.workspace_id === workspace)
         .reduce((a, r) => a + Number(r.amount || 0), 0)
       out[day] = (out[day] ?? 0) + cents / 100
     }
@@ -93,8 +98,21 @@ export async function monthCosts(tenantId: string, month: string): Promise<Month
     meta: { available: false, daily: {}, total: 0 },
   }
 
+  const { data: admin } = await db
+    .from('tenant_integrations')
+    .select('status, credentials, config')
+    .eq('tenant_id', tenantId)
+    .eq('integration_type', 'costs_anthropic')
+    .maybeSingle()
   try {
-    result.claude.daily = await claudeDaily(startIso, endIso)
+    const adminKey =
+      admin?.status === 'connected' && admin.credentials
+        ? decryptCredentials<{ admin_key: string }>(admin.credentials as EncryptedPayload).admin_key
+        : undefined
+    result.claude.daily = await claudeDaily(startIso, endIso, {
+      adminKey,
+      workspaceId: (admin?.config as { workspace_id?: string } | null)?.workspace_id || undefined,
+    })
     result.claude.available = true
   } catch (err) {
     result.claude.error = err instanceof Error ? err.message : 'Claude costs unavailable'

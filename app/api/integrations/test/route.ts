@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { decryptCredentials } from '@/lib/crypto'
+import { decryptCredentials, type EncryptedPayload } from '@/lib/crypto'
 import { lookupReservation } from '@/lib/cloudbeds'
 
 // Give the function room to finish: without this, a slow external call can
@@ -101,7 +101,21 @@ async function checkDeepgram(credentials: unknown): Promise<CheckResult> {
   return { ok: true, detail: name ? `Key accepted · project "${name}"` : 'Key accepted' }
 }
 
-const TESTABLE_TYPES = ['whatsapp', 'pms_cloudbeds', 'transcription_deepgram']
+async function checkAnthropicAdmin(credentials: EncryptedPayload): Promise<CheckResult> {
+  const { admin_key } = decryptCredentials<{ admin_key: string }>(credentials)
+  const since = new Date(Date.now() - 2 * 86400000).toISOString()
+  const res = await fetch(`https://api.anthropic.com/v1/organizations/cost_report?starting_at=${encodeURIComponent(since)}&limit=1`, {
+    headers: { 'x-api-key': admin_key, 'anthropic-version': '2023-06-01' },
+    signal: AbortSignal.timeout(8000),
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    return { ok: false, error: `Anthropic Admin API ${res.status}: ${text.slice(0, 300)}` }
+  }
+  return { ok: true, detail: 'Admin key accepted — Claude costs will show on the Costs page' }
+}
+
+const TESTABLE_TYPES = ['whatsapp', 'pms_cloudbeds', 'transcription_deepgram', 'costs_anthropic']
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -140,7 +154,9 @@ export async function POST(request: Request) {
         ? await checkWhatsApp(row.credentials, row.config as Record<string, string> | null)
         : integrationType === 'transcription_deepgram'
           ? await checkDeepgram(row.credentials)
-          : await checkCloudbeds(row.credentials, row.config as Record<string, string> | null)
+          : integrationType === 'costs_anthropic'
+            ? await checkAnthropicAdmin(row.credentials)
+            : await checkCloudbeds(row.credentials, row.config as Record<string, string> | null)
   } catch (err) {
     result = { ok: false, error: err instanceof Error ? err.message : 'Check failed unexpectedly' }
   }

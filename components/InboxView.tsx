@@ -9,6 +9,7 @@ const INTEGRATION_LABELS: Record<string, string> = {
   instagram: 'Instagram',
   email: 'Email',
   transcription_deepgram: 'Voice notes (Deepgram)',
+  costs_anthropic: 'Claude costs',
 }
 
 export default async function InboxView({
