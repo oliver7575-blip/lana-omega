@@ -107,12 +107,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
 
   const { data: tenant, error: tenantError } = await supabase
     .from('tenants')
-    .select('id, ai_persona_prompt, knowledge_base, status, escalation_contacts, booking_config, message_templates')
+    .select('id, ai_persona_prompt, knowledge_base, status, escalation_contacts, booking_config, message_templates, channel_settings')
     .eq('slug', slug)
     .maybeSingle()
 
   if (tenantError || !tenant) {
     return NextResponse.json({ error: 'Hotel not found' }, { status: 404, headers: CORS_HEADERS })
+  }
+
+  // Website chat switched off under Integrations → Guest channels.
+  if ((tenant.channel_settings as { widget?: boolean } | null)?.widget === false) {
+    return NextResponse.json(
+      { conversationId: null, reply: 'Our chat assistant is offline right now. Please write to us by email or WhatsApp and we will get back to you.' },
+      { headers: CORS_HEADERS }
+    )
   }
 
   const tenantId = tenant.id

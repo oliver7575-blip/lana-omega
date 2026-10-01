@@ -1,5 +1,6 @@
 'use client'
 
+import ChannelSwitches from '@/components/ChannelSwitches'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { INTEGRATIONS, type IntegrationType } from '@/lib/integrations'
@@ -145,6 +146,7 @@ export default function IntegrationsPage() {
         <Link href="/cloudbeds">← Dashboard</Link>
       </p>
       <h1>Integrations</h1>
+      <ChannelSwitches />
       {message && <p>{message}</p>}
       {INTEGRATIONS.map((def) => {
         const status = statuses[def.type]

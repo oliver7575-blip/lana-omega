@@ -417,6 +417,11 @@ async function processInbound(msg: ExtractedMessage) {
     .single()
   if (convoNow?.status === 'human_takeover' || convoNow?.status === 'closed') return
 
+  // WhatsApp switched off under Integrations → Guest channels: the message
+  // stays in the inbox for staff, but Lana doesn't reply.
+  const { data: channelRow } = await supabase.from('tenants').select('channel_settings').eq('id', tenantId).single()
+  if ((channelRow?.channel_settings as { whatsapp?: boolean } | null)?.whatsapp === false) return
+
   // ---- Tools & context ------------------------------------------------------
 
   const { data: tenant } = await supabase
@@ -622,6 +627,26 @@ async function processInbound(msg: ExtractedMessage) {
     }
   }
 
+  // Returning guest: they've chatted before, and Lana hasn't spoken yet in this conversation.
+  let returningContext = ''
+  {
+    const [{ data: earlier }, { count: lanaSoFar }] = await Promise.all([
+      supabase
+        .from('conversations')
+        .select('last_message_at, created_at')
+        .eq('tenant_id', tenantId)
+        .eq('guest_id', guest.id)
+        .neq('id', conversationId)
+        .order('created_at', { ascending: false })
+        .limit(1),
+      supabase.from('messages').select('id', { count: 'exact', head: true }).eq('conversation_id', conversationId).eq('sender_type', 'lana'),
+    ])
+    if (earlier?.length && !lanaSoFar) {
+      const when = (earlier[0].last_message_at ?? earlier[0].created_at) as string
+      returningContext = `RETURNING GUEST: This guest has chatted with us before (last time on ${when.slice(0, 10)}). Open your reply with a warm, natural "welcome back" in their language (e.g. "Welcome back, Oliver! 😊" or "¡Qué gusto saludarte de nuevo!"), then answer what they asked.\n\n`
+    }
+  }
+
   const guestName = (guest.name as string | null) ?? msg.profileName
   const guestNameContext = guestName
     ? `The guest's WhatsApp display name is "${guestName}". This is only a display name — don't treat it as confirming their identity or reservation.\n\n`
@@ -651,6 +676,7 @@ async function processInbound(msg: ExtractedMessage) {
   }))
 
   const systemPrompt =
+    returningContext +
     knownGuestContext +
     contactDirectoryContext +
     guestNameContext +
@@ -710,6 +736,23 @@ async function processInbound(msg: ExtractedMessage) {
       sender_type: 'lana',
       content: [noReply ? '' : replyText, photoNote].filter(Boolean).join('\n'),
     })
+  }
+
+  // A booking/availability link goes out as a button, like Beta ("Your availability").
+  if (!noReply && !contactButton) {
+    const booking = /https:\/\/hotels\.cloudbeds\.com\/[^\s)>\]]+/.exec(replyText)
+    if (booking) {
+      const body = replyText
+        .replace(booking[0], '')
+        .replace(/[ \t]+\n/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+      const spanish = (replyText.match(/\b(el|la|los|las|de|para|tus?|fechas|disponibilidad|puedes|aquí|reserva)\b/gi) ?? []).length >= 3
+      if (body.length > 0 && body.length <= 1000) {
+        replyText = body
+        contactButton = { contactName: '', contactPhone: '', contactUrl: booking[0], buttonText: spanish ? 'Ver disponibilidad' : 'Your availability' }
+      }
+    }
   }
 
   if (!noReply) {
