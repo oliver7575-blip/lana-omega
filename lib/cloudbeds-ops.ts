@@ -284,10 +284,12 @@ export interface ActivityRow {
 }
 
 export async function dashSummary(cb: CB, today: string, dayStartIso: string) {
-  const [dash, sales, cancels] = await Promise.all([
+  const [dash, sales, cancels, stayovers] = await Promise.all([
     cbGet(cb, 'getDashboard', { propertyID: cb.propertyId, date: today }).catch(() => ({ data: {} })),
     listReservations(cb, { resultsFrom: dayStartIso.replace('T', ' ').slice(0, 19) }),
     listReservations(cb, { status: 'canceled', modifiedFrom: dayStartIso.replace('T', ' ').slice(0, 19) }),
+    // Checked in and staying at least one more night.
+    listReservations(cb, { status: 'checked_in', checkOutFrom: addDays(today, 1) }),
   ])
   const d = (dash.data ?? {}) as Json
 
@@ -313,6 +315,7 @@ export async function dashSummary(cb: CB, today: string, dayStartIso: string) {
   return {
     arrivals: Number(d.arrivals ?? 0),
     departures: Number(d.departures ?? 0),
+    stayovers: stayovers.length,
     inHouse: Number(d.inHouse ?? 0),
     roomsOccupied: Number(d.roomsOccupied ?? 0),
     percentageOccupied: Number(d.percentageOccupied ?? 0),
@@ -480,4 +483,116 @@ export function cloudbedsLinks(propertyId: string) {
     newReservation: `https://hotels.cloudbeds.com/connect/${propertyId}#/newReservation`,
     reservation: (id: string) => `https://hotels.cloudbeds.com/connect/${propertyId}#/reservations/${id}`,
   }
+}
+
+// ---------------------------------------------------------------------------
+// New reservations
+// ---------------------------------------------------------------------------
+
+export interface AvailableRoomType {
+  roomTypeID: string
+  name: string
+  maxGuests: number
+  roomsAvailable: number
+  total: number | null
+  roomRateID: string | null
+  ratePlan: string | null
+  rooms: { roomID: string; roomName: string }[]
+}
+
+/** Room types free for the dates and party size, with the price for the stay. */
+export async function availability(cb: CB, start: string, end: string, adults: number, children: number): Promise<AvailableRoomType[]> {
+  const json = await cbGet(cb, 'getAvailableRoomTypes', {
+    propertyIDs: cb.propertyId,
+    startDate: start,
+    endDate: end,
+    rooms: 1,
+    adults,
+    children,
+    pageSize: 100,
+  })
+  const out: AvailableRoomType[] = []
+  for (const prop of (json.data as Json[]) ?? []) {
+    for (const rt of (prop.propertyRooms as Json[]) ?? []) {
+      if (Number(rt.roomsAvailable ?? 0) < 1) continue
+      out.push({
+        roomTypeID: String(rt.roomTypeID),
+        name: String(rt.roomTypeName ?? ''),
+        maxGuests: Number(rt.maxGuests ?? 0),
+        roomsAvailable: Number(rt.roomsAvailable ?? 0),
+        total: rt.roomRate !== undefined && rt.roomRate !== null ? Number(rt.roomRate) : null,
+        roomRateID: rt.roomRateID ? String(rt.roomRateID) : null,
+        ratePlan: (rt.ratePlanNamePublic as string) || null,
+        rooms: ((rt.individualRooms as Json[]) ?? []).map((r) => ({ roomID: String(r.roomID), roomName: String(r.roomName ?? '') })),
+      })
+    }
+  }
+  return out.sort((a, b) => (a.total ?? 0) - (b.total ?? 0))
+}
+
+/** Booking sources and payment methods set up in Cloudbeds. */
+export async function bookingOptions(cb: CB) {
+  const [sources, payments] = await Promise.all([
+    cbGet(cb, 'getSources', { propertyIDs: cb.propertyId }).catch(() => ({ data: [] })),
+    cbGet(cb, 'getPaymentMethods', { propertyID: cb.propertyId }).catch(() => ({ data: {} })),
+  ])
+  const pd = (payments.data ?? {}) as Json
+  return {
+    sources: ((sources.data as Json[]) ?? [])
+      .filter((s) => !s.isThirdParty)
+      .map((s) => ({ id: String(s.sourceID), name: String(s.sourceName ?? '') })),
+    paymentMethods: ((pd.methods as Json[]) ?? []).map((m) => ({ code: String(m.method ?? m.code ?? ''), name: String(m.name ?? m.method ?? '') })),
+  }
+}
+
+export interface NewReservation {
+  startDate: string
+  endDate: string
+  adults: number
+  children: number
+  roomTypeID: string
+  roomID?: string
+  roomRateID?: string
+  firstName: string
+  lastName: string
+  email: string
+  phone?: string
+  country: string
+  arrivalTime?: string
+  sourceID?: string
+  paymentMethod: string
+  sendEmail: boolean
+}
+
+/** Creates the reservation in Cloudbeds and returns its reservation ID. */
+export async function createReservation(cb: CB, r: NewReservation): Promise<string> {
+  const f: Record<string, string> = {
+    startDate: r.startDate,
+    endDate: r.endDate,
+    guestFirstName: r.firstName,
+    guestLastName: r.lastName,
+    guestEmail: r.email,
+    guestCountry: r.country.toUpperCase(),
+    paymentMethod: r.paymentMethod,
+    sendEmailConfirmation: r.sendEmail ? 'true' : 'false',
+    'rooms[0][roomTypeID]': r.roomTypeID,
+    'rooms[0][quantity]': '1',
+    'adults[0][roomTypeID]': r.roomTypeID,
+    'adults[0][quantity]': String(r.adults),
+    'children[0][roomTypeID]': r.roomTypeID,
+    'children[0][quantity]': String(r.children),
+  }
+  if (r.phone) f.guestPhone = r.phone
+  if (r.arrivalTime) f.estimatedArrivalTime = r.arrivalTime
+  if (r.sourceID) f.sourceID = r.sourceID
+  if (r.roomRateID) f['rooms[0][roomRateID]'] = r.roomRateID
+  if (r.roomID) {
+    f['rooms[0][roomID]'] = r.roomID
+    f['adults[0][roomID]'] = r.roomID
+    f['children[0][roomID]'] = r.roomID
+  }
+  const json = await cbPost(cb, 'postReservation', f)
+  const id = (json.reservationID ?? (json.data as Json | undefined)?.reservationID) as string | undefined
+  if (!id) throw new Error('Cloudbeds did not return a reservation number')
+  return String(id)
 }

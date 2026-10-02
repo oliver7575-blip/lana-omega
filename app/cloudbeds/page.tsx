@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import ReservationModal from '@/components/cloudbeds/ReservationModal'
 import SearchBar from '@/components/cloudbeds/SearchBar'
+import NewReservationModal from '@/components/cloudbeds/NewReservationModal'
 import { cbApi, mxn, statusLabel, type DashRow } from '@/components/cloudbeds/shared'
 
 interface ActivityRow { reservationID: string; guestName: string; revenue: number | null; checkIn: string; nights: number }
@@ -12,6 +13,7 @@ interface Summary {
   links: { newReservation: string }
   arrivals: number
   departures: number
+  stayovers: number
   roomsOccupied: number
   percentageOccupied: number
   sales: { count: number; roomNights: number; revenue: number; rows: ActivityRow[] }
@@ -60,6 +62,7 @@ export default function DashviewPage() {
   const [activity, setActivity] = useState<'sales' | 'cancellations' | 'overbookings'>('sales')
   const [overbookings, setOverbookings] = useState<{ roomID: string; reservationIDs: string[] }[] | null>(null)
   const [open, setOpen] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
 
   const loadSummary = useCallback(async () => {
     try {
@@ -103,7 +106,7 @@ export default function DashviewPage() {
   return (
     <div className="p-2 md:p-3">
       <div className="min-h-[calc(100vh-1.5rem)] rounded-2xl bg-[#f7f9fb] p-3.5 text-[12.5px] text-[#14213d]">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="mb-7 mt-2 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-lg font-semibold">{todayLabel || 'Dashboard'}</h1>
           <div className="flex flex-wrap items-center gap-2">
             <Link href="/cloudbeds/calendar" title="Reservation calendar" className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-gray-600 hover:text-[#3b6fe0]">
@@ -113,20 +116,21 @@ export default function DashviewPage() {
               <span className="h-2 w-2 rounded-full bg-emerald-500" /> Updates automatically
             </span>
             {summary && (
-              <a href={summary.links.newReservation} target="_blank" rel="noreferrer"
+              <button onClick={() => setCreating(true)}
                 className="rounded-md bg-[#5cc3a5] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-[#4bb294]">
                 Create new reservation
-              </a>
+              </button>
             )}
           </div>
         </div>
 
         {summaryError && <p className="mb-4 rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{summaryError}</p>}
 
-        <div className="mb-3 grid gap-2.5 md:grid-cols-3">
+        <div className="mb-4 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
           {[
             { n: summary?.arrivals, label: 'Arrivals', color: '#3aa99f' },
             { n: summary?.departures, label: 'Departures', color: '#e0622d' },
+            { n: summary?.stayovers, label: 'Stay overs', color: '#7a5af8' },
             { n: summary?.roomsOccupied, label: 'Accommodations booked', color: '#3b6fe0', pct: summary?.percentageOccupied },
           ].map((c) => (
             <div key={c.label} className="relative flex items-center gap-3 rounded-xl bg-white px-4 py-1.5 shadow-[0_1px_4px_rgba(15,23,42,0.08)]">
@@ -155,7 +159,8 @@ export default function DashviewPage() {
                 <thead className="bg-gray-100">
                   <tr><th className={th}>Guest</th><th className={th}>Conf #</th><th className={th}>Room</th><th className={th}>Arrival time</th><th className={th}>Status</th></tr>
                 </thead>
-                <tbody className="[&>tr:first-child>td]:pt-2.5">
+                <tbody>
+                  <tr aria-hidden="true"><td colSpan={5} className="h-4 p-0" /></tr>
                   {rows === null && <tr><td colSpan={5} className="py-5 text-center text-gray-500">Loading…</td></tr>}
                   {rows?.length === 0 && <tr><td colSpan={5} className="py-5 text-center text-gray-500">{listError ?? 'No reservations'}</td></tr>}
                   {rows?.map((r) => (
@@ -187,7 +192,8 @@ export default function DashviewPage() {
                 </div>
                 <table className="w-full text-[12px]">
                   <thead className="bg-gray-100"><tr><th className={th}>Guest</th><th className={th}>Revenue</th><th className={th}>Check-in</th><th className={th}>Nights</th></tr></thead>
-                  <tbody className="[&>tr:first-child>td]:pt-2.5">
+                  <tbody>
+                    <tr aria-hidden="true"><td colSpan={4} className="h-4 p-0" /></tr>
                     {act?.rows.length === 0 && <tr><td colSpan={4} className="py-5 text-center text-gray-500">Nothing yet today</td></tr>}
                     {act?.rows.map((r) => (
                       <tr key={r.reservationID} onClick={() => setOpen(r.reservationID)} className="cursor-pointer border-b border-gray-100 hover:bg-gray-50">
@@ -221,6 +227,14 @@ export default function DashviewPage() {
           <SearchBar onOpen={setOpen} />
         </div>
       </div>
+
+      {creating && summary && (
+        <NewReservationModal
+          today={summary.today}
+          onClose={() => setCreating(false)}
+          onCreated={(id) => { setCreating(false); setOpen(id); loadList(); loadSummary() }}
+        />
+      )}
 
       {open && summary && (
         <ReservationModal id={open} today={summary.today} onClose={() => setOpen(null)} onChanged={() => { loadList(); loadSummary() }} />
