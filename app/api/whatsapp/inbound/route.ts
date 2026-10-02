@@ -212,23 +212,45 @@ function logFailedDeliveries(body: Record<string, unknown>) {
   }
 }
 
+/** The app secret stored on the WhatsApp card for the number this webhook is about. */
+async function appSecretFor(body: Record<string, unknown>): Promise<string | null> {
+  const entry = (body.entry as { changes?: { value?: { metadata?: { phone_number_id?: string } } }[] }[] | undefined) ?? []
+  const phoneNumberId = entry.flatMap((e) => e.changes ?? []).map((c) => c.value?.metadata?.phone_number_id).find(Boolean)
+  if (!phoneNumberId) return null
+  const { data } = await createServiceClient()
+    .from('tenant_integrations')
+    .select('credentials')
+    .eq('integration_type', 'whatsapp')
+    .eq('config->>phone_number_id', phoneNumberId)
+    .maybeSingle()
+  if (!data?.credentials) return null
+  try {
+    return decryptCredentials<{ app_secret?: string }>(data.credentials as EncryptedPayload).app_secret || null
+  } catch {
+    return null
+  }
+}
+
 export async function POST(request: Request) {
   const rawBody = await request.text()
   const signature = request.headers.get('x-hub-signature-256')
-  const appSecret = process.env.META_APP_SECRET
-
-  if (!appSecret) {
-    return NextResponse.json({ error: 'META_APP_SECRET not configured' }, { status: 500 })
-  }
-  if (!verifyMetaSignature(rawBody, signature, appSecret)) {
-    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
-  }
 
   let parsedBody: Record<string, unknown>
   try {
     parsedBody = JSON.parse(rawBody) as Record<string, unknown>
   } catch {
     return NextResponse.json({ ignored: true, reason: 'invalid json' })
+  }
+
+  // Each hotel's WhatsApp card can hold the app secret of the Meta app that
+  // sends its webhooks (Integrations → WhatsApp → App secret); otherwise the
+  // platform default (META_APP_SECRET) is used.
+  const appSecret = (await appSecretFor(parsedBody)) ?? process.env.META_APP_SECRET
+  if (!appSecret) {
+    return NextResponse.json({ error: 'No app secret configured' }, { status: 500 })
+  }
+  if (!verifyMetaSignature(rawBody, signature, appSecret)) {
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
 
   logFailedDeliveries(parsedBody)

@@ -13,6 +13,8 @@
  *    ignore quiet hours and pacing)
  *  - staff reply "CODE TERMINADO / ACEPTO / AYUDA" or tap the buttons
  */
+import { notifyStaff } from './escalation'
+import { findEscalationContact, parseEscalationContacts } from './escalation-contacts'
 import { createServiceClient } from './supabase/service'
 import type { EncryptedPayload } from './crypto'
 import { sendWhatsAppButtons, sendWhatsAppMessage } from './whatsapp-send'
@@ -576,6 +578,7 @@ export async function processReminder(
       .update({ escalation_status: 'required', escalated_at: new Date().toISOString() })
       .eq('id', task.id)
     await logEvent(ctx, task.id, 'escalation_required', `${staff.name} has received ${count} reminders without completing the task.`)
+    await alertMaintenanceContact(ctx, task, `${staff.name} recibió ${count} recordatorios y no ha respondido.`)
   } else {
     await scheduleReminder(
       ctx,
@@ -589,6 +592,37 @@ export async function processReminder(
 // ---------------------------------------------------------------------------
 // Task lifecycle
 // ---------------------------------------------------------------------------
+
+/**
+ * Tells the maintenance contact (Settings → Staff escalation contacts) on
+ * WhatsApp that a task needs attention. Uses the staff-alert template when one
+ * is chosen, so it arrives even outside WhatsApp's 24-hour window.
+ */
+async function alertMaintenanceContact(ctx: EngineContext, task: TaskRow, summary: string) {
+  if (!ctx.whatsapp) return
+  try {
+    const { data: tenant } = await ctx.db
+      .from('tenants')
+      .select('escalation_contacts, message_templates')
+      .eq('id', ctx.tenantId)
+      .single()
+    const contact = findEscalationContact(parseEscalationContacts(tenant?.escalation_contacts), 'maintenance')
+    if (!contact) return
+    const result = await notifyStaff(
+      ctx.whatsapp.phoneNumberId,
+      ctx.whatsapp.credentials,
+      contact.phone,
+      'Mantenimiento',
+      { category: 'maintenance', summary: `#${task.task_code} ${task.title}: ${summary}`, urgency: task.priority === 'urgent' ? 'high' : 'normal' },
+      tenant?.message_templates,
+      'Mantenimiento'
+    )
+    await logEvent(ctx, task.id, result.success ? 'manager_alerted' : 'manager_alert_failed',
+      result.success ? 'Maintenance contact alerted on WhatsApp' : `Could not alert the maintenance contact: ${result.error ?? 'unknown error'}`)
+  } catch (err) {
+    console.error('[maintenance] manager alert failed', err)
+  }
+}
 
 export async function completeTask(ctx: EngineContext, task: TaskRow, how: { source: 'whatsapp' | 'dashboard'; text?: string }) {
   await ctx.db
@@ -661,6 +695,7 @@ export async function requestHelp(ctx: EngineContext, task: TaskRow, requester: 
         await ctx.db.from('maintenance_tasks').update({ escalation_status: 'required', escalated_at: new Date().toISOString() }).eq('id', nextId)
         await logEvent(ctx, nextId, 'escalation_required', `${requester.name} asked for help with the previous occurrence and nobody else was available`)
       }
+      await alertMaintenanceContact(ctx, task, `${requester.name} pidió ayuda y no hay nadie más disponible. Se pasó a mañana.`)
     } else {
       const base = task.due_at ? new Date(task.due_at) : new Date()
       const days = Math.max(1, Math.round(
@@ -682,6 +717,7 @@ export async function requestHelp(ctx: EngineContext, task: TaskRow, requester: 
         .eq('id', task.id)
       await scheduleReminder(ctx, task.id, newDue)
       await logEvent(ctx, task.id, 'escalation_required', reason)
+      await alertMaintenanceContact(ctx, task, `${requester.name} pidió ayuda y no hay nadie más disponible. Se pasó a mañana.`)
     }
     return false
   }

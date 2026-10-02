@@ -29,7 +29,10 @@ export const INTEGRATIONS: IntegrationDef[] = [
   {
     type: 'whatsapp',
     label: 'WhatsApp Business',
-    credentialFields: [{ key: 'access_token', label: 'Access Token', type: 'password' }],
+    credentialFields: [
+      { key: 'access_token', label: 'Access Token', type: 'password' },
+      { key: 'app_secret', label: 'App secret of the Meta app that sends this number\'s webhooks', type: 'password' },
+    ],
     configFields: [
       { key: 'phone_number_id', label: 'Phone Number ID', type: 'text' },
       { key: 'waba_id', label: 'WhatsApp Business Account ID', type: 'text' },
