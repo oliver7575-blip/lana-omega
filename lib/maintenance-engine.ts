@@ -324,6 +324,9 @@ export async function loadStaff(ctx: EngineContext): Promise<StaffRow[]> {
 }
 
 /** Available staff member with the fewest open tasks (ties: alphabetical). */
+/** A staff member can have at most this many unfinished (waiting / in progress) tasks. */
+export const MAX_OPEN_PER_STAFF = 2
+
 export async function pickStaff(ctx: EngineContext, excludeId?: string): Promise<StaffRow | null> {
   const staff = (await loadStaff(ctx)).filter((s) => s.active && s.id !== excludeId && !offToday(s, ctx.tz))
   if (staff.length === 0) return null
@@ -335,7 +338,9 @@ export async function pickStaff(ctx: EngineContext, excludeId?: string): Promise
     .in('assigned_to', staff.map((s) => s.id))
   const counts = new Map(staff.map((s) => [s.id, 0]))
   for (const r of open ?? []) counts.set(r.assigned_to as string, (counts.get(r.assigned_to as string) ?? 0) + 1)
-  return [...staff].sort((a, b) => (counts.get(a.id)! - counts.get(b.id)!) || a.name.localeCompare(b.name))[0]
+  // Nobody gets a new task while they already have MAX_OPEN_PER_STAFF unfinished ones.
+  const withRoom = staff.filter((s) => counts.get(s.id)! < MAX_OPEN_PER_STAFF)
+  return [...withRoom].sort((a, b) => (counts.get(a.id)! - counts.get(b.id)!) || a.name.localeCompare(b.name))[0] ?? null
 }
 
 // ---------------------------------------------------------------------------
@@ -401,7 +406,11 @@ export async function processReminder(
   opts: { force?: boolean } = {}
 ): Promise<ReminderOutcome> {
   const task = await loadTask(ctx, reminder.task_id)
-  if (!task || !ACTIVE_STATUSES.includes(task.status as never) || task.escalation_status === 'required') {
+  // Stop reminding once someone has ignored MAX_REMINDERS reminders (the task is
+  // flagged for a manager). A task moved to tomorrow after a help request is also
+  // flagged, but starts a fresh set of reminders, so it still goes out.
+  const ignoredTooOften = task?.escalation_status === 'required' && (task.reminder_count ?? 0) >= MAX_REMINDERS
+  if (!task || !ACTIVE_STATUSES.includes(task.status as never) || ignoredTooOften) {
     await ctx.db.from('maintenance_reminders').update({ status: 'cancelled' }).eq('id', reminder.id)
     return { taskId: reminder.task_id, result: 'cancelled' }
   }
@@ -446,6 +455,30 @@ export async function processReminder(
       return defer(ctx, reminder.id, task.id, nextMorning(staff, ctx.tz, days), 'reminder_deferred',
         `${staff.name} has days off until ${staff.unavailable_until}; reminder deferred`)
     }
+    // Capacity: if this would be a third unfinished task for them, hand it to
+    // someone with room, or wait until one of theirs is done.
+    if (task.status === 'scheduled') {
+      const { count: openCount } = await ctx.db
+        .from('maintenance_tasks')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', ctx.tenantId)
+        .eq('assigned_to', staff.id)
+        .in('status', ['waiting', 'in_progress'])
+        .neq('id', task.id)
+      if ((openCount ?? 0) >= MAX_OPEN_PER_STAFF) {
+        if (!task.lock_assignee) {
+          const other = await pickStaff(ctx, staff.id)
+          if (other) {
+            await ctx.db.from('maintenance_tasks').update({ assigned_to: other.id }).eq('id', task.id)
+            await logEvent(ctx, task.id, 'assigned', `${staff.name} already has ${MAX_OPEN_PER_STAFF} open tasks; reassigned to ${other.name}`)
+            return processReminder(ctx, reminder, opts)
+          }
+        }
+        return defer(ctx, reminder.id, task.id, minutesFromNow(30), 'reminder_deferred',
+          `${staff.name} already has ${MAX_OPEN_PER_STAFF} open tasks; waiting until one is finished`)
+      }
+    }
+
     if (task.priority !== 'urgent') {
       if (inQuietHours(staff, ctx.tz)) {
         return defer(ctx, reminder.id, task.id, nextMorning(staff, ctx.tz), 'reminder_deferred',
@@ -616,11 +649,40 @@ export async function requestHelp(ctx: EngineContext, task: TaskRow, requester: 
   await logEvent(ctx, task.id, 'reply_needs_help', text)
   const other = await pickStaff(ctx, requester.id)
   if (!other) {
-    await ctx.db
-      .from('maintenance_tasks')
-      .update({ escalation_status: 'required', escalated_at: new Date().toISOString() })
-      .eq('id', task.id)
-    await logEvent(ctx, task.id, 'escalation_required', `${requester.name} asked for help and nobody else is available`)
+    // Nobody can take it: move it to tomorrow and flag it (Needs attention).
+    await cancelPendingReminders(ctx, task.id)
+    const reason = `${requester.name} asked for help and nobody else is available; moved to tomorrow`
+    if (task.recurrence_rule === 'daily' || task.recurrence_rule === 'interval') {
+      // Tomorrow already has its own occurrence: close this one and flag the next.
+      await ctx.db.from('maintenance_tasks').update({ status: 'cancelled', updated_at: new Date().toISOString() }).eq('id', task.id)
+      await logEvent(ctx, task.id, 'escalation_required', reason)
+      const nextId = await spawnNext(ctx, task)
+      if (nextId) {
+        await ctx.db.from('maintenance_tasks').update({ escalation_status: 'required', escalated_at: new Date().toISOString() }).eq('id', nextId)
+        await logEvent(ctx, nextId, 'escalation_required', `${requester.name} asked for help with the previous occurrence and nobody else was available`)
+      }
+    } else {
+      const base = task.due_at ? new Date(task.due_at) : new Date()
+      const days = Math.max(1, Math.round(
+        (Date.parse(`${localDate(new Date(), ctx.tz)}T00:00:00Z`) - Date.parse(`${localDate(base, ctx.tz)}T00:00:00Z`)) / 86400000
+      ) + 1)
+      const newDue = addLocalDays(base, days, ctx.tz)
+      await ctx.db
+        .from('maintenance_tasks')
+        .update({
+          due_at: newDue.toISOString(),
+          series_due_at: task.series_due_at ?? task.due_at,
+          status: 'scheduled',
+          reminder_count: 0,
+          last_reminded_at: null,
+          escalation_status: 'required',
+          escalated_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', task.id)
+      await scheduleReminder(ctx, task.id, newDue)
+      await logEvent(ctx, task.id, 'escalation_required', reason)
+    }
     return false
   }
   await ctx.db
@@ -789,13 +851,13 @@ export async function handleStaffReply(ctx: EngineContext, staff: StaffRow, text
   const first = staff.name.split(' ')[0]
   if (parsed.action === 'done') {
     await completeTask(ctx, task, { source: 'whatsapp', text: label })
-    await sendStaffText(ctx, staff, task.id, `✅ #${task.task_code} ${task.title} — anotado como terminado. Gracias ${first}`)
+    await sendStaffText(ctx, staff, task.id, `✅ Anotado #${task.task_code}, gracias ${first}`)
   } else if (parsed.action === 'accept') {
     await acknowledgeTask(ctx, task, label)
-    await sendStaffText(ctx, staff, task.id, `👍 Entendido: #${task.task_code} ${task.title} en proceso.`)
+    await sendStaffText(ctx, staff, task.id, `Entendido #${task.task_code}`)
   } else {
     await requestHelp(ctx, task, staff, label)
-    await sendStaffText(ctx, staff, task.id, `Entiendo ${first}. Tomo nota y pido que alguien nos ayude con #${task.task_code} ${task.title}.`)
+    await sendStaffText(ctx, staff, task.id, `Entiendo ${first}. Tomo nota y pido que alguien nos ayude con la tarea #${task.task_code}.`)
   }
   return true
 }

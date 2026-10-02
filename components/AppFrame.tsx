@@ -135,11 +135,6 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
           {sub('/cloudbeds', 'Dashboard', pathname === '/cloudbeds')}
           {sub('/cloudbeds/calendar', 'Calendar', pathname.startsWith('/cloudbeds/calendar'))}
         </div>
-      </div>
-
-      <div className="my-4 border-t border-line" />
-
-      <div className="space-y-1">
         {item('/inbox', 'Messages', MailIcon, isInbox)}
         <div className="ml-8 border-l border-line pl-2">
           {sub('/reservations', 'Reservations', isReservations, info?.unreadReservations)}
