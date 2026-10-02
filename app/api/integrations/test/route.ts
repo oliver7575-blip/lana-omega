@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { decryptCredentials, type EncryptedPayload } from '@/lib/crypto'
 import { lookupReservation } from '@/lib/cloudbeds'
+import { checkInstagram, instagramConnection } from '@/lib/instagram'
 
 // Give the function room to finish: without this, a slow external call can
 // hit the platform's default limit and die without recording anything.
@@ -115,7 +116,7 @@ async function checkAnthropicAdmin(credentials: EncryptedPayload): Promise<Check
   return { ok: true, detail: 'Admin key accepted — Claude costs will show on the Costs page' }
 }
 
-const TESTABLE_TYPES = ['whatsapp', 'pms_cloudbeds', 'transcription_deepgram', 'costs_anthropic']
+const TESTABLE_TYPES = ['whatsapp', 'pms_cloudbeds', 'transcription_deepgram', 'costs_anthropic', 'instagram']
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -156,6 +157,8 @@ export async function POST(request: Request) {
           ? await checkDeepgram(row.credentials)
           : integrationType === 'costs_anthropic'
             ? await checkAnthropicAdmin(row.credentials)
+            : integrationType === 'instagram'
+              ? await checkInstagram(instagramConnection(row.credentials, row.config))
             : await checkCloudbeds(row.credentials, row.config as Record<string, string> | null)
   } catch (err) {
     result = { ok: false, error: err instanceof Error ? err.message : 'Check failed unexpectedly' }

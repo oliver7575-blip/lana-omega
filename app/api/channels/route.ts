@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
-const CHANNELS = ['whatsapp', 'widget'] as const
+const CHANNELS = ['whatsapp', 'widget', 'instagram'] as const
 
 async function caller() {
   const supabase = await createClient()
@@ -19,7 +19,7 @@ export async function GET() {
   if ('error' in c) return c.error
   const { data } = await c.supabase.from('tenants').select('channel_settings').eq('id', c.tenantId).single()
   const s = (data?.channel_settings ?? {}) as Record<string, boolean>
-  return NextResponse.json({ whatsapp: s.whatsapp !== false, widget: s.widget !== false, canEdit: c.canEdit })
+  return NextResponse.json({ whatsapp: s.whatsapp !== false, widget: s.widget !== false, instagram: s.instagram !== false, canEdit: c.canEdit })
 }
 
 /** { channel: 'whatsapp' | 'widget', enabled: boolean } */

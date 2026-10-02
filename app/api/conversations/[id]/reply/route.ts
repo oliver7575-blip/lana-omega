@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { sendWhatsAppMessage } from '@/lib/whatsapp-send'
+import { instagramConnection, sendInstagramText } from '@/lib/instagram'
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -87,6 +88,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     } else {
       deliveryResult = { success: false, error: 'WhatsApp integration not fully configured' }
     }
+  }
+
+  if (conversation.channel === 'instagram') {
+    const { data: guest } = await supabase.from('guests').select('phone').eq('id', conversation.guest_id).single()
+    const { data: integration } = await supabase
+      .from('tenant_integrations')
+      .select('credentials, config')
+      .eq('tenant_id', conversation.tenant_id)
+      .eq('integration_type', 'instagram')
+      .eq('status', 'connected')
+      .maybeSingle()
+    const igsid = (guest?.phone as string | undefined)?.replace(/^ig:/, '')
+    deliveryResult =
+      igsid && integration?.credentials
+        ? await sendInstagramText(instagramConnection(integration.credentials, integration.config), igsid, content.trim())
+        : { success: false, error: 'Instagram integration not fully configured' }
   }
 
   return NextResponse.json({ message, deliveryResult })

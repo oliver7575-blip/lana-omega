@@ -151,5 +151,6 @@ export function timeAgo(iso: string | null): string {
 export function displayPhone(phone: string | null): string {
   if (!phone) return ''
   if (phone.startsWith('web:')) return 'Website chat'
+  if (phone.startsWith('ig:')) return 'Instagram'
   return phone.startsWith('+') ? phone : `+${phone.replace(/\D/g, '')}`
 }

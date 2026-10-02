@@ -36,10 +36,18 @@ export const INTEGRATIONS: IntegrationDef[] = [
     ],
   },
   {
+    // Instagram Direct. Works with an Instagram Login token (leave Page ID
+    // blank) or a Facebook Page token (fill in the Page ID).
     type: 'instagram',
     label: 'Instagram',
-    credentialFields: [{ key: 'access_token', label: 'Access Token', type: 'password' }],
-    configFields: [{ key: 'page_id', label: 'Page ID', type: 'text' }],
+    credentialFields: [
+      { key: 'access_token', label: 'Access token', type: 'password' },
+      { key: 'app_secret', label: 'App secret of the Meta app sending the webhooks (optional if it is the same app as WhatsApp)', type: 'password' },
+    ],
+    configFields: [
+      { key: 'account_id', label: 'Instagram account ID (professional account)', type: 'text' },
+      { key: 'page_id', label: 'Facebook Page ID (only if connected through a Facebook Page)', type: 'text' },
+    ],
   },
   {
     type: 'email',
