@@ -11,6 +11,8 @@ const V = 'v21.0'
 export interface InstagramConfig {
   account_id?: string // Instagram professional account ID (the webhook's entry.id)
   page_id?: string // only for the Facebook Page connection style
+  token_expires_at?: string // set by the automatic renewal
+  token_refresh_error?: string | null
 }
 
 export interface InstagramConnection {
@@ -130,7 +132,12 @@ export async function checkInstagram(conn: InstagramConnection): Promise<{ ok: b
     if (conn.config.account_id && id && id !== conn.config.account_id) {
       return { ok: false, error: `Token belongs to Instagram account ${id} (@${json.username}), not ${conn.config.account_id}` }
     }
-    return { ok: true, detail: `Connected as @${json.username} (account ${id})` }
+    const renewal = conn.config.token_refresh_error
+      ? ` · last token renewal failed: ${conn.config.token_refresh_error}`
+      : conn.config.token_expires_at
+        ? ` · token renews automatically (current one valid until ${conn.config.token_expires_at.slice(0, 10)})`
+        : ' · token renews automatically every week'
+    return { ok: true, detail: `Connected as @${json.username} (account ${id})${renewal}` }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Instagram check failed' }
   }
