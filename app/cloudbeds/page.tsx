@@ -29,7 +29,7 @@ const TABS = [
 
 function Card({ title, onRefresh, children }: { title: string; onRefresh: () => void; children: React.ReactNode }) {
   return (
-    <section className="rounded-xl border-t-[3px] border-[#3b6fe0] bg-white p-3 shadow-[0_1px_4px_rgba(15,23,42,0.08)]">
+    <section className="min-w-0 rounded-xl border-t-[3px] border-[#3b6fe0] bg-white p-3 shadow-[0_1px_4px_rgba(15,23,42,0.08)]">
       <div className="mb-2.5 flex items-center justify-between">
         <h2 className="text-sm font-semibold">{title}</h2>
         <button onClick={onRefresh} title="Refresh" className="text-sm text-gray-500 hover:text-[#3b6fe0]">↻</button>
@@ -105,7 +105,7 @@ export default function DashviewPage() {
 
   return (
     <div className="p-2 md:p-3">
-      <div className="min-h-[calc(100vh-1.5rem)] rounded-2xl bg-[#f7f9fb] p-3.5 text-[12.5px] text-[#14213d]">
+      <div className="min-h-[calc(100vh-1.5rem)] min-w-0 overflow-hidden rounded-2xl bg-[#f7f9fb] p-3.5 text-[12.5px] text-[#14213d]">
         <div className="mb-7 mt-2 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-lg font-semibold">{todayLabel || 'Dashboard'}</h1>
           <div className="flex flex-wrap items-center gap-2">
@@ -165,7 +165,7 @@ export default function DashviewPage() {
                   {rows?.length === 0 && <tr><td colSpan={5} className="py-5 text-center text-gray-500">{listError ?? 'No reservations'}</td></tr>}
                   {rows?.map((r) => (
                     <tr key={r.reservationID} onClick={() => setOpen(r.reservationID)} className="cursor-pointer border-b border-gray-100 hover:bg-gray-50">
-                      <td className="px-3 py-1.5 font-medium">{r.guestName}</td>
+                      <td className="min-w-[150px] px-3 py-1.5 font-medium">{r.guestName}</td>
                       <td className="px-3 py-1.5 text-gray-600">{r.reservationID}</td>
                       <td className="px-3 py-1.5">{r.room}</td>
                       <td className="px-3 py-1.5">{r.arrivalTime ?? '—'}</td>
@@ -190,6 +190,7 @@ export default function DashviewPage() {
                   <div><p className="text-xl text-[#3b6fe0]">{act?.roomNights ?? '—'}</p><p className="text-[10px] font-semibold uppercase">Room nights</p></div>
                   <div><p className="text-xl text-[#3b6fe0]">{act ? mxn(act.revenue) : '—'}</p><p className="text-[10px] font-semibold uppercase">Revenue</p></div>
                 </div>
+                <div className="overflow-x-auto">
                 <table className="w-full text-[12px]">
                   <thead className="bg-gray-100"><tr><th className={th}>Guest</th><th className={th}>Revenue</th><th className={th}>Check-in</th><th className={th}>Nights</th></tr></thead>
                   <tbody>
@@ -197,7 +198,7 @@ export default function DashviewPage() {
                     {act?.rows.length === 0 && <tr><td colSpan={4} className="py-5 text-center text-gray-500">Nothing yet today</td></tr>}
                     {act?.rows.map((r) => (
                       <tr key={r.reservationID} onClick={() => setOpen(r.reservationID)} className="cursor-pointer border-b border-gray-100 hover:bg-gray-50">
-                        <td className="px-3 py-1.5 font-medium">{r.guestName}</td>
+                        <td className="min-w-[150px] px-3 py-1.5 font-medium">{r.guestName}</td>
                         <td className="px-3 py-1.5">{mxn(r.revenue)}</td>
                         <td className="px-3 py-1.5">{r.checkIn}</td>
                         <td className="px-3 py-1.5">{r.nights}</td>
@@ -205,6 +206,7 @@ export default function DashviewPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </>
             ) : (
               <div className="mt-4 text-sm">

@@ -138,7 +138,7 @@ export default function MaintenancePage() {
   const cols = 'grid grid-cols-[24px_minmax(0,2.4fr)_minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,1.5fr)] items-center gap-4'
 
   return (
-    <main className="px-5 py-6 md:px-8">
+    <main className="min-w-0 overflow-x-hidden px-3 py-5 sm:px-5 md:px-8">
       <LiveRefresh tables={['maintenance_tasks', 'maintenance_task_events']} onChange={load} pollMs={30000} />
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
@@ -225,7 +225,69 @@ export default function MaintenancePage() {
           </div>
         )}
 
-        <div className="mt-4 overflow-x-auto border-t border-line">
+        {/* Phones: one card per task */}
+        <div className="mt-4 divide-y divide-line border-t border-line md:hidden">
+          {loaded && visible.length === 0 && (
+            <p className="px-4 py-8 text-center text-sm text-navy/50">No tasks here{dateFilter ? ' for this date' : ''}.</p>
+          )}
+          {visible.map((t) => (
+            <div key={t.id} className={`px-4 py-3 ${t.status === 'in_progress' ? 'border-l-2 border-l-emerald-400 bg-emerald-500/[0.08]' : t.escalation_status === 'required' ? 'bg-clay/[0.06]' : ''}`}>
+              <div className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={selected.has(t.id)}
+                  onChange={() => {
+                    const n = new Set(selected)
+                    if (n.has(t.id)) n.delete(t.id)
+                    else n.add(t.id)
+                    setSelected(n)
+                  }}
+                  className="mt-1 h-4 w-4 shrink-0 accent-clay"
+                />
+                <button onClick={() => setDrawerId(t.id)} className="min-w-0 flex-1 text-left">
+                  <p className="text-[14px] leading-snug text-white">
+                    <span className="mr-1.5 rounded bg-clay/10 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-clay">#{t.task_code}</span>
+                    {t.title}
+                    {t.priority === 'urgent' && <span className="ml-1.5 text-xs text-red-300">🚨</span>}
+                  </p>
+                  <p className="mt-0.5 break-words text-xs text-navy/50">
+                    {[t.location ? `⌖ ${t.location}` : null, recurrenceLabel(t), `${t.reminder_count} reminder${t.reminder_count === 1 ? '' : 's'}`].filter(Boolean).join(' · ')}
+                    {t.escalation_status === 'required' && <span className="text-clay"> · Needs attention</span>}
+                  </p>
+                  <p className="mt-1 text-xs text-navy/70">
+                    {t.assigned_to ? staffName(t.assigned_to) : 'Auto'} · {fmtDateTime(mode === 'completed' ? t.completed_at ?? t.updated_at : t.due_at, tz)}
+                  </p>
+                </button>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 pl-7 text-sm">
+                <select
+                  value={t.status}
+                  onChange={(e) => setStatus(t, e.target.value)}
+                  className={`rounded-md border px-2 py-1 text-xs outline-none ${
+                    t.status === 'in_progress'
+                      ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200'
+                      : t.status === 'waiting'
+                        ? 'border-amber-400/30 bg-amber-500/10 text-amber-200'
+                        : 'border-line bg-paper text-navy'
+                  }`}
+                >
+                  {Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                </select>
+                <button onClick={() => setEditTask(t)} className="text-navy/75">Edit</button>
+                {mode === 'active' && (
+                  <>
+                    <button onClick={() => action(t, 'send_now', 'Reminder sent')} className="text-navy/85">⚡ Send</button>
+                    <button onClick={() => action(t, 'mark_done', `#${t.task_code} marked done`)} className="text-emerald-300">Done</button>
+                  </>
+                )}
+                <button onClick={() => remove(t)} className="text-red-300">Delete</button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Tablets and computers: the table */}
+        <div className="mt-4 hidden overflow-x-auto border-t border-line md:block">
           <div className="min-w-[860px]">
             <div className={`${cols} border-b border-line px-5 py-3 text-[11px] font-semibold uppercase tracking-[.13em] text-navy/45`}>
               <input
@@ -314,13 +376,13 @@ export default function MaintenancePage() {
           <span className="mt-2 h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_10px_#34d399]" />
         </div>
         {activity.length === 0 && <p className="text-sm text-navy/50">No activity yet.</p>}
-        <div className="grid gap-3 lg:grid-cols-2">
+        <div className="grid min-w-0 gap-3 lg:grid-cols-2">
           {activity.map((e) => (
-            <button key={e.id} onClick={() => setDrawerId(e.task_id)} className="flex gap-3 rounded-xl border border-line bg-paper/40 px-4 py-3 text-left hover:bg-paper/60">
+            <button key={e.id} onClick={() => setDrawerId(e.task_id)} className="flex w-full min-w-0 gap-3 rounded-xl border border-line bg-paper/40 px-4 py-3 text-left hover:bg-paper/60">
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-clay/10 text-sm text-clay">{eventIcon(e.event_type)}</span>
-              <span className="min-w-0">
+              <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold text-white">{e.task_title}</span>
-                <span className="block text-xs text-navy/60">{titleCase(e.detail)}</span>
+                <span className="block text-xs text-navy/60 [overflow-wrap:anywhere]">{titleCase(e.detail).replace(/\b[0-9a-f]{8}-[0-9a-f-]{27}\b/gi, '').replace(/\s{2,}/g, ' ').replace(/ ([;,.])/g, '$1')}</span>
                 <span className="block text-xs text-navy/40">{fmtDateTime(e.created_at, tz)}</span>
               </span>
             </button>
