@@ -265,7 +265,7 @@ export default function CalendarPage() {
           </div>
         </div>
 
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-2 py-1">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-2 py-1">
           <SearchBar onOpen={setOpen} />
           <div className="flex items-center gap-2 text-xs">
             {data && (

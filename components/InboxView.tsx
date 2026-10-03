@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { requireStaff } from '@/lib/staff-context'
 import { displayPhone, loadInbox, timeAgo } from '@/lib/inbox'
 import LiveRefresh from './LiveRefresh'
+import InboxList from './InboxList'
 
 const INTEGRATION_LABELS: Record<string, string> = {
   whatsapp: 'WhatsApp',
@@ -75,46 +76,19 @@ export default async function InboxView({
         </p>
       )}
 
-      <div className="overflow-hidden rounded-2xl border border-line bg-surface">
-        {rows.length === 0 && <p className="px-6 py-10 text-center text-sm text-navy/50">No conversations here.</p>}
-        {rows.map((r) => {
-          const name = r.guestName?.trim() || ''
-          return (
-            <Link
-              key={r.id}
-              href={`/conversations/${r.id}`}
-              className="flex items-center gap-3 border-b border-line px-4 py-3 transition last:border-b-0 hover:bg-white/[0.03] sm:px-5"
-            >
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-paper font-display text-base italic text-white">
-                {name ? name[0].toUpperCase() : ''}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                  {name && <span className="text-[14px] font-semibold text-white">{name}</span>}
-                  <span className="text-[11px] uppercase tracking-wider text-navy/45">{r.channel}</span>
-                  {r.reservationStatus && (
-                    <span className="rounded-full bg-clay/15 px-2 py-0.5 text-[11px] text-clay">
-                      {r.reservationStatus.replace(/_/g, ' ')}
-                    </span>
-                  )}
-                </div>
-                {r.guestPhone && <p className="text-xs text-navy/55">{displayPhone(r.guestPhone)}</p>}
-                <p className="truncate text-sm text-navy/85">{r.preview}</p>
-              </div>
-              <div className="flex shrink-0 flex-col items-end gap-1.5">
-                {r.status === 'human_takeover' ? (
-                  <span className="rounded-full bg-purple-500/15 px-2.5 py-1 text-xs font-medium text-purple-300">
-                    human takeover
-                  </span>
-                ) : r.unread ? (
-                  <span className="rounded-full bg-[#1b2340] px-2.5 py-1 text-xs font-medium text-[#8dacff]">new</span>
-                ) : null}
-                <span className="text-xs text-navy/50">{timeAgo(r.lastMessageAt)}</span>
-              </div>
-            </Link>
-          )
-        })}
-      </div>
+      <InboxList
+        rows={rows.map((r) => ({
+          id: r.id,
+          name: r.guestName?.trim() || '',
+          channel: r.channel,
+          reservationStatus: r.reservationStatus ?? null,
+          phone: r.guestPhone ? displayPhone(r.guestPhone) : null,
+          preview: r.preview,
+          status: r.status,
+          unread: r.unread,
+          ago: timeAgo(r.lastMessageAt),
+        }))}
+      />
     </main>
   )
 }
