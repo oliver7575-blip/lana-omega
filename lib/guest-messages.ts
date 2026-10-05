@@ -1,3 +1,4 @@
+import { normalizePhone } from './phone'
 import { createServiceClient } from './supabase/service'
 import type { EncryptedPayload } from './crypto'
 import { getMapping, renderMappedTemplateText, reservationValues, sendMappedTemplate } from './message-templates'
@@ -100,7 +101,7 @@ export async function sendGuestMessage(
   const waType = WHATSAPP_TYPE[purpose]
   if (!ctx.whatsapp) whatsapp = { sent: false, skipped: 'WhatsApp not connected' }
   else if (!mapping) whatsapp = { sent: false, skipped: 'No WhatsApp template chosen for this message' }
-  else if (!r.guestPhone) whatsapp = { sent: false, skipped: 'No phone number on the reservation' }
+  else if (!r.guestPhone || normalizePhone(r.guestPhone).length < 8) whatsapp = { sent: false, skipped: 'No phone number on the reservation' }
   else if (await alreadySent(ctx.tenantId, r.reservationID, waType))
     whatsapp = { sent: false, skipped: 'Already sent' }
   else {

@@ -26,6 +26,10 @@ export async function findOrCreateGuest(
   phone: string,
   details: { name?: string; email?: string } = {}
 ) {
+  // Cloudbeds sends "N/A" (or similar) when a booking has no phone. Without a
+  // real number there's nothing to match on, so don't create a guest — doing
+  // so would merge every phoneless booking into one record.
+  if (normalizePhone(phone).length < 8) return null
   const existing = await findGuestByPhone(db, tenantId, phone)
   if (existing) {
     const updates: Record<string, string> = {}
