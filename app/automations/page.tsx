@@ -387,9 +387,15 @@ function EmailCard({
           </div>
           <iframe
             title={`${tpl.key} preview`}
-            sandbox=""
-            srcDoc={`<div style="font-family:sans-serif;font-size:14px;padding:4px 12px">${renderEmail(body)}</div>`}
-            style={{ width: '100%', height: 320, border: 0 }}
+            // Same-origin only so the frame can be measured; scripts stay blocked.
+            sandbox="allow-same-origin"
+            srcDoc={`<!doctype html><html><head><meta charset="utf-8"><base target="_blank"><style>html,body{margin:0;background:#ffffff;color:#222222;font-family:Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5}body{padding:16px 20px}a{color:#1a56db}img{max-width:100%}</style></head><body>${renderEmail(body)}</body></html>`}
+            onLoad={(e) => {
+              const f = e.currentTarget
+              const h = f.contentDocument?.documentElement.scrollHeight
+              if (h) f.style.height = `${h + 4}px`
+            }}
+            style={{ width: '100%', height: 320, border: 0, background: '#ffffff', borderRadius: '0 0 6px 6px', display: 'block' }}
           />
         </div>
       )}

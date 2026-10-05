@@ -142,7 +142,6 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
         {item('/escalations', 'Escalations', AlertIcon, pathname.startsWith('/escalations'), info?.newEscalations)}
         {item('/automations', 'Templates', TemplateIcon, pathname.startsWith('/automations'))}
         {item('/integrations', 'Integrations', ShareIcon, pathname.startsWith('/integrations'))}
-        {item('/costs', 'Costs', DollarIcon, pathname.startsWith('/costs'))}
         {item('/maintenance', 'Maintenance', HammerIcon, pathname.startsWith('/maintenance'))}
       </div>
 
@@ -151,6 +150,7 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
       <div className="space-y-1">
         {item('/waitlist', 'Waitlist', ListIcon, pathname.startsWith('/waitlist'))}
         {item('/staff', 'Staff', UsersIcon, pathname.startsWith('/staff'))}
+        {item('/costs', 'Costs', DollarIcon, pathname.startsWith('/costs'))}
         {item('/settings', 'Settings', SettingsIcon, pathname.startsWith('/settings'))}
       </div>
 
