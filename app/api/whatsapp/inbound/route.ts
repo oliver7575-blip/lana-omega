@@ -1,3 +1,4 @@
+import { makeReviewTool } from '@/lib/reviews'
 import crypto from 'crypto'
 import { NextResponse, after } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
@@ -759,7 +760,8 @@ async function processInbound(msg: ExtractedMessage) {
       waitlistTool,
       registerReservationTool,
       contactButtonTool,
-      roomPhotosTool
+      roomPhotosTool,
+      makeReviewTool({ tenantId, conversationId: conversationId as string, guestName: guestName ?? null, source: 'whatsapp' })
     )
     replyText = result.text
     noReply = Boolean(result.noReply)

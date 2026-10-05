@@ -1,3 +1,4 @@
+import { makeReviewTool } from '@/lib/reviews'
 import { NextResponse, after } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { verifyMetaSignature } from '@/lib/verify-webhook'
@@ -276,7 +277,8 @@ async function handleMessage(tenantId: string, conn: InstagramConnection, accoun
       undefined,
       undefined,
       undefined,
-      roomPhotosTool
+      roomPhotosTool,
+      makeReviewTool({ tenantId, conversationId, guestName, source: 'instagram' })
     )
   } catch (err) {
     console.error('[instagram-inbound] AI reply failed', err)

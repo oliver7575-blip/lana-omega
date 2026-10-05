@@ -10,6 +10,7 @@ import {
   DollarIcon,
   BedIcon,
   HammerIcon,
+  StarIcon,
   ListIcon,
   MailIcon,
   MenuIcon,
@@ -138,10 +139,12 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
         {item('/inbox', 'Messages', MailIcon, isInbox)}
         <div className="ml-8 border-l border-line pl-2">
           {sub('/reservations', 'Reservations', isReservations, info?.unreadReservations)}
+          {sub('/email-inquiries', 'Email Inquiries', pathname.startsWith('/email-inquiries'))}
         </div>
         {item('/escalations', 'Escalations', AlertIcon, pathname.startsWith('/escalations'), info?.newEscalations)}
         {item('/automations', 'Templates', TemplateIcon, pathname.startsWith('/automations'))}
         {item('/integrations', 'Integrations', ShareIcon, pathname.startsWith('/integrations'))}
+        {item('/reviews', 'Reviews', StarIcon, pathname.startsWith('/reviews'))}
         {item('/maintenance', 'Maintenance', HammerIcon, pathname.startsWith('/maintenance'))}
       </div>
 

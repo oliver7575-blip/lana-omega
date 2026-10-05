@@ -61,6 +61,7 @@ export const INTEGRATIONS: IntegrationDef[] = [
       { key: 'smtp_host', label: 'SMTP Host', type: 'text' },
       { key: 'smtp_port', label: 'SMTP Port', type: 'text' },
       { key: 'smtp_user', label: 'SMTP Username', type: 'text' },
+      { key: 'imap_host', label: 'IMAP Host for reading incoming email (optional — defaults to the SMTP host with imap. instead of smtp.)', type: 'text' },
     ],
   },
   {

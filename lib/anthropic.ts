@@ -1,3 +1,4 @@
+import type { ReviewTool, ReviewToolInput } from './reviews'
 /** The model behind every guest-facing reply. */
 export const CONCIERGE_MODEL = 'claude-sonnet-5'
 
@@ -105,9 +106,29 @@ export async function generateReply(
   waitlistTool?: WaitlistTool,
   registerReservationTool?: RegisterReservationTool,
   contactButtonTool?: ContactButtonTool,
-  roomPhotosTool?: RoomPhotosTool
+  roomPhotosTool?: RoomPhotosTool,
+  reviewTool?: ReviewTool
 ): Promise<GenerateReplyResult> {
   const tools: Record<string, unknown>[] = []
+
+  if (reviewTool) {
+    tools.push({
+      name: 'record_review',
+      description:
+        "Save a guest's feedback about their stay to the hotel's Reviews list. Call it when the guest gives real feedback or a rating about Soirée — praise, a complaint about the room or service, suggestions, or how they rated their stay (e.g. 'loved the pool, staff were great', 'the AC was noisy all night', '10/10'). Do NOT call it for questions, small talk, plain thanks ('gracias'), or problems that need fixing right now (escalate those). Call it once per piece of feedback, in addition to replying normally. Never mention to the guest that you saved it.",
+      input_schema: {
+        type: 'object',
+        properties: {
+          reviewText: { type: 'string', description: "The guest's feedback in their own words (quote it)" },
+          sentiment: { type: 'string', enum: ['positive', 'neutral', 'negative'] },
+          rating: { type: 'number', description: 'Only if the guest gave a number rating' },
+          ratingScale: { type: 'number', description: 'The maximum of that rating, e.g. 5 or 10' },
+          summary: { type: 'string', description: 'One short sentence in English summarising the feedback' },
+        },
+        required: ['reviewText', 'sentiment'],
+      },
+    })
+  }
 
   if (reservationTool) {
     tools.push({
@@ -358,6 +379,8 @@ export async function generateReply(
           const { photoUrls: _omit, ...forModel } = photos
           void _omit
           result = forModel
+        } else if (block.name === 'record_review' && reviewTool) {
+          result = await reviewTool.recordReview(block.input as unknown as ReviewToolInput)
         } else if (block.name === 'send_contact_button' && contactButtonTool) {
           contactButtonResult = block.input as unknown as ContactButtonToolInput
           result = { success: true }

@@ -1,3 +1,4 @@
+import { makeReviewTool } from '@/lib/reviews'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { generateReply } from '@/lib/anthropic'
@@ -474,7 +475,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       waitlistTool,
       registerReservationTool,
       undefined,
-      roomPhotosTool
+      roomPhotosTool,
+      makeReviewTool({ tenantId, conversationId: conversationId as string, guestName: null, source: 'widget' })
     )
     // The widget shows plain text, so room photos go out as links.
     const photoLinks = (result.photoUrls ?? []).join('\n')
