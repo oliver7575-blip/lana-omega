@@ -17,7 +17,17 @@ export interface TaskInput {
   season_end_month?: number | string | null
   season_lead_days?: number | string | null
   season_within_frequency?: string | null
+  /** A follow-up task: waits on hold until another task's completion starts it. */
+  on_hold?: boolean
+  /** When this task is finished, start this follow-up task. */
+  next_task_id?: string | null
+  /** Wait before the follow-up starts: 0, 15, 30, 60, 120, 240 minutes, or -1 = next morning. */
+  next_delay_minutes?: number | string | null
+  /** Who does the follow-up: the person who finished this task, the follow-up's own assignee, or auto. */
+  next_assign?: string | null
 }
+
+export const FOLLOW_UP_DELAYS = [0, 15, 30, 60, 120, 240, -1] as const
 
 const num = (v: unknown) => (v === '' || v === null || v === undefined ? null : Number(v))
 
@@ -75,6 +85,23 @@ export function cleanTask(body: TaskInput, partial: boolean, tz: string): { valu
         ? body.season_within_frequency
         : null
     }
+  }
+  if (body.next_task_id !== undefined) {
+    const id = body.next_task_id || null
+    if (id && !/^[0-9a-f-]{36}$/i.test(id)) return { error: 'Unknown follow-up task' }
+    v.next_task_id = id
+  }
+  if (body.next_delay_minutes !== undefined) {
+    const d = Number(body.next_delay_minutes ?? 0)
+    if (!(FOLLOW_UP_DELAYS as readonly number[]).includes(d)) return { error: 'Unknown wait before the follow-up' }
+    v.next_delay_minutes = d
+  }
+  if (body.next_assign !== undefined) {
+    v.next_assign = ['finisher', 'own', 'auto'].includes(body.next_assign ?? '') ? body.next_assign : 'finisher'
+  }
+  // Follow-up tasks don't repeat on their own: each trigger makes one copy.
+  if (body.on_hold) {
+    v.recurrence_rule = 'none'
   }
   return { values: v }
 }

@@ -62,6 +62,9 @@ export interface TaskRow {
   last_reminded_at: string | null
   escalation_status: string
   created_by: string | null
+  next_task_id?: string | null
+  next_delay_minutes?: number | null
+  next_assign?: string | null
 }
 
 export interface StaffRow {
@@ -264,6 +267,9 @@ export async function spawnNext(ctx: EngineContext, task: TaskRow): Promise<stri
         season_within_frequency: task.season_within_frequency,
         parent_task_id: task.parent_task_id ?? task.id,
         created_by: task.created_by,
+        next_task_id: task.next_task_id ?? null,
+        next_delay_minutes: task.next_delay_minutes ?? 0,
+        next_assign: task.next_assign ?? 'finisher',
       })
       .select('id')
       .single()
@@ -624,6 +630,76 @@ async function alertMaintenanceContact(ctx: EngineContext, task: TaskRow, summar
   }
 }
 
+/**
+ * "When this task is finished, start …": makes a fresh copy of the follow-up
+ * task (which waits on hold as a template) and schedules its reminder after
+ * the chosen wait. The template stays on hold for next time.
+ */
+export async function startFollowUp(ctx: EngineContext, finished: TaskRow): Promise<string | null> {
+  if (!finished.next_task_id) return null
+  const { data: tpl } = await ctx.db
+    .from('maintenance_tasks')
+    .select('*')
+    .eq('id', finished.next_task_id)
+    .eq('tenant_id', ctx.tenantId)
+    .maybeSingle()
+  if (!tpl || tpl.status === 'cancelled') {
+    await logEvent(ctx, finished.id, 'followup_missing', 'Follow-up task not found (it may have been deleted)')
+    return null
+  }
+
+  const delay = Number(finished.next_delay_minutes ?? 0)
+  let due: Date
+  if (delay === -1) {
+    // Next morning at 07:00 hotel time.
+    const tomorrow = localDate(addLocalDays(new Date(), 1, ctx.tz), ctx.tz)
+    const [y, m, d] = tomorrow.split('-').map(Number)
+    due = fromZoned(y, m, d, 7, 0, ctx.tz)
+  } else {
+    due = minutesFromNow(Math.max(0, delay))
+  }
+
+  const mode = finished.next_assign ?? 'finisher'
+  const assignee = mode === 'finisher' ? finished.assigned_to : mode === 'own' ? (tpl.assigned_to as string | null) : null
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { data: created, error } = await ctx.db
+      .from('maintenance_tasks')
+      .insert({
+        tenant_id: ctx.tenantId,
+        task_code: newTaskCode(),
+        title: tpl.title,
+        description: tpl.description,
+        location: tpl.location,
+        priority: tpl.priority,
+        status: 'scheduled',
+        assigned_to: assignee,
+        lock_assignee: mode === 'own' ? Boolean(tpl.lock_assignee) : false,
+        due_at: due.toISOString(),
+        recurrence_rule: 'none',
+        parent_task_id: tpl.id,
+        created_by: tpl.created_by,
+        // Chains: the copy carries the template's own follow-up (A → B → C).
+        next_task_id: tpl.next_task_id ?? null,
+        next_delay_minutes: tpl.next_delay_minutes ?? 0,
+        next_assign: tpl.next_assign ?? 'finisher',
+      })
+      .select('id, task_code')
+      .single()
+    if (error?.code === '23505') continue
+    if (error || !created) {
+      await logEvent(ctx, finished.id, 'followup_failed', `Could not start the follow-up task: ${error?.message ?? 'unknown error'}`)
+      return null
+    }
+    await scheduleReminder(ctx, created.id as string, due)
+    const when = delay === -1 ? 'tomorrow at 07:00' : delay === 0 ? 'now' : `in ${delay} min`
+    await logEvent(ctx, created.id as string, 'created', `Follow-up of #${finished.task_code} ${finished.title} (starts ${when})`)
+    await logEvent(ctx, finished.id, 'followup_started', `Started follow-up #${created.task_code} ${tpl.title} (${when})`)
+    return created.id as string
+  }
+  return null
+}
+
 export async function completeTask(ctx: EngineContext, task: TaskRow, how: { source: 'whatsapp' | 'dashboard'; text?: string }) {
   await ctx.db
     .from('maintenance_tasks')
@@ -642,6 +718,7 @@ export async function completeTask(ctx: EngineContext, task: TaskRow, how: { sou
     how.source === 'whatsapp' ? (how.text ?? 'Completed via WhatsApp') : 'Status changed to done'
   )
   await spawnNext(ctx, task)
+  await startFollowUp(ctx, task)
 
   // Capacity freed up: bring this person's next overdue reminder forward.
   if (task.assigned_to) {

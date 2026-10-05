@@ -44,6 +44,22 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const { values, error } = cleanTask(body, true, ctx.tz)
   if (error) return NextResponse.json({ error }, { status: 400 })
+
+  // Follow-up switch: put the task on hold (no reminders) or bring it back.
+  if (body.on_hold !== undefined) {
+    const wasOnHold = existing.status === 'on_hold'
+    if (body.on_hold && !wasOnHold && ['scheduled', 'waiting', 'in_progress'].includes(existing.status)) {
+      values!.status = 'on_hold'
+      await c.supabase.from('maintenance_reminders').update({ status: 'cancelled' }).eq('task_id', id).eq('status', 'pending')
+      await logEvent(ctx, id, 'status_changed', 'Turned into a follow-up task — on hold until another task starts it')
+    } else if (!body.on_hold && wasOnHold) {
+      values!.status = 'scheduled'
+      const dueIso = (values!.due_at as string | undefined) ?? (existing.due_at as string | null)
+      const due = dueIso ? new Date(dueIso) : new Date()
+      await scheduleReminder(ctx, id, due.getTime() > Date.now() ? due : new Date())
+      await logEvent(ctx, id, 'status_changed', 'No longer a follow-up — scheduled as a normal task')
+    }
+  }
   if (Object.keys(values!).length === 0) return NextResponse.json({ ok: true })
   const { error: dbError } = await c.supabase
     .from('maintenance_tasks')
@@ -52,7 +68,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (dbError) return NextResponse.json({ error: dbError.message }, { status: 500 })
 
   // A new due time replaces the reminder schedule.
-  if (values!.due_at && values!.due_at !== existing.due_at && ['scheduled', 'waiting', 'in_progress'].includes(existing.status)) {
+  if (values!.due_at && values!.due_at !== existing.due_at && ['scheduled', 'waiting', 'in_progress'].includes(existing.status) && values!.status !== 'on_hold' && !(existing.status === 'on_hold' && values!.status === 'scheduled')) {
     await c.supabase.from('maintenance_reminders').update({ status: 'cancelled' }).eq('task_id', id).eq('status', 'pending')
     const due = new Date(values!.due_at as string)
     await scheduleReminder(ctx, id, due.getTime() > Date.now() ? due : new Date())

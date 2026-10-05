@@ -14,7 +14,7 @@ export async function GET() {
   if ('error' in c) return c.error
   const since = new Date(Date.now() - 60 * 86400000).toISOString()
   const [{ data: active }, { data: recent }, { count: completedAll }] = await Promise.all([
-    c.supabase.from('maintenance_tasks').select('*').in('status', ['scheduled', 'waiting', 'in_progress']).order('due_at').limit(500),
+    c.supabase.from('maintenance_tasks').select('*').in('status', ['scheduled', 'waiting', 'in_progress', 'on_hold']).order('due_at').limit(500),
     c.supabase
       .from('maintenance_tasks')
       .select('*')
@@ -29,7 +29,7 @@ export async function GET() {
     tasks: all,
     timezone: await tenantTz(c),
     stats: {
-      open: (active ?? []).length,
+      open: (active ?? []).filter((t) => t.status !== 'on_hold').length,
       inProgress: (active ?? []).filter((t) => t.status === 'in_progress').length,
       needAttention: (active ?? []).filter((t) => t.escalation_status === 'required').length,
       completed: completedAll ?? 0,
@@ -41,21 +41,27 @@ export async function POST(request: Request) {
   const c = await maintenanceCaller()
   if ('error' in c) return c.error
   const tz = await tenantTz(c)
-  const { values, error } = cleanTask((await request.json()) as TaskInput, false, tz)
+  const body = (await request.json()) as TaskInput
+  const onHold = Boolean(body.on_hold)
+  const { values, error } = cleanTask(body, false, tz)
   if (error) return NextResponse.json({ error }, { status: 400 })
 
   const ctx = await loadEngineContext(c.tenantId)
   for (let attempt = 0; attempt < 5; attempt++) {
     const { data, error: dbError } = await c.supabase
       .from('maintenance_tasks')
-      .insert({ tenant_id: c.tenantId, task_code: newTaskCode(), status: 'scheduled', created_by: c.staffUserId, ...values })
+      .insert({ tenant_id: c.tenantId, task_code: newTaskCode(), status: onHold ? 'on_hold' : 'scheduled', created_by: c.staffUserId, ...values })
       .select()
       .single()
     if (dbError?.code === '23505') continue
     if (dbError || !data) return NextResponse.json({ error: dbError?.message ?? 'Could not save' }, { status: 500 })
-    const due = new Date(data.due_at as string)
-    await scheduleReminder(ctx, data.id as string, due.getTime() > Date.now() ? due : new Date())
-    await logEvent(ctx, data.id as string, 'created', 'Task created from the dashboard')
+    if (onHold) {
+      await logEvent(ctx, data.id as string, 'created', 'Follow-up task created — on hold until another task starts it')
+    } else {
+      const due = new Date(data.due_at as string)
+      await scheduleReminder(ctx, data.id as string, due.getTime() > Date.now() ? due : new Date())
+      await logEvent(ctx, data.id as string, 'created', 'Task created from the dashboard')
+    }
     return NextResponse.json({ task: data })
   }
   return NextResponse.json({ error: 'Could not create a task code, try again' }, { status: 500 })

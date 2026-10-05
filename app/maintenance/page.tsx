@@ -46,7 +46,7 @@ export default function MaintenancePage() {
 
   const [staffFilter, setStaffFilter] = useState('')
   const [dateFilter, setDateFilter] = useState<string>(() => localParts(new Date().toISOString(), 'America/Mexico_City').date)
-  const [mode, setMode] = useState<'active' | 'completed'>('active')
+  const [mode, setMode] = useState<'active' | 'completed' | 'followups'>('active')
   const [category, setCategory] = useState('all')
   const [statusTab, setStatusTab] = useState('all')
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -84,9 +84,16 @@ export default function MaintenancePage() {
 
   const staffName = (id: string | null) => (id ? staff.find((s) => s.id === id)?.name ?? '—' : 'Unassigned')
 
+  // "→ then #CODE title" when finishing this task starts a follow-up.
+  const followUpLabel = (t: Task) => {
+    if (!t.next_task_id) return null
+    const f = tasks.find((x) => x.id === t.next_task_id)
+    return f ? `→ then #${f.task_code} ${f.title}` : '→ then a follow-up'
+  }
+
   const visible = useMemo(() => {
     return tasks
-      .filter((t) => (mode === 'active' ? ['scheduled', 'waiting', 'in_progress'].includes(t.status) : ['done', 'cancelled'].includes(t.status)))
+      .filter((t) => (mode === 'followups' ? t.status === 'on_hold' : mode === 'active' ? ['scheduled', 'waiting', 'in_progress'].includes(t.status) : ['done', 'cancelled'].includes(t.status)))
       .filter((t) => !staffFilter || t.assigned_to === staffFilter)
       .filter((t) => {
         if (!dateFilter) return true
@@ -191,9 +198,9 @@ export default function MaintenancePage() {
             <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="rounded-md border border-line bg-paper px-2.5 py-1.5 text-sm text-navy outline-none" />
             <button onClick={() => setDateFilter('')} title="Show all dates" className="rounded-md border border-line bg-paper px-2.5 py-1.5 text-sm text-navy/60 hover:text-navy">×</button>
             <div className="flex rounded-lg bg-paper p-1">
-              {(['active', 'completed'] as const).map((m) => (
+              {(['active', 'completed', 'followups'] as const).map((m) => (
                 <button key={m} onClick={() => { setMode(m); setSelected(new Set()) }} className={`rounded-md px-3 py-1 text-sm capitalize ${mode === m ? 'bg-surface text-white' : 'text-navy/50 hover:text-navy'}`}>
-                  {m}
+                  {m === 'followups' ? `Follow-ups (${tasks.filter((t) => t.status === 'on_hold').length})` : m}
                 </button>
               ))}
             </div>
@@ -251,7 +258,7 @@ export default function MaintenancePage() {
                     {t.priority === 'urgent' && <span className="ml-1.5 text-xs text-red-300">🚨</span>}
                   </p>
                   <p className="mt-0.5 break-words text-xs text-navy/50">
-                    {[t.location ? `⌖ ${t.location}` : null, recurrenceLabel(t), `${t.reminder_count} reminder${t.reminder_count === 1 ? '' : 's'}`].filter(Boolean).join(' · ')}
+                    {[t.location ? `⌖ ${t.location}` : null, t.status === 'on_hold' ? 'Follow-up' : recurrenceLabel(t), t.status === 'on_hold' ? null : `${t.reminder_count} reminder${t.reminder_count === 1 ? '' : 's'}`, followUpLabel(t)].filter(Boolean).join(' · ')}
                     {t.escalation_status === 'required' && <span className="text-clay"> · Needs attention</span>}
                   </p>
                   <p className="mt-1 text-xs text-navy/70">
@@ -260,6 +267,9 @@ export default function MaintenancePage() {
                 </button>
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 pl-7 text-sm">
+                {t.status === 'on_hold' ? (
+                  <span className="w-fit rounded-md border border-sky-400/30 bg-sky-500/10 px-2 py-1 text-xs text-sky-200">On hold · follow-up</span>
+                ) : (
                 <select
                   value={t.status}
                   onChange={(e) => setStatus(t, e.target.value)}
@@ -273,6 +283,7 @@ export default function MaintenancePage() {
                 >
                   {Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                 </select>
+                )}
                 <button onClick={() => setEditTask(t)} className="text-navy/75">Edit</button>
                 {mode === 'active' && (
                   <>
@@ -327,7 +338,7 @@ export default function MaintenancePage() {
                     {t.priority === 'urgent' && <span className="ml-2 text-xs text-red-300">🚨 Urgent</span>}
                   </p>
                   <p className="truncate text-xs text-navy/50">
-                    {[t.location ? `⌖ ${t.location}` : null, t.priority, recurrenceLabel(t), `${t.reminder_count} reminder${t.reminder_count === 1 ? '' : 's'}`].filter(Boolean).join(' · ')}
+                    {[t.location ? `⌖ ${t.location}` : null, t.priority, t.status === 'on_hold' ? 'Follow-up' : recurrenceLabel(t), t.status === 'on_hold' ? null : `${t.reminder_count} reminder${t.reminder_count === 1 ? '' : 's'}`, followUpLabel(t)].filter(Boolean).join(' · ')}
                     {t.escalation_status === 'required' && <span className="ml-2 text-clay">· Needs attention</span>}
                   </p>
                 </button>
@@ -338,6 +349,9 @@ export default function MaintenancePage() {
                   <span className="truncate text-sm text-navy/85">{t.assigned_to ? staffName(t.assigned_to) : 'Auto'}</span>
                 </div>
                 <span className="text-sm text-navy/70">{fmtDateTime(mode === 'completed' ? t.completed_at ?? t.updated_at : t.due_at, tz)}</span>
+                {t.status === 'on_hold' ? (
+                  <span className="w-fit rounded-md border border-sky-400/30 bg-sky-500/10 px-2 py-1 text-xs text-sky-200">On hold · follow-up</span>
+                ) : (
                 <select
                   value={t.status}
                   onChange={(e) => setStatus(t, e.target.value)}
@@ -351,6 +365,7 @@ export default function MaintenancePage() {
                 >
                   {Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                 </select>
+                )}
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
                   <button onClick={() => setEditTask(t)} className="text-navy/75 hover:text-navy">Edit</button>
                   {mode === 'active' && (
@@ -397,6 +412,7 @@ export default function MaintenancePage() {
           task={editTask === 'new' ? null : editTask}
           staff={staff}
           timezone={tz}
+          followUps={tasks.filter((t) => t.status === 'on_hold')}
           onClose={() => setEditTask(null)}
           onSaved={() => { setEditTask(null); load() }}
         />

@@ -5,7 +5,7 @@ export interface Task {
   description: string | null
   location: string | null
   priority: 'routine' | 'urgent'
-  status: 'scheduled' | 'waiting' | 'in_progress' | 'done' | 'cancelled'
+  status: 'scheduled' | 'waiting' | 'in_progress' | 'done' | 'cancelled' | 'on_hold'
   assigned_to: string | null
   lock_assignee: boolean
   due_at: string | null
@@ -21,6 +21,9 @@ export interface Task {
   escalation_status: string
   completed_at: string | null
   updated_at: string
+  next_task_id?: string | null
+  next_delay_minutes?: number | null
+  next_assign?: string | null
 }
 
 export interface Staff {

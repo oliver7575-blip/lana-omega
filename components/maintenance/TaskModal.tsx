@@ -6,9 +6,11 @@ import { api, inputCls, labelCls, localParts, type Staff, type Task } from './sh
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
-export default function TaskModal({ task, staff, timezone, onClose, onSaved }: {
+export default function TaskModal({ task, staff, timezone, followUps = [], onClose, onSaved }: {
   task: Task | null
   staff: Staff[]
+  /** Follow-up tasks (on hold) this task can start when it's finished. */
+  followUps?: Task[]
   timezone: string
   onClose: () => void
   onSaved: () => void
@@ -31,6 +33,10 @@ export default function TaskModal({ task, staff, timezone, onClose, onSaved }: {
     season_end_month: String(task?.season_end_month ?? 3),
     season_lead_days: String(task?.season_lead_days ?? 0),
     season_within_frequency: task?.season_within_frequency ?? 'monthly',
+    on_hold: task?.status === 'on_hold',
+    next_task_id: task?.next_task_id ?? '',
+    next_delay_minutes: String(task?.next_delay_minutes ?? 0),
+    next_assign: task?.next_assign ?? 'finisher',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -64,6 +70,13 @@ export default function TaskModal({ task, staff, timezone, onClose, onSaved }: {
       }
     >
       <div className="space-y-4">
+        <label className="flex items-start gap-2.5 rounded-xl border border-line bg-paper/40 px-3 py-2.5 text-sm text-navy/85">
+          <input type="checkbox" checked={f.on_hold} onChange={(e) => set('on_hold', e.target.checked)} className="mt-0.5 h-4 w-4 accent-clay" />
+          <span>
+            <span className="font-semibold text-white">Follow-up task</span>
+            <span className="block text-xs text-navy/55">Only starts when another task is finished. Set it up once; it waits on hold and a fresh copy is sent each time it's triggered.</span>
+          </span>
+        </label>
         <div>
           <label className={labelCls}>Task *</label>
           <input className={inputCls} value={f.title} onChange={(e) => set('title', e.target.value)} placeholder="Apagar filtro de albercas" />
@@ -84,7 +97,7 @@ export default function TaskModal({ task, staff, timezone, onClose, onSaved }: {
               <option value="urgent">🚨 Urgent</option>
             </select>
           </div>
-          <div>
+          <div className={f.on_hold ? 'hidden' : ''}>
             <label className={labelCls}>Due (hotel time) — reminder is sent at this time</label>
             <input type="datetime-local" className={inputCls} value={f.due_local} onChange={(e) => set('due_local', e.target.value)} />
           </div>
@@ -97,7 +110,7 @@ export default function TaskModal({ task, staff, timezone, onClose, onSaved }: {
               ))}
             </select>
           </div>
-          <div>
+          <div className={f.on_hold ? 'hidden' : ''}>
             <label className={labelCls}>Repeat</label>
             <select className={inputCls} value={f.recurrence_rule} onChange={(e) => set('recurrence_rule', e.target.value)}>
               <option value="none">One-off</option>
@@ -110,7 +123,7 @@ export default function TaskModal({ task, staff, timezone, onClose, onSaved }: {
           </div>
         </div>
 
-        {f.recurrence_rule === 'interval' && (
+        {!f.on_hold && f.recurrence_rule === 'interval' && (
           <div className="grid grid-cols-3 gap-3 rounded-xl border border-line bg-paper/40 p-3">
             <div>
               <label className={labelCls}>Every (hours)</label>
@@ -127,7 +140,7 @@ export default function TaskModal({ task, staff, timezone, onClose, onSaved }: {
           </div>
         )}
 
-        {f.recurrence_rule === 'seasonal' && (
+        {!f.on_hold && f.recurrence_rule === 'seasonal' && (
           <div className="grid grid-cols-2 gap-3 rounded-xl border border-line bg-paper/40 p-3">
             <div>
               <label className={labelCls}>Season starts</label>
@@ -162,6 +175,43 @@ export default function TaskModal({ task, staff, timezone, onClose, onSaved }: {
             Always give this task to the same person
           </label>
         )}
+        <div className="rounded-xl border border-line bg-paper/40 p-3">
+          <label className={labelCls}>When this task is finished, start…</label>
+          <select className={inputCls} value={f.next_task_id} onChange={(e) => set('next_task_id', e.target.value)}>
+            <option value="">Nothing</option>
+            {followUps.filter((t) => t.id !== task?.id).map((t) => (
+              <option key={t.id} value={t.id}>#{t.task_code} {t.title}</option>
+            ))}
+          </select>
+          {followUps.filter((t) => t.id !== task?.id).length === 0 && (
+            <p className="mt-1.5 text-xs text-navy/55">No follow-up tasks yet. Create one first with "Follow-up task" ticked, then choose it here.</p>
+          )}
+          {f.next_task_id && (
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>Start it</label>
+                <select className={inputCls} value={f.next_delay_minutes} onChange={(e) => set('next_delay_minutes', e.target.value)}>
+                  <option value="0">Right away</option>
+                  <option value="15">After 15 minutes</option>
+                  <option value="30">After 30 minutes</option>
+                  <option value="60">After 1 hour</option>
+                  <option value="120">After 2 hours</option>
+                  <option value="240">After 4 hours</option>
+                  <option value="-1">Next morning (07:00)</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Who does it</label>
+                <select className={inputCls} value={f.next_assign} onChange={(e) => set('next_assign', e.target.value)}>
+                  <option value="finisher">Whoever finished this task</option>
+                  <option value="own">The follow-up's own assignee</option>
+                  <option value="auto">Auto (lowest workload)</option>
+                </select>
+              </div>
+            </div>
+          )}
+        </div>
+
         {error && <p className="text-sm text-red-300">{error}</p>}
       </div>
     </Modal>
