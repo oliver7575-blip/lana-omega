@@ -62,6 +62,66 @@ export default function ChannelSwitches() {
           )
         })}
       </div>
+      <WhatsAppDelivery />
     </section>
+  )
+}
+
+/** "Is Meta delivering this number's WhatsApp messages to Omega?" with start/stop. */
+function WhatsAppDelivery() {
+  const [info, setInfo] = useState<{ subscribed: boolean | null; apps: { id: string; name: string }[]; canEdit: boolean } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  async function load() {
+    const res = await fetch('/api/whatsapp/subscription', { cache: 'no-store' })
+    const j = await res.json().catch(() => ({}))
+    if (res.ok) {
+      setInfo(j)
+      setError(null)
+    } else setError(j.error ?? 'Could not check WhatsApp delivery')
+  }
+  useEffect(() => {
+    load()
+  }, [])
+
+  async function change(start: boolean) {
+    const msg = start
+      ? 'Start receiving this number\'s WhatsApp messages in Omega?\n\nOnly do this once Beta\'s Make scenarios are switched off, or guests will get two replies.'
+      : 'Stop receiving this number\'s WhatsApp messages in Omega?\n\nUse this to switch back to Beta (turn its Make scenarios on again).'
+    if (!confirm(msg)) return
+    setBusy(true)
+    const res = await fetch('/api/whatsapp/subscription', { method: start ? 'POST' : 'DELETE' })
+    const j = await res.json().catch(() => ({}))
+    if (!res.ok) setError(j.error ?? 'Meta refused the change')
+    await load()
+    setBusy(false)
+  }
+
+  return (
+    <div className="mt-2 rounded-xl border border-line bg-surface px-4 py-2.5">
+      <p className="text-[13px] font-semibold text-white">WhatsApp delivery to Omega</p>
+      {error && <p className="text-[11.5px] text-red-300">{error}</p>}
+      {!info && !error && <p className="text-[11.5px] text-navy/55">Checking with Meta…</p>}
+      {info && (
+        <>
+          <p className="text-[11.5px] text-navy/55">
+            {info.subscribed
+              ? '✓ Meta is sending this number\'s messages to Omega.'
+              : 'Meta is not sending this number\'s messages to Omega yet.'}
+            {info.apps.length > 0 && <> Apps receiving them: {info.apps.map((a) => a.name || a.id).join(', ')}.</>}
+          </p>
+          {info.canEdit && (
+            <div className="mt-1.5">
+              {info.subscribed ? (
+                <button type="button" disabled={busy} onClick={() => change(false)}>Stop receiving (switch back to Beta)</button>
+              ) : (
+                <button type="button" disabled={busy} onClick={() => change(true)}>Start receiving messages on this number</button>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </div>
   )
 }
