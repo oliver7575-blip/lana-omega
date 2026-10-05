@@ -32,6 +32,7 @@ export const INTEGRATIONS: IntegrationDef[] = [
     credentialFields: [
       { key: 'access_token', label: 'Access Token', type: 'password' },
       { key: 'app_secret', label: 'App secret of the Meta app that sends this number\'s webhooks', type: 'password' },
+      { key: 'relay_secret', label: 'Relay secret (only if messages are forwarded by Make — coexistence numbers)', type: 'password' },
     ],
     configFields: [
       { key: 'phone_number_id', label: 'Phone Number ID', type: 'text' },

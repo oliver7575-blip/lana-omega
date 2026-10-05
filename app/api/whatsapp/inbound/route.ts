@@ -1,3 +1,4 @@
+import crypto from 'crypto'
 import { NextResponse, after } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { generateReply, NO_REPLY_TOKEN } from '@/lib/anthropic'
@@ -212,6 +213,29 @@ function logFailedDeliveries(body: Record<string, unknown>) {
   }
 }
 
+/** True when the request carries the relay secret saved on this number's WhatsApp card. */
+async function relaySecretMatches(body: Record<string, unknown>, given: string): Promise<boolean> {
+  const entry = (body.entry as { changes?: { value?: { metadata?: { phone_number_id?: string } } }[] }[] | undefined) ?? []
+  const phoneNumberId = entry.flatMap((e) => e.changes ?? []).map((c) => c.value?.metadata?.phone_number_id).find(Boolean)
+  if (!phoneNumberId || !given) return false
+  const { data } = await createServiceClient()
+    .from('tenant_integrations')
+    .select('credentials')
+    .eq('integration_type', 'whatsapp')
+    .eq('config->>phone_number_id', phoneNumberId)
+    .maybeSingle()
+  if (!data?.credentials) return false
+  try {
+    const secret = decryptCredentials<{ relay_secret?: string }>(data.credentials as EncryptedPayload).relay_secret
+    if (!secret || secret.length < 24) return false
+    const a = Buffer.from(secret)
+    const b = Buffer.from(given)
+    return a.length === b.length && crypto.timingSafeEqual(a, b)
+  } catch {
+    return false
+  }
+}
+
 /** The app secret stored on the WhatsApp card for the number this webhook is about. */
 async function appSecretFor(body: Record<string, unknown>): Promise<string | null> {
   const entry = (body.entry as { changes?: { value?: { metadata?: { phone_number_id?: string } } }[] }[] | undefined) ?? []
@@ -245,12 +269,20 @@ export async function POST(request: Request) {
   // Each hotel's WhatsApp card can hold the app secret of the Meta app that
   // sends its webhooks (Integrations → WhatsApp → App secret); otherwise the
   // platform default (META_APP_SECRET) is used.
-  const appSecret = (await appSecretFor(parsedBody)) ?? process.env.META_APP_SECRET
-  if (!appSecret) {
-    return NextResponse.json({ error: 'No app secret configured' }, { status: 500 })
-  }
-  if (!verifyMetaSignature(rawBody, signature, appSecret)) {
-    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+  // Messages relayed by Make (coexistence numbers deliver only to the partner
+  // app that connected them) carry the hotel's relay secret instead of Meta's
+  // signature: Authorization: Bearer <relay secret>.
+  const relayHeader = request.headers.get('authorization')
+  const relayed = relayHeader?.startsWith('Bearer ') ? await relaySecretMatches(parsedBody, relayHeader.slice(7)) : false
+
+  if (!relayed) {
+    const appSecret = (await appSecretFor(parsedBody)) ?? process.env.META_APP_SECRET
+    if (!appSecret) {
+      return NextResponse.json({ error: 'No app secret configured' }, { status: 500 })
+    }
+    if (!verifyMetaSignature(rawBody, signature, appSecret)) {
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+    }
   }
 
   logFailedDeliveries(parsedBody)
