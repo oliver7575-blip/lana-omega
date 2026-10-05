@@ -12,6 +12,7 @@ import {
   TakeOverButton,
 } from '@/components/ConversationClient'
 import LiveRefresh from '@/components/LiveRefresh'
+import WhatsAppText from '@/components/WhatsAppText'
 
 export const dynamic = 'force-dynamic'
 
@@ -140,7 +141,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
                       m.sender_type === 'guest' ? 'bg-surface' : m.sender_type === 'staff' ? 'bg-clay/15' : 'bg-[#1f2848]'
                     }`}
                   >
-                    {m.content}
+                    <WhatsAppText text={(m.content as string) ?? ''} />
                   </div>
                   <p className="mt-1 text-[11px] text-navy/45">
                     {SENDER[m.sender_type as string] ?? m.sender_type} ·{' '}
