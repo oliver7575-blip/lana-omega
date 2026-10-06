@@ -12,6 +12,7 @@ interface Email {
   category: string
   summary: string | null
   status: 'new' | 'done'
+  read: boolean
 }
 
 const LABEL: Record<string, string> = {
@@ -67,6 +68,12 @@ export default function EmailInquiriesPage() {
     if (change.category === 'review') load()
   }
 
+  async function markRead(ids: string[], read: boolean) {
+    if (!ids.length) return
+    setEmails((list) => list.map((e) => (ids.includes(e.id) ? { ...e, read } : e)))
+    await fetch('/api/item-reads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'email', ids, read }) })
+  }
+
   const inView = useMemo(() => emails.filter((e) => e.status === view && (e.category !== 'automated' || showAutomated)), [emails, view, showAutomated])
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: inView.length }
@@ -74,6 +81,7 @@ export default function EmailInquiriesPage() {
     return c
   }, [inView])
   const visible = inView.filter((e) => filter === 'all' || e.category === filter)
+  const unreadVisible = visible.filter((e) => !e.read)
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-8">
@@ -107,6 +115,11 @@ export default function EmailInquiriesPage() {
             <input type="checkbox" checked={showAutomated} onChange={(e) => setShowAutomated(e.target.checked)} className="accent-clay" />
             Show automated
           </label>
+          {unreadVisible.length > 0 && (
+            <button onClick={() => markRead(unreadVisible.map((e) => e.id), true)} className="rounded-lg border border-line px-3 py-1 text-xs text-navy hover:bg-line/40">
+              Mark all as read ({unreadVisible.length})
+            </button>
+          )}
           <div className="flex rounded-lg border border-line p-0.5">
             {(['new', 'done'] as const).map((v) => (
               <button key={v} onClick={() => setView(v)} className={`rounded-md px-3 py-1 text-xs ${view === v ? 'bg-surface text-white' : 'text-navy/50 hover:text-navy'}`}>
@@ -126,11 +139,18 @@ export default function EmailInquiriesPage() {
           const replySubject = e.subject?.toLowerCase().startsWith('re:') ? e.subject : `Re: ${e.subject ?? ''}`
           return (
             <div key={e.id} className="bg-surface/30">
-              <button onClick={() => setOpen(expanded ? null : e.id)} className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-surface/60">
+              <button
+                onClick={() => {
+                  setOpen(expanded ? null : e.id)
+                  if (!expanded && !e.read) markRead([e.id], true)
+                }}
+                className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-surface/60"
+              >
+                <span title={e.read ? 'Read' : 'Unread'} className={`mt-2 h-2 w-2 shrink-0 rounded-full ${e.read ? 'bg-emerald-400/60' : 'bg-[#ef4d3f]'}`} />
                 <span className={`mt-0.5 shrink-0 rounded-md px-2 py-0.5 text-[11px] ${COLOR[e.category] ?? COLOR.other}`}>{LABEL[e.category] ?? e.category}</span>
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-baseline justify-between gap-x-3">
-                    <span className="truncate text-sm font-semibold text-white">{e.from_name || e.from_email || 'Unknown sender'}</span>
+                    <span className={`truncate text-sm text-white ${e.read ? 'font-medium' : 'font-bold'}`}>{e.from_name || e.from_email || 'Unknown sender'}</span>
                     <span className="shrink-0 text-[11px] text-navy/45">{new Date(e.received_at).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
                   </span>
                   <span className="block truncate text-sm text-navy/85">{e.subject}</span>
@@ -150,6 +170,9 @@ export default function EmailInquiriesPage() {
                         Reply
                       </a>
                     )}
+                    <button onClick={() => markRead([e.id], !e.read)} className="rounded-lg border border-line px-3 py-1.5 text-xs text-navy hover:bg-line/40">
+                      {e.read ? 'Mark as unread' : 'Mark as read'}
+                    </button>
                     <button onClick={() => patch(e.id, { status: e.status === 'new' ? 'done' : 'new' })} className="rounded-lg border border-line px-3 py-1.5 text-xs text-navy hover:bg-line/40">
                       {e.status === 'new' ? 'Mark handled' : 'Move back to "To handle"'}
                     </button>

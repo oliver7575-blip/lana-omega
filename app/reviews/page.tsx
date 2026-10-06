@@ -16,6 +16,7 @@ interface Review {
   conversation_id: string | null
   received_at: string
   status: 'new' | 'done'
+  read: boolean
   inbound_emails: { from_email: string | null; from_name: string | null; subject: string | null; body_text: string | null } | null
 }
 
@@ -54,6 +55,12 @@ export default function ReviewsPage() {
     await fetch('/api/reviews', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, ...change }) })
   }
 
+  async function markRead(ids: string[], read: boolean) {
+    if (!ids.length) return
+    setReviews((list) => list.map((r) => (ids.includes(r.id) ? { ...r, read } : r)))
+    await fetch('/api/item-reads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'review', ids, read }) })
+  }
+
   const stats = useMemo(() => {
     const rated = reviews.map(outOfFive).filter((x): x is number => x != null)
     return {
@@ -64,6 +71,7 @@ export default function ReviewsPage() {
     }
   }, [reviews])
   const visible = reviews.filter((r) => r.status === view && (mood === 'all' || r.sentiment === mood))
+  const unreadVisible = visible.filter((r) => !r.read)
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-8">
@@ -92,12 +100,19 @@ export default function ReviewsPage() {
             </button>
           ))}
         </div>
+        <div className="flex items-center gap-3">
+        {unreadVisible.length > 0 && (
+          <button onClick={() => markRead(unreadVisible.map((r) => r.id), true)} className="rounded-lg border border-line px-3 py-1 text-xs text-navy hover:bg-line/40">
+            Mark all as read ({unreadVisible.length})
+          </button>
+        )}
         <div className="flex rounded-lg border border-line p-0.5">
           {(['new', 'done'] as const).map((v) => (
             <button key={v} onClick={() => setView(v)} className={`rounded-md px-3 py-1 text-xs ${view === v ? 'bg-surface text-white' : 'text-navy/50 hover:text-navy'}`}>
               {v === 'new' ? 'New' : 'Handled'}
             </button>
           ))}
+        </div>
         </div>
       </div>
 
@@ -108,10 +123,17 @@ export default function ReviewsPage() {
         {visible.map((r) => {
           const stars = outOfFive(r)
           return (
-            <div key={r.id} className={`rounded-xl border p-4 ${SENTIMENT[r.sentiment ?? 'neutral']}`}>
+            <div
+              key={r.id}
+              onClick={() => { if (!r.read) markRead([r.id], true) }}
+              className={`rounded-xl border p-4 ${SENTIMENT[r.sentiment ?? 'neutral']}`}
+            >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="font-semibold text-white">{r.guest_name || 'Guest'}</p>
+                  <p className="flex items-center gap-2 font-semibold text-white">
+                    <span title={r.read ? 'Read' : 'Unread'} className={`h-2 w-2 shrink-0 rounded-full ${r.read ? 'bg-emerald-400/60' : 'bg-[#ef4d3f]'}`} />
+                    {r.guest_name || 'Guest'}
+                  </p>
                   <p className="text-xs text-navy/55">
                     {[PLATFORM[r.platform ?? ''] ?? r.platform, `via ${SOURCE[r.source]}`, new Date(r.received_at).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })]
                       .filter(Boolean)
@@ -139,6 +161,9 @@ export default function ReviewsPage() {
                     {openEmail === r.id ? 'Hide email' : 'Show email'}
                   </button>
                 )}
+                <button onClick={(ev) => { ev.stopPropagation(); markRead([r.id], !r.read) }} className="text-navy/70 hover:text-white">
+                  {r.read ? 'Mark as unread' : 'Mark as read'}
+                </button>
                 <button onClick={() => patch(r.id, { status: r.status === 'new' ? 'done' : 'new' })} className="text-navy/70 hover:text-white">
                   {r.status === 'new' ? 'Mark handled' : 'Mark as new'}
                 </button>

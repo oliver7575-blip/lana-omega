@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { readIds } from '@/lib/item-reads'
 
 const CATEGORIES = ['inquiry', 'reservation', 'billing', 'job', 'sales', 'other', 'automated', 'review']
 
@@ -16,12 +17,15 @@ export async function GET(request: Request) {
     .order('received_at', { ascending: false })
     .limit(300)
   if (!showAutomated) q = q.neq('category', 'automated')
-  const [{ data, error }, { data: state }] = await Promise.all([
+  const { data: staff } = await supabase.from('staff_users').select('id').eq('auth_uid', user.id).single()
+  const [{ data, error }, { data: state }, reads] = await Promise.all([
     q,
     supabase.from('email_poll_state').select('last_polled_at, last_error').maybeSingle(),
+    staff ? readIds(supabase, staff.id as string, 'email') : Promise.resolve(new Set<string>()),
   ])
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ emails: data ?? [], lastChecked: state?.last_polled_at ?? null, lastError: state?.last_error ?? null })
+  const emails = (data ?? []).map((e) => ({ ...e, read: reads.has(e.id as string) }))
+  return NextResponse.json({ emails, lastChecked: state?.last_polled_at ?? null, lastError: state?.last_error ?? null })
 }
 
 /** Mark handled / new, or move to another category (staff correcting the sorting). */

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { unreadConversationIds } from '@/lib/inbox'
+import { unreadCounts } from '@/lib/item-reads'
 
 /** Sidebar data: who is signed in, hotel name and the unread badges. */
 export async function GET() {
@@ -17,16 +18,19 @@ export async function GET() {
     .single()
   if (!staff) return NextResponse.json({ error: 'No tenant' }, { status: 404 })
 
-  const [{ data: tenant }, { count: newEscalations }, unreadReservations] = await Promise.all([
+  const [{ data: tenant }, { count: newEscalations }, unreadReservations, unread] = await Promise.all([
     supabase.from('tenants').select('name').eq('id', staff.tenant_id).single(),
     supabase.from('escalations').select('id', { count: 'exact', head: true }).eq('status', 'new'),
     unreadConversationIds(supabase, staff.id as string, { reservationsOnly: true }).then((ids) => ids.length),
+    unreadCounts(supabase, staff.id as string),
   ])
 
   return NextResponse.json({
     email: user.email ?? '',
     tenantName: tenant?.name ?? '',
     unreadReservations,
+    unreadEmails: unread.emails,
+    unreadReviews: unread.reviews,
     newEscalations: newEscalations ?? 0,
   })
 }

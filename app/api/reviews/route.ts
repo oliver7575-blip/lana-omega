@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { readIds } from '@/lib/item-reads'
 
 /** Reviews from email (OTA notifications, guest emails) and from chats. */
 export async function GET() {
@@ -12,7 +13,9 @@ export async function GET() {
     .order('received_at', { ascending: false })
     .limit(300)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ reviews: data ?? [] })
+  const { data: staff } = await supabase.from('staff_users').select('id').eq('auth_uid', user.id).single()
+  const reads = staff ? await readIds(supabase, staff.id as string, 'review') : new Set<string>()
+  return NextResponse.json({ reviews: (data ?? []).map((r) => ({ ...r, read: reads.has(r.id as string) })) })
 }
 
 /** Mark a review handled / new, or delete it. */
