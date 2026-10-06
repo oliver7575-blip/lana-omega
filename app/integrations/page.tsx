@@ -1,6 +1,7 @@
 'use client'
 
 import ChannelSwitches from '@/components/ChannelSwitches'
+import PaymentSetupCheck from '@/components/PaymentSetupCheck'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { INTEGRATIONS, type IntegrationType } from '@/lib/integrations'
@@ -147,6 +148,7 @@ export default function IntegrationsPage() {
       </p>
       <h1>Integrations</h1>
       <ChannelSwitches />
+      <PaymentSetupCheck />
       {message && <p>{message}</p>}
       {INTEGRATIONS.map((def) => {
         const status = statuses[def.type]
