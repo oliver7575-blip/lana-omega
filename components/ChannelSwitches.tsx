@@ -6,7 +6,7 @@ const ROWS = [
   { key: 'whatsapp', label: 'WhatsApp', help: 'Lana replies to guest WhatsApp messages. When off, messages still arrive in the Inbox for staff.' },
   { key: 'widget', label: 'Website chat', help: 'Lana answers in the chat on your website. When off, visitors are told the chat is offline.' },
   { key: 'instagram', label: 'Instagram', help: 'Lana replies to Instagram direct messages. When off, messages still arrive in the Inbox for staff.' },
-  { key: 'email_replies', label: 'Email replies', help: 'Lana answers guests who email their arrival time. When off, the time is still saved to Cloudbeds but no email is sent.' },
+  { key: 'email_replies', label: 'Email replies', help: 'Lana answers guest emails she can answer from the knowledge base (arrival times, questions about the stay, directions…); anything else is left for staff. When off, arrival times are still saved to Cloudbeds but no email is sent.' },
 ] as const
 
 type ChannelKey = (typeof ROWS)[number]['key']

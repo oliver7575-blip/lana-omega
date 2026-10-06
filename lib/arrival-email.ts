@@ -1,37 +1,29 @@
 import { createServiceClient } from './supabase/service'
 import { cloudbedsForTenant } from './cloudbeds-tenant'
 import { findReservationByConfirmation, getReservationDetail, setEstimatedArrival } from './cloudbeds-ops'
-import { sendTenantEmail } from './email'
 import { notifyStaff } from './escalation'
 import { parseEscalationContacts, findEscalationContact } from './escalation-contacts'
-import { buildKnowledgeBaseSection } from './knowledge-base'
-import { CONCIERGE_MODEL } from './anthropic'
+import {
+  arrivalSituation,
+  composeEmailReply,
+  deliverReply,
+  repliesEnabled,
+  replyGuard,
+  REPLY_TENANT_COLUMNS,
+  type ReplyMail,
+  type ReplyTenant,
+} from './email-reply'
 import type { EncryptedPayload } from './crypto'
 
 /**
  * A guest emailed when they will arrive. Lana:
  *  1. saves the time on their reservation in Cloudbeds,
- *  2. answers the guest with a short, friendly email based on that time,
+ *  2. answers the guest by email (the arrival time, plus anything else they asked
+ *     that the knowledge base covers),
  *  3. for arrivals outside check-in hours (after 9 PM / before 8 AM), alerts
  *     the reservations contact on WhatsApp so a person can arrange it.
  * What happened is recorded on the email so staff can see it.
  */
-
-// Check-in hours from the hotel's knowledge base: 3:00 PM – 9:00 PM.
-const CHECK_IN_FROM = 15 * 60
-const CHECK_IN_UNTIL = 21 * 60
-// Staff start at 7:00 and the hotel asks for notice before 8:00 AM.
-const EARLIEST_ARRIVAL = 8 * 60
-
-export type ArrivalSituation = 'ok' | 'early' | 'special'
-
-export function arrivalSituation(time: string): ArrivalSituation {
-  const [h, m] = time.split(':').map(Number)
-  const minutes = h * 60 + m
-  if (minutes > CHECK_IN_UNTIL || minutes < EARLIEST_ARRIVAL) return 'special'
-  if (minutes < CHECK_IN_FROM) return 'early'
-  return 'ok'
-}
 
 export interface ArrivalInfo {
   confirmation_number?: string | null
@@ -42,23 +34,7 @@ export interface ArrivalInfo {
   guest_message?: string | null
 }
 
-export interface ArrivalMail {
-  id: string
-  fromEmail: string
-  fromName: string
-  replyTo: string | null
-  messageId: string
-  references: string | null
-  subject: string
-}
-
-interface Tenant {
-  ai_persona_prompt: string | null
-  knowledge_base: string | null
-  channel_settings: { email_replies?: boolean } | null
-  message_templates: unknown
-  escalation_contacts: unknown
-}
+export type ArrivalMail = ReplyMail
 
 export async function handleArrivalEmail(tenantId: string, mail: ArrivalMail, arrival: ArrivalInfo): Promise<void> {
   const db = createServiceClient()
@@ -113,9 +89,9 @@ export async function handleArrivalEmail(tenantId: string, mail: ArrivalMail, ar
   // ---- 2. Reply to the guest -------------------------------------------------
   const { data: tenant } = await db
     .from('tenants')
-    .select('ai_persona_prompt, knowledge_base, channel_settings, message_templates, escalation_contacts')
+    .select(REPLY_TENANT_COLUMNS)
     .eq('id', tenantId)
-    .single<Tenant>()
+    .single<ReplyTenant>()
 
   let replySent = false
   if (saved && tenant) {
@@ -146,111 +122,39 @@ export async function handleArrivalEmail(tenantId: string, mail: ArrivalMail, ar
 // Reply
 // ---------------------------------------------------------------------------
 
+/** Returns whether the guest was fully answered (sent, and nothing left for a person). */
 async function replyToGuest(
   db: ReturnType<typeof createServiceClient>,
   tenantId: string,
-  tenant: Tenant,
-  mail: ArrivalMail,
+  tenant: ReplyTenant,
+  mail: ReplyMail,
   arrival: ArrivalInfo,
   time: string,
   kind: 'stated' | 'request',
-  situation: ArrivalSituation
+  situation: ReturnType<typeof arrivalSituation>
 ): Promise<boolean> {
   const setReply = (patch: Record<string, unknown>) => db.from('inbound_emails').update(patch).eq('id', mail.id)
 
-  if (tenant.channel_settings?.email_replies === false) {
+  if (!repliesEnabled(tenant)) {
     await setReply({ reply_status: 'not_sent', reply_detail: 'Email replies are switched off (Integrations → Guest channels).' })
     return false
   }
-
-  const text = await composeReply(tenant, arrival, time, kind, situation)
-  if (!text) {
+  const guard = await replyGuard(db, tenantId, mail)
+  if (!guard.allow) {
+    await setReply({ reply_status: 'not_sent', reply_detail: guard.detail })
+    return false
+  }
+  const d = await composeEmailReply(tenant, mail, arrival.guest_message || '', { time, kind, situation })
+  if (!d) {
     await setReply({ reply_status: 'failed', reply_detail: "Lana couldn't write a reply — please answer the guest yourself." })
     return false
   }
-
-  const to = (mail.replyTo || mail.fromEmail || '').trim().toLowerCase()
-  const local = to.split('@')[0] ?? ''
-  if (!to || /^(no-?reply|do-?not-?reply|donotreply|mailer-daemon|postmaster|bounce)/.test(local)) {
-    await setReply({
-      reply_text: text,
-      reply_status: 'not_sent',
-      reply_detail: "This email can't be answered by email (it comes from a no-reply address). Reply to the guest in Booking.com / Airbnb — suggested reply below.",
-    })
+  if (d.decision === 'staff' || !d.reply) {
+    await setReply({ reply_status: 'not_sent', reply_detail: `Lana didn't reply — ${d.reason || 'needs a person'}.` })
     return false
   }
-
-  // Booking.com delivers anything above this line to the guest.
-  const relay = /@guest\.booking\.com$/.test(to)
-  const body = relay ? `${text}\n\n##- Please type your reply above this line -##` : text
-  const subject = /^re:/i.test(mail.subject) ? mail.subject : `Re: ${mail.subject}`
-  const html = text
-    .split(/\n{2,}/)
-    .map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`)
-    .join('')
-  const res = await sendTenantEmail(tenantId, to, subject, html, {
-    text: body,
-    inReplyTo: mail.messageId,
-    references: [mail.references, mail.messageId].filter(Boolean).join(' ') || undefined,
-  })
-  await setReply({
-    reply_text: text,
-    reply_status: res.success ? 'sent' : 'failed',
-    reply_detail: res.success ? `Sent to ${to}` : `Could not send: ${res.error ?? 'email error'}`,
-  })
-  return res.success
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-}
-
-async function composeReply(
-  tenant: Tenant,
-  arrival: ArrivalInfo,
-  time: string,
-  kind: 'stated' | 'request',
-  situation: ArrivalSituation
-): Promise<string | null> {
-  const system =
-    (tenant.ai_persona_prompt ?? 'You are a warm, helpful hotel concierge.') +
-    buildKnowledgeBaseSection(tenant.knowledge_base) +
-    `
-
-TASK — EMAIL REPLY
-A guest emailed the time they expect to arrive. Write the reply email from the hotel.
-- Reply in the SAME LANGUAGE as the guest's message.
-- Short and warm, like a friendly local host: 2–4 short sentences, then a sign-off line "Soirée Reservations". No subject line, no markdown, no bullet points, at most one emoji.
-- Greet the guest by first name.
-- Use only facts from the knowledge base. Never invent anything. Never promise early check-in, late check-out or any special arrangement.
-- Situation "ok" (arrival within check-in hours, 3:00 PM–9:00 PM): thank them, confirm you've noted their arrival time, remind them that check-in is 3:00 PM–9:00 PM at Mezcalería Gota Gorda (easiest to find by searching that name in Google Maps), and say you look forward to welcoming them.
-- Situation "early" (arrival before 3:00 PM): thank them and say you've noted their arrival time. Check-in starts at 3:00 PM and early check-in depends on availability, so it can't be confirmed in advance. If the room isn't ready they are welcome to leave their luggage with us on arrival day and enjoy the pool, the patio or El Cafecito, or explore Zipolite.
-- Situation "special" (arrival after 9:00 PM or before 8:00 AM): thank them and say you've noted their arrival time. Arrivals outside 3:00 PM–9:00 PM need to be arranged in advance, so a member of the team will contact them shortly to arrange it. Do not promise it will be possible.
-Reply with ONLY the email text.`
-
-  const guest = (arrival.guest_name ?? '').trim()
-  const content = [
-    `Guest name: ${guest || '(unknown — greet without a name)'}`,
-    `Guest's message: ${(arrival.guest_message ?? '').slice(0, 1200) || '(not available)'}`,
-    `Arrival time they gave: ${time} (${kind === 'request' ? 'they are REQUESTING this check-in time' : 'they stated when they will arrive'})`,
-    `Situation: ${situation}`,
-  ].join('\n')
-
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY!, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: CONCIERGE_MODEL, max_tokens: 500, system, messages: [{ role: 'user', content }] }),
-    })
-    const data = (await res.json()) as { content?: { type: string; text?: string }[]; error?: { message?: string } }
-    if (!res.ok) throw new Error(data.error?.message ?? `HTTP ${res.status}`)
-    const text = (data.content ?? []).map((b) => b.text ?? '').join('').trim()
-    if (text.length < 20 || text.length > 1400) return null
-    return text
-  } catch (err) {
-    console.error('[arrival-email] writing the reply failed', err)
-    return null
-  }
+  const sent = await deliverReply(db, tenantId, mail, d.reply, guard.canSend, d.needsStaff ? `part of it needs a person: ${d.reason}` : undefined)
+  return sent && !d.needsStaff
 }
 
 // ---------------------------------------------------------------------------
@@ -260,7 +164,7 @@ Reply with ONLY the email text.`
 async function alertStaff(
   db: ReturnType<typeof createServiceClient>,
   tenantId: string,
-  tenant: Tenant,
+  tenant: ReplyTenant,
   info: {
     guestName: string
     time: string

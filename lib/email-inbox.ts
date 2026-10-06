@@ -3,6 +3,7 @@ import { simpleParser } from 'mailparser'
 import { createServiceClient } from './supabase/service'
 import { decryptCredentials, type EncryptedPayload } from './crypto'
 import { handleArrivalEmail, type ArrivalInfo } from './arrival-email'
+import { answerGeneralEmail, REPLY_TENANT_COLUMNS, type ReplyMail, type ReplyTenant } from './email-reply'
 
 /**
  * Reads the hotel's inbox (read-only: nothing is moved, deleted or marked as
@@ -80,9 +81,10 @@ export async function pollInbox(tenantId: string): Promise<PollResult> {
       let lastUid = resetCursor ? 0 : Number(state?.last_uid ?? 0)
 
       const started = Date.now()
+      let tenantRow: ReplyTenant | null | undefined
       for (const uid of batch) {
         // Stay inside the function's time limit; the rest is picked up on the next run.
-        if (Date.now() - started > 25_000) break
+        if (Date.now() - started > 20_000) break
         // BODY.PEEK — reading doesn't mark the email as read.
         const msg = await client.fetchOne(String(uid), { source: true, internalDate: true }, { uid: true })
         lastUid = Math.max(lastUid, uid)
@@ -119,20 +121,26 @@ export async function pollInbox(tenantId: string): Promise<PollResult> {
           .select('id')
           .single()
         if (row && sorted.category !== 'automated') filed++
-        if (row && sorted.arrival?.time) {
-          await handleArrivalEmail(
-            tenantId,
-            {
-              id: row.id as string,
-              fromEmail: fromEmail,
-              fromName: from?.name ?? '',
-              replyTo: parsed.replyTo?.value?.[0]?.address ?? null,
-              messageId,
-              references: Array.isArray(parsed.references) ? parsed.references.join(' ') : parsed.references ?? null,
-              subject,
-            },
-            sorted.arrival
-          )
+        // Guest emails: save an arrival time if they gave one, and answer them when the knowledge base covers it.
+        if (row && ['inquiry', 'reservation', 'other'].includes(sorted.category)) {
+          const precedence = String(parsed.headers.get('precedence') ?? '').toLowerCase()
+          const autoSubmitted = String(parsed.headers.get('auto-submitted') ?? 'no').toLowerCase()
+          const mail: ReplyMail = {
+            id: row.id as string,
+            fromEmail,
+            fromName: from?.name ?? '',
+            replyTo: parsed.replyTo?.value?.[0]?.address ?? null,
+            messageId,
+            references: Array.isArray(parsed.references) ? parsed.references.join(' ') : parsed.references ?? null,
+            subject,
+            auto: autoSubmitted !== 'no' || ['bulk', 'junk', 'list'].includes(precedence),
+          }
+          if (sorted.arrival?.time) {
+            await handleArrivalEmail(tenantId, mail, sorted.arrival)
+          } else {
+            tenantRow ??= (await db.from('tenants').select(REPLY_TENANT_COLUMNS).eq('id', tenantId).single<ReplyTenant>()).data
+            if (tenantRow) await answerGeneralEmail(db, tenantId, tenantRow, mail, text)
+          }
         }
         if (row && sorted.category === 'review') {
           const r = sorted.review ?? {}
