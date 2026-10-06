@@ -1,3 +1,5 @@
+import { makePaymentTool } from '@/lib/payments/lana-tool'
+import { redactCardData } from '@/lib/card-redaction'
 import { makeReviewTool } from '@/lib/reviews'
 import crypto from 'crypto'
 import { NextResponse, after } from 'next/server'
@@ -420,10 +422,12 @@ async function processInbound(msg: ExtractedMessage) {
     }
   }
 
-  const content = msg.mediaId
+  const rawContent = msg.mediaId
     ? await resolveMediaToText(msg, credentials, deepgramApiKey)
     : msg.text
-  if (!content) return
+  if (!rawContent) return
+  // Card numbers and security codes never get stored or shown to the model.
+  const content = redactCardData(rawContent).text
 
   const { data: guestMessage, error: messageError } = await supabase
     .from('messages')
@@ -575,6 +579,18 @@ async function processInbound(msg: ExtractedMessage) {
           },
         }
       : undefined
+
+  // Payment links (direct bookings only; the server enforces who qualifies and the amounts).
+  const paymentTool = reservationTool
+    ? makePaymentTool({
+        tenantId,
+        conversationId: conversationId as string,
+        guestId: guest.id as string,
+        channel: 'whatsapp',
+        senderPhone: from,
+        escalate: async (summary: string) => escalationTool?.escalateToStaff({ category: 'billing', summary, urgency: 'normal' }),
+      })
+    : undefined
 
   const waitlistTool = {
     joinWaitlist: async (input: {
@@ -745,6 +761,7 @@ async function processInbound(msg: ExtractedMessage) {
 
   let replyText: string
   let noReply = false
+  let paymentSent = false
   let photoUrls: string[] = []
   let contactButton:
     | { contactName: string; contactPhone: string; contactUrl: string; buttonText: string }
@@ -761,12 +778,19 @@ async function processInbound(msg: ExtractedMessage) {
       registerReservationTool,
       contactButtonTool,
       roomPhotosTool,
-      makeReviewTool({ tenantId, conversationId: conversationId as string, guestName: guestName ?? null, source: 'whatsapp' })
+      makeReviewTool({ tenantId, conversationId: conversationId as string, guestName: guestName ?? null, source: 'whatsapp' }),
+      paymentTool
     )
     replyText = result.text
     noReply = Boolean(result.noReply)
     photoUrls = result.photoUrls ?? []
     contactButton = result.contactButton
+    // The secure payment link goes out as a button; remove any copy of the URL from the text.
+    if (result.paymentUrl) {
+      replyText = replyText.split(result.paymentUrl).join('').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim() || replyText
+      contactButton = { contactName: '', contactPhone: '', contactUrl: result.paymentUrl, buttonText: result.paymentButtonText ?? 'Pay now' }
+      paymentSent = true
+    }
   } catch (err) {
     console.error('[whatsapp-inbound] AI generation failed', err)
     const fallbackText =
@@ -782,9 +806,12 @@ async function processInbound(msg: ExtractedMessage) {
     return
   }
 
-  const photoNote = photoUrls.length
-    ? `[Sent ${photoUrls.length} room photo${photoUrls.length === 1 ? '' : 's'}]`
-    : ''
+  const photoNote = [
+    photoUrls.length ? `[Sent ${photoUrls.length} room photo${photoUrls.length === 1 ? '' : 's'}]` : '',
+    paymentSent ? '[Sent a secure payment button]' : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
   if (!noReply || photoNote) {
     await supabase.from('messages').insert({
       tenant_id: tenantId,

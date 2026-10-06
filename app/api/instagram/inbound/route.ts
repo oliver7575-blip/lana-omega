@@ -1,3 +1,5 @@
+import { makePaymentTool } from '@/lib/payments/lana-tool'
+import { redactCardData } from '@/lib/card-redaction'
 import { makeReviewTool } from '@/lib/reviews'
 import { NextResponse, after } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
@@ -116,7 +118,8 @@ async function describeAttachments(ev: IgEvent): Promise<string[]> {
 
 async function handleMessage(tenantId: string, conn: InstagramConnection, accountId: string, senderId: string, ev: IgEvent) {
   const supabase = createServiceClient()
-  const text = [ev.message?.text?.trim(), ...(await describeAttachments(ev))].filter(Boolean).join('\n')
+  // Card numbers and security codes never get stored or shown to the model.
+  const text = redactCardData([ev.message?.text?.trim(), ...(await describeAttachments(ev))].filter(Boolean).join('\n')).text
   if (!text) return
 
   // ---- Guest & conversation ------------------------------------------------
@@ -266,6 +269,17 @@ async function handleMessage(tenantId: string, conn: InstagramConnection, accoun
     buildBookingLinkInstruction(tenant?.booking_config as Record<string, unknown>) +
     channelInstruction
 
+  const paymentTool = reservationTool
+    ? makePaymentTool({
+        tenantId,
+        conversationId,
+        guestId: guest.id as string,
+        channel: 'instagram',
+        senderPhone: null,
+        escalate: async (summary: string) => escalationTool?.escalateToStaff({ category: 'billing', summary, urgency: 'normal' }),
+      })
+    : undefined
+
   let reply: Awaited<ReturnType<typeof generateReply>>
   try {
     reply = await generateReply(
@@ -278,7 +292,8 @@ async function handleMessage(tenantId: string, conn: InstagramConnection, accoun
       undefined,
       undefined,
       roomPhotosTool,
-      makeReviewTool({ tenantId, conversationId, guestName, source: 'instagram' })
+      makeReviewTool({ tenantId, conversationId, guestName, source: 'instagram' }),
+      paymentTool
     )
   } catch (err) {
     console.error('[instagram-inbound] AI reply failed', err)
@@ -287,7 +302,7 @@ async function handleMessage(tenantId: string, conn: InstagramConnection, accoun
 
   const photos = reply.photoUrls ?? []
   const replyText = reply.noReply ? '' : reply.text.replace(/\*\*?([^*]+)\*\*?/g, '$1')
-  const note = photos.length ? `[Sent ${photos.length} room photo${photos.length === 1 ? '' : 's'}]` : ''
+  const note = [photos.length ? `[Sent ${photos.length} room photo${photos.length === 1 ? '' : 's'}]` : '', reply.paymentUrl ? '[Sent a secure payment link]' : ''].filter(Boolean).join('\n')
   if (replyText || note) {
     await supabase.from('messages').insert({
       tenant_id: tenantId,
@@ -298,7 +313,8 @@ async function handleMessage(tenantId: string, conn: InstagramConnection, accoun
     await supabase.from('conversations').update({ last_message_at: new Date().toISOString() }).eq('id', conversationId)
   }
   if (replyText) {
-    const sent = await sendInstagramText(conn, senderId, replyText)
+    const outgoing = reply.paymentUrl && !replyText.includes(reply.paymentUrl) ? `${replyText}\n\n${reply.paymentUrl}` : replyText
+    const sent = await sendInstagramText(conn, senderId, outgoing)
     if (!sent.success) console.error('[instagram-inbound] send failed', sent.error)
   }
   for (const url of photos) {

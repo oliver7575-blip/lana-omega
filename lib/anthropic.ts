@@ -1,4 +1,5 @@
 import type { ReviewTool, ReviewToolInput } from './reviews'
+import type { PaymentTool, PaymentToolInput } from './payments/lana-tool'
 /** The model behind every guest-facing reply. */
 export const CONCIERGE_MODEL = 'claude-sonnet-5'
 
@@ -95,6 +96,9 @@ export interface GenerateReplyResult {
     contactUrl: string
     buttonText: string
   } | null
+  /** A secure payment link the caller must deliver (a button on WhatsApp, a plain link elsewhere). */
+  paymentUrl?: string
+  paymentButtonText?: string
 }
 
 export async function generateReply(
@@ -107,9 +111,45 @@ export async function generateReply(
   registerReservationTool?: RegisterReservationTool,
   contactButtonTool?: ContactButtonTool,
   roomPhotosTool?: RoomPhotosTool,
-  reviewTool?: ReviewTool
+  reviewTool?: ReviewTool,
+  paymentTool?: PaymentTool
 ): Promise<GenerateReplyResult> {
   const tools: Record<string, unknown>[] = []
+
+  if (paymentTool) {
+    const who = {
+      confirmationNumber: { type: 'string', description: "The reservation's confirmation number if the guest gave one (Cloudbeds number or the booking platform's number). Omit it to use the guest's own WhatsApp number." },
+      lastName: { type: 'string', description: 'The last name on the reservation, if the guest told you. Needed when the guest gave a confirmation number.' },
+    }
+    tools.push(
+      {
+        name: 'get_payment_options',
+        description:
+          "Use when a guest wants to PAY, asks how to pay, or asks to pay a deposit or their balance. Looks up what can be paid on their reservation — the server decides who qualifies and the exact amounts, and tells you what to say in 'instruction' (follow it exactly). Do NOT escalate a payment request to staff yourself and do NOT say you will 'connect them with the team': the tool notifies staff automatically when a person is needed. Never ask for card details.",
+        input_schema: { type: 'object', properties: who },
+      },
+      {
+        name: 'request_payment_link',
+        description:
+          "Creates the guest's secure payment link for a deposit or the full balance and sends it with your message. Call it after the guest chose an option from get_payment_options. You can NEVER choose or change an amount. Never write the URL yourself — it is attached automatically. The guest enters card details only on the secure payment page.",
+        input_schema: {
+          type: 'object',
+          properties: {
+            ...who,
+            option: { type: 'string', enum: ['deposit', 'balance'], description: 'deposit = the deposit amount; balance = everything still owed' },
+            language: { type: 'string', description: "The language the guest is writing in: 'es' or 'en'" },
+          },
+          required: ['option'],
+        },
+      },
+      {
+        name: 'check_payment_status',
+        description:
+          "Use when a guest says they paid, asks whether their payment went through, or asks about a payment link. Returns the VERIFIED status. You may say a payment is received/confirmed ONLY when this returns status 'paid'. Otherwise never claim it is paid.",
+        input_schema: { type: 'object', properties: who },
+      }
+    )
+  }
 
   if (reviewTool) {
     tools.push({
@@ -301,6 +341,8 @@ export async function generateReply(
   const messages: ClaudeMessage[] = [...conversationHistory]
   let contactButtonResult: GenerateReplyResult['contactButton'] = null
   let photoUrls: string[] = []
+  let paymentUrlResult: string | undefined
+  let paymentButtonText: string | undefined
 
   for (let i = 0; i < 6; i++) {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -384,6 +426,17 @@ export async function generateReply(
         } else if (block.name === 'send_contact_button' && contactButtonTool) {
           contactButtonResult = block.input as unknown as ContactButtonToolInput
           result = { success: true }
+        } else if (block.name === 'get_payment_options' && paymentTool) {
+          result = await paymentTool.paymentOptions(block.input as unknown as PaymentToolInput)
+        } else if (block.name === 'request_payment_link' && paymentTool) {
+          const r = await paymentTool.requestPaymentLink(block.input as unknown as PaymentToolInput)
+          result = r.result
+          if (r.paymentUrl) {
+            paymentUrlResult = r.paymentUrl
+            paymentButtonText = r.buttonText
+          }
+        } else if (block.name === 'check_payment_status' && paymentTool) {
+          result = await paymentTool.paymentStatus(block.input as unknown as PaymentToolInput)
         }
 
         const ok = (result as { success?: boolean; found?: boolean } | null) ?? {}
@@ -404,11 +457,13 @@ export async function generateReply(
       .map((b) => b.text ?? '')
       .join('')
       .trim()
-    if (!text || text.includes(NO_REPLY_TOKEN)) {
+    if ((!text || text.includes(NO_REPLY_TOKEN)) && !paymentUrlResult) {
       // Nothing to say (e.g. the guest just wrote "gracias"). Photos still go out.
       return { text: '', noReply: true, contactButton: null, photoUrls }
     }
-    return { text, contactButton: contactButtonResult, photoUrls }
+    // A payment link must never go out without a message around it.
+    const body = text && !text.includes(NO_REPLY_TOKEN) ? text : paymentButtonText === 'Pagar ahora' ? 'Aquí está tu enlace de pago seguro 👇' : 'Here is your secure payment link 👇'
+    return { text: body, contactButton: contactButtonResult, photoUrls, paymentUrl: paymentUrlResult, paymentButtonText }
   }
 
   return {

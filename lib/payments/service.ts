@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getReservationRaw, type CB } from '../cloudbeds-ops'
 import { evaluate, factsFromRaw, readPaymentSettings, type Eligibility, type PaymentKind, type PaymentSettings } from './rules'
 import { createPayByLink, getPayByLink } from './paylink'
+import { notifyGuestPaid } from './notify'
 
 export type PaymentStatus = 'creating' | 'link_active' | 'paid_unverified' | 'paid' | 'expired' | 'cancelled' | 'failed' | 'needs_review'
 
@@ -29,6 +30,8 @@ export interface PaymentRequestRow {
   check_count: number | null
   last_checked_at: string | null
   paid_at: string | null
+  language: string | null
+  guest_notified_at: string | null
   created_at: string
   updated_at: string
 }
@@ -74,6 +77,7 @@ export interface CreateInput {
   conversationId?: string | null
   guestId?: string | null
   channel?: string | null
+  language?: string | null
 }
 
 export type CreateResult =
@@ -146,6 +150,7 @@ export async function createPaymentLink(db: SupabaseClient, cb: CB, ctx: Payment
       conversation_id: input.conversationId ?? null,
       guest_id: input.guestId ?? null,
       channel: input.channel ?? null,
+      language: input.language ?? null,
     })
     .select('*')
     .single()
@@ -248,7 +253,12 @@ export async function pollPayment(db: SupabaseClient, cb: CB, ctx: PaymentContex
   const { data } = await db.from('payment_requests').update(patch).eq('id', row.id).select('*').single()
   const ev = event as { name: string; detail?: Record<string, unknown> } | null
   if (ev) await logPaymentEvent(db, ctx.tenantId, row.id, ev.name, ev.detail)
-  return ((data as PaymentRequestRow | null) ?? row) as PaymentRequestRow
+  const result = ((data as PaymentRequestRow | null) ?? row) as PaymentRequestRow
+  // Verified payment → tell the guest (once). Best effort: never breaks the check.
+  if (result.status === 'paid' && row.status !== 'paid') {
+    await notifyGuestPaid(result).catch((err) => console.error('[payments] could not notify the guest', err))
+  }
+  return result
 }
 
 /** Staff closes a request on our side. Cloudbeds cannot cancel API links, so a closed link may still be payable until it expires. */

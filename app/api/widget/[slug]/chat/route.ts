@@ -1,3 +1,5 @@
+import { makePaymentTool } from '@/lib/payments/lana-tool'
+import { redactCardData } from '@/lib/card-redaction'
 import { makeReviewTool } from '@/lib/reviews'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
@@ -88,7 +90,9 @@ interface WidgetChatRequest {
 export async function POST(request: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const body = (await request.json()) as Partial<WidgetChatRequest>
-  const { visitorId, message } = body
+  const { visitorId } = body
+  // Card numbers and security codes never get stored or shown to the model.
+  const message = typeof body.message === 'string' ? redactCardData(body.message).text : body.message
 
   if (!visitorId || !message) {
     return NextResponse.json(
@@ -464,6 +468,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     if (propertyId) roomPhotosTool = buildRoomPhotosTool(api_key, propertyId)
   }
 
+  const paymentTool = reservationTool
+    ? makePaymentTool({
+        tenantId,
+        conversationId: conversationId as string,
+        guestId: guest.id as string,
+        channel: 'widget',
+        senderPhone: null,
+        escalate: async (summary: string) => escalationTool?.escalateToStaff({ category: 'billing', summary, urgency: 'normal' }),
+      })
+    : undefined
+
   let replyText: string
   try {
     const result = await generateReply(
@@ -476,11 +491,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       registerReservationTool,
       undefined,
       roomPhotosTool,
-      makeReviewTool({ tenantId, conversationId: conversationId as string, guestName: null, source: 'widget' })
+      makeReviewTool({ tenantId, conversationId: conversationId as string, guestName: null, source: 'widget' }),
+      paymentTool
     )
     // The widget shows plain text, so room photos go out as links.
     const photoLinks = (result.photoUrls ?? []).join('\n')
-    replyText = [result.text || (photoLinks ? '' : '😊'), photoLinks].filter(Boolean).join('\n\n')
+    replyText = [result.text || (photoLinks || result.paymentUrl ? '' : '😊'), photoLinks, result.paymentUrl && !result.text.includes(result.paymentUrl) ? result.paymentUrl : ''].filter(Boolean).join('\n\n')
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'AI generation failed' },
