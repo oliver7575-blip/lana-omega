@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   const showAutomated = new URL(request.url).searchParams.get('automated') === '1'
   let q = supabase
     .from('inbound_emails')
-    .select('id, from_email, from_name, subject, body_text, received_at, category, summary, status')
+    .select('id, from_email, from_name, subject, body_text, received_at, category, summary, status, action, action_detail')
     .neq('category', 'review')
     .order('received_at', { ascending: false })
     .limit(300)

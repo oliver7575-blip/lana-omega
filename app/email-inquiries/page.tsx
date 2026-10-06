@@ -12,6 +12,8 @@ interface Email {
   category: string
   summary: string | null
   status: 'new' | 'done'
+  action: 'arrival_saved' | 'arrival_not_saved' | null
+  action_detail: string | null
   read: boolean
 }
 
@@ -155,6 +157,11 @@ export default function EmailInquiriesPage() {
                   </span>
                   <span className="block truncate text-sm text-navy/85">{e.subject}</span>
                   {e.summary && <span className="mt-0.5 block text-xs text-navy/55">{e.summary}</span>}
+                  {e.action && (
+                    <span className={`mt-1.5 block rounded-md px-2 py-1 text-xs ${e.action === 'arrival_saved' ? 'bg-emerald-500/10 text-emerald-200' : 'bg-amber-500/10 text-amber-200'}`}>
+                      {e.action === 'arrival_saved' ? '✓ ' : '⚠ '}{e.action_detail}
+                    </span>
+                  )}
                 </span>
               </button>
               {expanded && (

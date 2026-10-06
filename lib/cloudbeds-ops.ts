@@ -55,9 +55,9 @@ async function cbPost(cb: CB, method: string, fields: Record<string, string>): P
 }
 
 /** All pages of getReservations (max 5 × 100). */
-async function listReservations(cb: CB, params: Record<string, string | number | boolean | undefined>): Promise<Json[]> {
+async function listReservations(cb: CB, params: Record<string, string | number | boolean | undefined>, maxPages = 5): Promise<Json[]> {
   const out: Json[] = []
-  for (let page = 1; page <= 5; page++) {
+  for (let page = 1; page <= maxPages; page++) {
     const json = await cbGet(cb, 'getReservations', { propertyID: cb.propertyId, pageSize: 100, pageNumber: page, ...params })
     const data = (json.data as Json[]) ?? []
     out.push(...data)
@@ -476,6 +476,43 @@ export async function searchReservations(cb: CB, q: string): Promise<DashRow[]> 
     }
   }
   return [...seen.values()].sort((a, b) => b.startDate.localeCompare(a.startDate)).slice(0, 50)
+}
+
+/**
+ * Finds a reservation from the number a guest quotes: a Booking.com / Airbnb /
+ * Expedia confirmation number (Cloudbeds keeps it as thirdPartyIdentifier) or
+ * Cloudbeds' own reservation id. A check-in date, when known, narrows the search.
+ */
+export async function findReservationByConfirmation(
+  cb: CB,
+  confirmation: string,
+  checkInHint?: string | null
+): Promise<{ reservationID: string } | null> {
+  const num = confirmation.trim()
+  if (!num) return null
+  const today = new Date().toISOString().slice(0, 10)
+  const windows: Record<string, string>[] = []
+  if (checkInHint && /^\d{4}-\d{2}-\d{2}$/.test(checkInHint)) windows.push({ checkInFrom: checkInHint, checkInTo: checkInHint })
+  windows.push({ checkInFrom: addDays(today, -2), checkInTo: addDays(today, 540) })
+  for (const w of windows) {
+    const list = await listReservations(cb, w, 10).catch(() => [] as Json[])
+    const hit = list.find((r) => String(r.thirdPartyIdentifier ?? '') === num || String(r.reservationID ?? '') === num)
+    if (hit) return { reservationID: String(hit.reservationID) }
+  }
+  if (/^\d{6,}$/.test(num)) {
+    try {
+      const d = await getReservationDetail(cb, num)
+      if (d.reservationID) return { reservationID: d.reservationID }
+    } catch {
+      // not a Cloudbeds id
+    }
+  }
+  return null
+}
+
+/** Writes the guest's expected arrival time (HH:MM) onto the reservation in Cloudbeds. */
+export async function setEstimatedArrival(cb: CB, reservationID: string, time: string): Promise<void> {
+  await cbPut(cb, 'putReservation', { reservationID, estimatedArrivalTime: time })
 }
 
 export function cloudbedsLinks(propertyId: string) {
