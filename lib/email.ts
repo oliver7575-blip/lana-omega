@@ -66,7 +66,8 @@ export async function sendTenantEmail(
   tenantId: string,
   to: string,
   subject: string,
-  html: string
+  html: string,
+  opts: { text?: string; inReplyTo?: string; references?: string } = {}
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = createServiceClient()
   const { data: integration } = await supabase
@@ -104,7 +105,11 @@ export async function sendTenantEmail(
       to,
       subject,
       html,
-      text: htmlToText(html),
+      text: opts.text ?? htmlToText(html),
+      ...(opts.inReplyTo ? { inReplyTo: opts.inReplyTo } : {}),
+      ...(opts.references ? { references: opts.references } : {}),
+      // Lets you tell Omega's emails apart from Beta's (Gmail → Show original).
+      headers: { 'X-Sent-By': 'Lana Omega' },
     })
     return { success: true }
   } catch (err) {

@@ -14,6 +14,9 @@ interface Email {
   status: 'new' | 'done'
   action: 'arrival_saved' | 'arrival_not_saved' | null
   action_detail: string | null
+  reply_text: string | null
+  reply_status: 'sent' | 'not_sent' | 'failed' | null
+  reply_detail: string | null
   read: boolean
 }
 
@@ -162,11 +165,25 @@ export default function EmailInquiriesPage() {
                       {e.action === 'arrival_saved' ? '✓ ' : '⚠ '}{e.action_detail}
                     </span>
                   )}
+                  {e.reply_status && (
+                    <span className={`mt-1 block rounded-md px-2 py-1 text-xs ${e.reply_status === 'sent' ? 'bg-emerald-500/10 text-emerald-200' : 'bg-amber-500/10 text-amber-200'}`}>
+                      {e.reply_status === 'sent' ? '✉ Lana replied · ' : '✉ Not sent · '}{e.reply_detail}
+                    </span>
+                  )}
                 </span>
               </button>
               {expanded && (
                 <div className="border-t border-line px-4 pb-4 pt-3">
                   <p className="text-xs text-navy/50">{e.from_email}</p>
+                  {e.reply_text && (
+                    <div className="mt-2 rounded-lg border border-line bg-surface/60 p-3">
+                      <p className="mb-1 text-[11px] uppercase tracking-wide text-navy/50">{e.reply_status === 'sent' ? 'Reply Lana sent' : 'Suggested reply'}</p>
+                      <p className="whitespace-pre-wrap text-sm text-navy/90">{e.reply_text}</p>
+                      {e.reply_status !== 'sent' && (
+                        <button onClick={() => navigator.clipboard?.writeText(e.reply_text ?? '')} className="mt-2 rounded-md border border-line px-2 py-1 text-xs text-navy hover:bg-line/40">Copy reply</button>
+                      )}
+                    </div>
+                  )}
                   <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-black/20 p-3 font-sans text-sm text-navy/85">{e.body_text || '(empty)'}</pre>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     {e.from_email && (

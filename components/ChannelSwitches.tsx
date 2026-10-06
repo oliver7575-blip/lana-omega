@@ -6,21 +6,24 @@ const ROWS = [
   { key: 'whatsapp', label: 'WhatsApp', help: 'Lana replies to guest WhatsApp messages. When off, messages still arrive in the Inbox for staff.' },
   { key: 'widget', label: 'Website chat', help: 'Lana answers in the chat on your website. When off, visitors are told the chat is offline.' },
   { key: 'instagram', label: 'Instagram', help: 'Lana replies to Instagram direct messages. When off, messages still arrive in the Inbox for staff.' },
+  { key: 'email_replies', label: 'Email replies', help: 'Lana answers guests who email their arrival time. When off, the time is still saved to Cloudbeds but no email is sent.' },
 ] as const
+
+type ChannelKey = (typeof ROWS)[number]['key']
 
 /** Beta-style on/off switches per guest messaging channel. */
 export default function ChannelSwitches() {
-  const [state, setState] = useState<{ whatsapp: boolean; widget: boolean; instagram: boolean; canEdit: boolean } | null>(null)
+  const [state, setState] = useState<(Record<ChannelKey, boolean> & { canEdit: boolean }) | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/channels', { cache: 'no-store' }).then(async (r) => (r.ok ? setState(await r.json()) : setError('Could not load channels')))
   }, [])
 
-  async function toggle(key: 'whatsapp' | 'widget' | 'instagram') {
+  async function toggle(key: ChannelKey) {
     if (!state) return
     const enabled = !state[key]
-    if (!enabled && !confirm(`Turn off Lana on ${key === 'whatsapp' ? 'WhatsApp' : key === 'instagram' ? 'Instagram' : 'the website chat'}?`)) return
+    if (!enabled && !confirm(`Turn off Lana on ${key === 'whatsapp' ? 'WhatsApp' : key === 'instagram' ? 'Instagram' : key === 'email_replies' ? 'email replies' : 'the website chat'}?`)) return
     setState({ ...state, [key]: enabled })
     const res = await fetch('/api/channels', {
       method: 'PATCH',

@@ -2,8 +2,7 @@ import { ImapFlow } from 'imapflow'
 import { simpleParser } from 'mailparser'
 import { createServiceClient } from './supabase/service'
 import { decryptCredentials, type EncryptedPayload } from './crypto'
-import { cloudbedsForTenant } from './cloudbeds-tenant'
-import { findReservationByConfirmation, getReservationDetail, setEstimatedArrival } from './cloudbeds-ops'
+import { handleArrivalEmail, type ArrivalInfo } from './arrival-email'
 
 /**
  * Reads the hotel's inbox (read-only: nothing is moved, deleted or marked as
@@ -17,13 +16,6 @@ const FIRST_RUN_DAYS = 3
 const MAX_PER_RUN = 15
 
 export type EmailCategory = 'review' | 'inquiry' | 'reservation' | 'billing' | 'job' | 'sales' | 'other' | 'automated'
-
-interface ArrivalInfo {
-  confirmation_number?: string | null
-  time?: string | null
-  kind?: 'stated' | 'request' | null
-  check_in_date?: string | null
-}
 
 interface Sorted {
   category: EmailCategory
@@ -90,7 +82,7 @@ export async function pollInbox(tenantId: string): Promise<PollResult> {
       const started = Date.now()
       for (const uid of batch) {
         // Stay inside the function's time limit; the rest is picked up on the next run.
-        if (Date.now() - started > 40_000) break
+        if (Date.now() - started > 25_000) break
         // BODY.PEEK — reading doesn't mark the email as read.
         const msg = await client.fetchOne(String(uid), { source: true, internalDate: true }, { uid: true })
         lastUid = Math.max(lastUid, uid)
@@ -127,7 +119,21 @@ export async function pollInbox(tenantId: string): Promise<PollResult> {
           .select('id')
           .single()
         if (row && sorted.category !== 'automated') filed++
-        if (row && sorted.arrival?.time) await applyArrival(tenantId, row.id as string, sorted.arrival)
+        if (row && sorted.arrival?.time) {
+          await handleArrivalEmail(
+            tenantId,
+            {
+              id: row.id as string,
+              fromEmail: fromEmail,
+              fromName: from?.name ?? '',
+              replyTo: parsed.replyTo?.value?.[0]?.address ?? null,
+              messageId,
+              references: Array.isArray(parsed.references) ? parsed.references.join(' ') : parsed.references ?? null,
+              subject,
+            },
+            sorted.arrival
+          )
+        }
         if (row && sorted.category === 'review') {
           const r = sorted.review ?? {}
           await db.from('reviews').insert({
@@ -196,7 +202,7 @@ A review notification from an OTA is "review", not "automated".
 summary — one short sentence in English saying what the email is about and what (if anything) the hotel should do.
 
 arrival — only when the email says or asks WHEN the guest will arrive / check in on an existing booking, else null:
-{"confirmation_number": the booking or confirmation number shown in the email (e.g. "Confirmation number: 5503861769", an Airbnb code) or null, "time": "HH:MM" in 24-hour format, "kind": "stated" or "request", "check_in_date": "YYYY-MM-DD" if the email shows the check-in date, else null}
+{"confirmation_number": the booking or confirmation number shown in the email (e.g. "Confirmation number: 5503861769", an Airbnb code) or null, "time": "HH:MM" in 24-hour format, "kind": "stated" or "request", "check_in_date": "YYYY-MM-DD" if the email shows the check-in date, else null, "guest_name": the guest's name as written in the email or null, "guest_message": the guest's own message, copied as written (without the booking.com / airbnb boilerplate), max 600 characters}
 - kind "stated": the guest says when they will arrive ("we'll arrive around 5 pm", "llegamos a las 8").
 - kind "request": the guest asks whether they may check in at a time ("can we check in at 12:00?", "early check-in at 12:00-13:00"). For a time range use the START of the range.
 - "5 pm" = "17:00". If the time is vague ("in the afternoon", "late at night") or there is no time, set arrival to null.
@@ -205,47 +211,6 @@ Arrival times often appear inside Booking.com / Airbnb relayed guest messages �
 review — only when category is "review", else null:
 {"platform": "booking"|"airbnb"|"google"|"tripadvisor"|"expedia"|"direct"|other lowercase name, "guest_name": string or null, "rating": number or null, "rating_scale": the maximum of that rating (e.g. 10 for Booking, 5 for Airbnb/Google) or null, "sentiment": "positive"|"neutral"|"negative", "review_text": the guest's own words, as written, or null if the email only links to the review}`
 
-/**
- * A guest told us when they'll arrive: save it on their reservation in Cloudbeds
- * and record what happened on the email. A plain "we'll arrive around 5 pm" is
- * fully handled; an early check-in *request* stays open for staff to answer
- * (Lana never promises early check-in).
- */
-async function applyArrival(tenantId: string, emailId: string, arrival: ArrivalInfo): Promise<void> {
-  const db = createServiceClient()
-  const fail = async (detail: string) => {
-    await db.from('inbound_emails').update({ action: 'arrival_not_saved', action_detail: detail }).eq('id', emailId)
-  }
-  const time = (arrival.time ?? '').trim()
-  const number = (arrival.confirmation_number ?? '').trim()
-  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return
-  if (!number) return fail(`Guest gave an arrival time (${time}) but no booking number — add it in Cloudbeds by hand.`)
-
-  try {
-    const cb = await cloudbedsForTenant(db, tenantId)
-    if (!cb) return fail('Cloudbeds is not connected, so the arrival time was not saved.')
-    const found = await findReservationByConfirmation(cb, number, arrival.check_in_date)
-    if (!found) return fail(`Couldn't find booking ${number} in Cloudbeds — add the arrival time (${time}) by hand.`)
-    const detail = await getReservationDetail(cb, found.reservationID)
-    if (['canceled', 'cancelled', 'no_show', 'checked_out'].includes(detail.status.toLowerCase())) {
-      return fail(`Booking ${number} is ${detail.status} in Cloudbeds, so the arrival time (${time}) was not saved.`)
-    }
-    await setEstimatedArrival(cb, found.reservationID, time)
-    const was = detail.estimatedArrivalTime && detail.estimatedArrivalTime !== time ? ` (was ${detail.estimatedArrivalTime})` : ''
-    const request = arrival.kind === 'request'
-    await db
-      .from('inbound_emails')
-      .update({
-        action: 'arrival_saved',
-        action_detail: `Arrival time ${time} saved to Cloudbeds for ${detail.guestName} · #${found.reservationID}${was}${request ? ' · early check-in requested — staff to reply' : ''}`,
-        status: request ? 'new' : 'done',
-      })
-      .eq('id', emailId)
-  } catch (err) {
-    await fail(`Could not save the arrival time (${time}): ${err instanceof Error ? err.message : 'Cloudbeds error'}`)
-  }
-}
-
 async function sortEmail(fromEmail: string, fromName: string, subject: string, text: string, headers: Map<string, unknown>): Promise<Sorted> {
   const autoHints = ['list-unsubscribe', 'auto-submitted', 'precedence'].filter((h) => headers.has(h)).join(', ')
   const content = `From: ${fromName} <${fromEmail}>\nSubject: ${subject}${autoHints ? `\nHeaders present: ${autoHints}` : ''}\n\n${text.slice(0, 6000)}`
@@ -253,7 +218,7 @@ async function sortEmail(fromEmail: string, fromName: string, subject: string, t
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY!, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: SORT_MODEL, max_tokens: 600, system: SORT_PROMPT, messages: [{ role: 'user', content }] }),
+      body: JSON.stringify({ model: SORT_MODEL, max_tokens: 900, system: SORT_PROMPT, messages: [{ role: 'user', content }] }),
     })
     const data = (await res.json()) as { content?: { type: string; text?: string }[]; error?: { message?: string } }
     if (!res.ok) throw new Error(data.error?.message ?? `HTTP ${res.status}`)

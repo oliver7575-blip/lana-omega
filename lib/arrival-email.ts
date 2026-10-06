@@ -1,0 +1,319 @@
+import { createServiceClient } from './supabase/service'
+import { cloudbedsForTenant } from './cloudbeds-tenant'
+import { findReservationByConfirmation, getReservationDetail, setEstimatedArrival } from './cloudbeds-ops'
+import { sendTenantEmail } from './email'
+import { notifyStaff } from './escalation'
+import { parseEscalationContacts, findEscalationContact } from './escalation-contacts'
+import { buildKnowledgeBaseSection } from './knowledge-base'
+import { CONCIERGE_MODEL } from './anthropic'
+import type { EncryptedPayload } from './crypto'
+
+/**
+ * A guest emailed when they will arrive. Lana:
+ *  1. saves the time on their reservation in Cloudbeds,
+ *  2. answers the guest with a short, friendly email based on that time,
+ *  3. for arrivals outside check-in hours (after 9 PM / before 8 AM), alerts
+ *     the reservations contact on WhatsApp so a person can arrange it.
+ * What happened is recorded on the email so staff can see it.
+ */
+
+// Check-in hours from the hotel's knowledge base: 3:00 PM – 9:00 PM.
+const CHECK_IN_FROM = 15 * 60
+const CHECK_IN_UNTIL = 21 * 60
+// Staff start at 7:00 and the hotel asks for notice before 8:00 AM.
+const EARLIEST_ARRIVAL = 8 * 60
+
+export type ArrivalSituation = 'ok' | 'early' | 'special'
+
+export function arrivalSituation(time: string): ArrivalSituation {
+  const [h, m] = time.split(':').map(Number)
+  const minutes = h * 60 + m
+  if (minutes > CHECK_IN_UNTIL || minutes < EARLIEST_ARRIVAL) return 'special'
+  if (minutes < CHECK_IN_FROM) return 'early'
+  return 'ok'
+}
+
+export interface ArrivalInfo {
+  confirmation_number?: string | null
+  time?: string | null
+  kind?: 'stated' | 'request' | null
+  check_in_date?: string | null
+  guest_name?: string | null
+  guest_message?: string | null
+}
+
+export interface ArrivalMail {
+  id: string
+  fromEmail: string
+  fromName: string
+  replyTo: string | null
+  messageId: string
+  references: string | null
+  subject: string
+}
+
+interface Tenant {
+  ai_persona_prompt: string | null
+  knowledge_base: string | null
+  channel_settings: { email_replies?: boolean } | null
+  message_templates: unknown
+  escalation_contacts: unknown
+}
+
+export async function handleArrivalEmail(tenantId: string, mail: ArrivalMail, arrival: ArrivalInfo): Promise<void> {
+  const db = createServiceClient()
+  const time = (arrival.time ?? '').trim()
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return
+  const number = (arrival.confirmation_number ?? '').trim()
+  const kind = arrival.kind === 'request' ? 'request' : 'stated'
+  const situation = arrivalSituation(time)
+
+  // ---- 1. Save the arrival time in Cloudbeds -------------------------------
+  let saved: { id: string; guestName: string; startDate: string; endDate: string; room: string } | null = null
+  let problem: string | null = null
+  let savedNote = ''
+  if (!number) {
+    problem = `Guest gave an arrival time (${time}) but no booking number — add it in Cloudbeds by hand.`
+  } else {
+    try {
+      const cb = await cloudbedsForTenant(db, tenantId)
+      if (!cb) {
+        problem = 'Cloudbeds is not connected, so the arrival time was not saved.'
+      } else {
+        const found = await findReservationByConfirmation(cb, number, arrival.check_in_date)
+        if (!found) {
+          problem = `Couldn't find booking ${number} in Cloudbeds — add the arrival time (${time}) by hand.`
+        } else {
+          const d = await getReservationDetail(cb, found.reservationID)
+          if (['canceled', 'cancelled', 'no_show', 'checked_out'].includes(d.status.toLowerCase())) {
+            problem = `Booking ${number} is ${d.status} in Cloudbeds, so the arrival time (${time}) was not saved.`
+          } else {
+            await setEstimatedArrival(cb, found.reservationID, time)
+            saved = {
+              id: found.reservationID,
+              guestName: d.guestName,
+              startDate: d.startDate,
+              endDate: d.endDate,
+              room: d.rooms.map((r) => r.roomName ?? r.roomTypeName).filter(Boolean).join(', '),
+            }
+            if (d.estimatedArrivalTime && d.estimatedArrivalTime !== time) savedNote = ` (was ${d.estimatedArrivalTime})`
+          }
+        }
+      }
+    } catch (err) {
+      problem = `Could not save the arrival time (${time}): ${err instanceof Error ? err.message : 'Cloudbeds error'}`
+    }
+  }
+  const notes: string[] = []
+  if (saved) notes.push(`Arrival time ${time} saved to Cloudbeds for ${saved.guestName} · #${saved.id}${savedNote}`)
+  else notes.push(problem ?? 'Arrival time not saved.')
+  if (kind === 'request') notes.push('early check-in requested — staff to reply')
+  await db.from('inbound_emails').update({ action: saved ? 'arrival_saved' : 'arrival_not_saved', action_detail: notes.join(' · ') }).eq('id', mail.id)
+
+  // ---- 2. Reply to the guest -------------------------------------------------
+  const { data: tenant } = await db
+    .from('tenants')
+    .select('ai_persona_prompt, knowledge_base, channel_settings, message_templates, escalation_contacts')
+    .eq('id', tenantId)
+    .single<Tenant>()
+
+  let replySent = false
+  if (saved && tenant) {
+    replySent = await replyToGuest(db, tenantId, tenant, mail, arrival, time, kind, situation)
+  }
+
+  // ---- 3. Arrivals outside check-in hours → alert staff ---------------------
+  if (situation === 'special' && tenant) {
+    const alerted = await alertStaff(db, tenantId, tenant, {
+      guestName: saved?.guestName || arrival.guest_name || mail.fromName,
+      time,
+      reason: time > '21:00' ? 'después de las 21:00' : time < '06:00' ? 'de madrugada, después de medianoche' : 'antes de las 8:00',
+      number,
+      saved,
+      mail,
+    })
+    notes.push(alerted ? 'late arrival — staff alerted on WhatsApp' : "late arrival — couldn't alert staff on WhatsApp, please check")
+    await db.from('inbound_emails').update({ action_detail: notes.join(' · ') }).eq('id', mail.id)
+  }
+
+  // A plain "we'll arrive around X" that was saved and answered needs nothing more.
+  if (saved && replySent && kind === 'stated' && situation !== 'special') {
+    await db.from('inbound_emails').update({ status: 'done' }).eq('id', mail.id)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Reply
+// ---------------------------------------------------------------------------
+
+async function replyToGuest(
+  db: ReturnType<typeof createServiceClient>,
+  tenantId: string,
+  tenant: Tenant,
+  mail: ArrivalMail,
+  arrival: ArrivalInfo,
+  time: string,
+  kind: 'stated' | 'request',
+  situation: ArrivalSituation
+): Promise<boolean> {
+  const setReply = (patch: Record<string, unknown>) => db.from('inbound_emails').update(patch).eq('id', mail.id)
+
+  if (tenant.channel_settings?.email_replies === false) {
+    await setReply({ reply_status: 'not_sent', reply_detail: 'Email replies are switched off (Integrations → Guest channels).' })
+    return false
+  }
+
+  const text = await composeReply(tenant, arrival, time, kind, situation)
+  if (!text) {
+    await setReply({ reply_status: 'failed', reply_detail: "Lana couldn't write a reply — please answer the guest yourself." })
+    return false
+  }
+
+  const to = (mail.replyTo || mail.fromEmail || '').trim().toLowerCase()
+  const local = to.split('@')[0] ?? ''
+  if (!to || /^(no-?reply|do-?not-?reply|donotreply|mailer-daemon|postmaster|bounce)/.test(local)) {
+    await setReply({
+      reply_text: text,
+      reply_status: 'not_sent',
+      reply_detail: "This email can't be answered by email (it comes from a no-reply address). Reply to the guest in Booking.com / Airbnb — suggested reply below.",
+    })
+    return false
+  }
+
+  // Booking.com delivers anything above this line to the guest.
+  const relay = /@guest\.booking\.com$/.test(to)
+  const body = relay ? `${text}\n\n##- Please type your reply above this line -##` : text
+  const subject = /^re:/i.test(mail.subject) ? mail.subject : `Re: ${mail.subject}`
+  const html = text
+    .split(/\n{2,}/)
+    .map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`)
+    .join('')
+  const res = await sendTenantEmail(tenantId, to, subject, html, {
+    text: body,
+    inReplyTo: mail.messageId,
+    references: [mail.references, mail.messageId].filter(Boolean).join(' ') || undefined,
+  })
+  await setReply({
+    reply_text: text,
+    reply_status: res.success ? 'sent' : 'failed',
+    reply_detail: res.success ? `Sent to ${to}` : `Could not send: ${res.error ?? 'email error'}`,
+  })
+  return res.success
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+async function composeReply(
+  tenant: Tenant,
+  arrival: ArrivalInfo,
+  time: string,
+  kind: 'stated' | 'request',
+  situation: ArrivalSituation
+): Promise<string | null> {
+  const system =
+    (tenant.ai_persona_prompt ?? 'You are a warm, helpful hotel concierge.') +
+    buildKnowledgeBaseSection(tenant.knowledge_base) +
+    `
+
+TASK — EMAIL REPLY
+A guest emailed the time they expect to arrive. Write the reply email from the hotel.
+- Reply in the SAME LANGUAGE as the guest's message.
+- Short and warm, like a friendly local host: 2–4 short sentences, then a sign-off line "Soirée Reservations". No subject line, no markdown, no bullet points, at most one emoji.
+- Greet the guest by first name.
+- Use only facts from the knowledge base. Never invent anything. Never promise early check-in, late check-out or any special arrangement.
+- Situation "ok" (arrival within check-in hours, 3:00 PM–9:00 PM): thank them, confirm you've noted their arrival time, remind them that check-in is 3:00 PM–9:00 PM at Mezcalería Gota Gorda (easiest to find by searching that name in Google Maps), and say you look forward to welcoming them.
+- Situation "early" (arrival before 3:00 PM): thank them and say you've noted their arrival time. Check-in starts at 3:00 PM and early check-in depends on availability, so it can't be confirmed in advance. If the room isn't ready they are welcome to leave their luggage with us on arrival day and enjoy the pool, the patio or El Cafecito, or explore Zipolite.
+- Situation "special" (arrival after 9:00 PM or before 8:00 AM): thank them and say you've noted their arrival time. Arrivals outside 3:00 PM–9:00 PM need to be arranged in advance, so a member of the team will contact them shortly to arrange it. Do not promise it will be possible.
+Reply with ONLY the email text.`
+
+  const guest = (arrival.guest_name ?? '').trim()
+  const content = [
+    `Guest name: ${guest || '(unknown — greet without a name)'}`,
+    `Guest's message: ${(arrival.guest_message ?? '').slice(0, 1200) || '(not available)'}`,
+    `Arrival time they gave: ${time} (${kind === 'request' ? 'they are REQUESTING this check-in time' : 'they stated when they will arrive'})`,
+    `Situation: ${situation}`,
+  ].join('\n')
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY!, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: CONCIERGE_MODEL, max_tokens: 500, system, messages: [{ role: 'user', content }] }),
+    })
+    const data = (await res.json()) as { content?: { type: string; text?: string }[]; error?: { message?: string } }
+    if (!res.ok) throw new Error(data.error?.message ?? `HTTP ${res.status}`)
+    const text = (data.content ?? []).map((b) => b.text ?? '').join('').trim()
+    if (text.length < 20 || text.length > 1400) return null
+    return text
+  } catch (err) {
+    console.error('[arrival-email] writing the reply failed', err)
+    return null
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Staff alert (late / very early arrivals)
+// ---------------------------------------------------------------------------
+
+async function alertStaff(
+  db: ReturnType<typeof createServiceClient>,
+  tenantId: string,
+  tenant: Tenant,
+  info: {
+    guestName: string
+    time: string
+    reason: string
+    number: string
+    saved: { id: string; startDate: string; endDate: string; room: string } | null
+    mail: ArrivalMail
+  }
+): Promise<boolean> {
+  const contact = findEscalationContact(parseEscalationContacts(tenant.escalation_contacts), 'reservations')
+  const { data: wa } = await db
+    .from('tenant_integrations')
+    .select('status, credentials, config')
+    .eq('tenant_id', tenantId)
+    .eq('integration_type', 'whatsapp')
+    .maybeSingle()
+  const phoneNumberId = (wa?.config as { phone_number_id?: string } | null)?.phone_number_id
+
+  // One line (WhatsApp template fields can't hold line breaks).
+  const parts = [
+    `Llegada fuera de horario: ${info.guestName} llegará a las ${info.time} (${info.reason})`,
+    info.number ? `Reserva ${info.number}` : null,
+    info.saved ? `Cloudbeds #${info.saved.id}` : 'NO se pudo guardar en Cloudbeds',
+    info.saved ? `${info.saved.startDate} → ${info.saved.endDate}` : null,
+    info.saved?.room ? info.saved.room : null,
+    `por email (${info.mail.fromEmail})`,
+    'Contactar al huésped para coordinar',
+  ].filter(Boolean)
+  const summary = parts.join(' · ')
+
+  let delivered = false
+  if (contact && wa?.status === 'connected' && wa.credentials && phoneNumberId) {
+    const result = await notifyStaff(
+      phoneNumberId,
+      wa.credentials as EncryptedPayload,
+      contact.phone,
+      info.number ? `Reserva ${info.number}` : info.mail.fromEmail,
+      { category: 'reservations', summary, urgency: 'normal' },
+      tenant.message_templates,
+      info.guestName
+    )
+    delivered = result.success
+    if (!result.success) console.error('[arrival-email] staff alert failed', result.error)
+  }
+  await db.from('escalations').insert({
+    tenant_id: tenantId,
+    conversation_id: null,
+    guest_id: null,
+    category: 'reservations',
+    urgency: 'normal',
+    summary,
+    room: null,
+    delivered,
+  })
+  return delivered
+}
