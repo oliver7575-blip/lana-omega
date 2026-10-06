@@ -119,6 +119,12 @@ export interface ReservationDetail {
   estimatedArrivalTime: string | null
 }
 
+/** The raw getReservation record (used by payments to read source, balance and deposit fields). */
+export async function getReservationRaw(cb: CB, reservationID: string): Promise<Json> {
+  const json = await cbGet(cb, 'getReservation', { propertyID: cb.propertyId, reservationID })
+  return (json.data ?? {}) as Json
+}
+
 export async function getReservationDetail(cb: CB, reservationID: string): Promise<ReservationDetail> {
   const json = await cbGet(cb, 'getReservation', { propertyID: cb.propertyId, reservationID })
   const d = (json.data ?? {}) as Json

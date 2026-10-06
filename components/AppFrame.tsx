@@ -11,6 +11,7 @@ import {
   BedIcon,
   HammerIcon,
   StarIcon,
+  CardIcon,
   ListIcon,
   MailIcon,
   MenuIcon,
@@ -31,6 +32,7 @@ interface ShellInfo {
   unreadReservations: number
   unreadEmails: number
   unreadReviews: number
+  paymentsAttention: number
   newEscalations: number
 }
 
@@ -144,6 +146,7 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
           {sub('/email-inquiries', 'Email Inquiries', pathname.startsWith('/email-inquiries'), info?.unreadEmails)}
         </div>
         {item('/escalations', 'Escalations', AlertIcon, pathname.startsWith('/escalations'), info?.newEscalations)}
+        {item('/payments', 'Payments', CardIcon, pathname.startsWith('/payments'), info?.paymentsAttention)}
         {item('/automations', 'Templates', TemplateIcon, pathname.startsWith('/automations'))}
         {item('/integrations', 'Integrations', ShareIcon, pathname.startsWith('/integrations'))}
         {item('/reviews', 'Reviews', StarIcon, pathname.startsWith('/reviews'), info?.unreadReviews)}

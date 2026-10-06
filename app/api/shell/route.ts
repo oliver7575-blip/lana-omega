@@ -18,11 +18,12 @@ export async function GET() {
     .single()
   if (!staff) return NextResponse.json({ error: 'No tenant' }, { status: 404 })
 
-  const [{ data: tenant }, { count: newEscalations }, unreadReservations, unread] = await Promise.all([
+  const [{ data: tenant }, { count: newEscalations }, unreadReservations, unread, { count: paymentsAttention }] = await Promise.all([
     supabase.from('tenants').select('name').eq('id', staff.tenant_id).single(),
     supabase.from('escalations').select('id', { count: 'exact', head: true }).eq('status', 'new'),
     unreadConversationIds(supabase, staff.id as string, { reservationsOnly: true }).then((ids) => ids.length),
     unreadCounts(supabase, staff.id as string),
+    supabase.from('payment_requests').select('id', { count: 'exact', head: true }).in('status', ['needs_review', 'paid_unverified']),
   ])
 
   return NextResponse.json({
@@ -31,6 +32,7 @@ export async function GET() {
     unreadReservations,
     unreadEmails: unread.emails,
     unreadReviews: unread.reviews,
+    paymentsAttention: paymentsAttention ?? 0,
     newEscalations: newEscalations ?? 0,
   })
 }

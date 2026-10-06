@@ -99,3 +99,10 @@ export const StarIcon = ({ className }: P) => (
     <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5Z" />
   </svg>
 )
+
+export const CardIcon = ({ className }: P) => (
+  <svg {...base} className={className}>
+    <rect x="3" y="5.5" width="18" height="13" rx="2" />
+    <path d="M3 10h18M7 15h4" />
+  </svg>
+)
