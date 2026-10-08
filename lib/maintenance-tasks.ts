@@ -17,6 +17,10 @@ export interface TaskInput {
   season_end_month?: number | string | null
   season_lead_days?: number | string | null
   season_within_frequency?: string | null
+  /** Pause switch (handled by the task route: pausing stops reminders and repeating until switched back on). */
+  paused?: boolean
+  /** Carry over until finished: never resets at midnight; 8:01 AM check-in each day. */
+  carry_over?: boolean
   /** A follow-up task: waits on hold until another task's completion starts it. */
   on_hold?: boolean
   /** When this task is finished, start this follow-up task. */
@@ -96,6 +100,7 @@ export function cleanTask(body: TaskInput, partial: boolean, tz: string): { valu
     if (!(FOLLOW_UP_DELAYS as readonly number[]).includes(d)) return { error: 'Unknown wait before the follow-up' }
     v.next_delay_minutes = d
   }
+  if (body.carry_over !== undefined) v.carry_over = Boolean(body.carry_over)
   if (body.next_assign !== undefined) {
     v.next_assign = ['finisher', 'own', 'auto'].includes(body.next_assign ?? '') ? body.next_assign : 'finisher'
   }

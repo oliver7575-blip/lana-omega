@@ -21,6 +21,8 @@ export interface Task {
   escalation_status: string
   completed_at: string | null
   updated_at: string
+  paused?: boolean
+  carry_over?: boolean
   next_task_id?: string | null
   next_delay_minutes?: number | null
   next_assign?: string | null
@@ -94,3 +96,6 @@ export async function api<T = Record<string, unknown>>(url: string, method = 'GE
   if (!res.ok) throw new Error((json as { error?: string }).error ?? `Request failed (${res.status})`)
   return json as T
 }
+
+/** Tasks that never reset at midnight and stay open until finished (has a follow-up, is a follow-up, or the switch is on). */
+export const carriesOver = (t: Pick<Task, 'carry_over' | 'next_task_id'>) => Boolean(t.carry_over) || Boolean(t.next_task_id)

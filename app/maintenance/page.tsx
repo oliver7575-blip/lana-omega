@@ -6,7 +6,7 @@ import TaskModal from '@/components/maintenance/TaskModal'
 import TaskDrawer from '@/components/maintenance/TaskDrawer'
 import PreviewModal from '@/components/maintenance/PreviewModal'
 import LiveRefresh from '@/components/LiveRefresh'
-import { api, fmtDateTime, localParts, recurrenceLabel, STATUS_LABEL, titleCase, type Staff, type Task } from '@/components/maintenance/shared'
+import { api, carriesOver, fmtDateTime, localParts, recurrenceLabel, STATUS_LABEL, titleCase, type Staff, type Task } from '@/components/maintenance/shared'
 
 interface Stats { open: number; inProgress: number; needAttention: number; completed: number }
 interface ActivityEvent { id: string; task_id: string; task_title: string; event_type: string; detail: string; created_at: string }
@@ -120,6 +120,7 @@ export default function MaintenancePage() {
   }
 
   const action = (t: Task, a: string, ok: string) => run(() => api(`/api/maintenance/tasks/${t.id}/action`, 'POST', { action: a }), ok)
+  const setPaused = (t: Task, paused: boolean) => run(() => api(`/api/maintenance/tasks/${t.id}`, 'PATCH', { paused }), paused ? `#${t.task_code} paused` : `#${t.task_code} switched back on`)
   const setStatus = (t: Task, status: string) => run(() => api(`/api/maintenance/tasks/${t.id}`, 'PATCH', { status }))
   const remove = (t: Task) => {
     if (confirm(`Delete "${t.title}" (#${t.task_code})? A recurring task stops repeating.`)) {
@@ -238,7 +239,7 @@ export default function MaintenancePage() {
             <p className="px-4 py-8 text-center text-sm text-navy/50">No tasks here{dateFilter ? ' for this date' : ''}.</p>
           )}
           {visible.map((t) => (
-            <div key={t.id} className={`px-4 py-3 ${t.status === 'in_progress' ? 'border-l-2 border-l-emerald-400 bg-emerald-500/[0.08]' : t.escalation_status === 'required' ? 'bg-clay/[0.06]' : ''}`}>
+            <div key={t.id} className={`px-4 py-3 ${t.paused ? 'opacity-60' : ''} ${t.status === 'in_progress' ? 'border-l-2 border-l-emerald-400 bg-emerald-500/[0.08]' : t.escalation_status === 'required' ? 'bg-clay/[0.06]' : ''}`}>
               <div className="flex items-start gap-3">
                 <input
                   type="checkbox"
@@ -258,7 +259,7 @@ export default function MaintenancePage() {
                     {t.priority === 'urgent' && <span className="ml-1.5 text-xs text-red-300">🚨</span>}
                   </p>
                   <p className="mt-0.5 break-words text-xs text-navy/50">
-                    {[t.location ? `⌖ ${t.location}` : null, t.status === 'on_hold' ? 'Follow-up' : recurrenceLabel(t), t.status === 'on_hold' ? null : `${t.reminder_count} reminder${t.reminder_count === 1 ? '' : 's'}`, followUpLabel(t)].filter(Boolean).join(' · ')}
+                    {[t.location ? `⌖ ${t.location}` : null, t.status === 'on_hold' ? 'Follow-up' : recurrenceLabel(t), t.status === 'on_hold' ? null : `${t.reminder_count} reminder${t.reminder_count === 1 ? '' : 's'}`, followUpLabel(t), t.paused ? '⏸ Paused' : null, t.status !== 'on_hold' && carriesOver(t) ? 'Carries over' : null].filter(Boolean).join(' · ')}
                     {t.escalation_status === 'required' && <span className="text-clay"> · Needs attention</span>}
                   </p>
                   <p className="mt-1 text-xs text-navy/70">
@@ -285,6 +286,7 @@ export default function MaintenancePage() {
                 </select>
                 )}
                 <button onClick={() => setEditTask(t)} className="text-navy/75">Edit</button>
+                {mode === 'active' && t.status !== 'on_hold' && <PauseSwitch task={t} onToggle={setPaused} />}
                 {mode === 'active' && (
                   <>
                     <button onClick={() => action(t, 'send_now', 'Reminder sent')} className="text-navy/85">⚡ Send</button>
@@ -319,7 +321,7 @@ export default function MaintenancePage() {
               </p>
             )}
             {visible.map((t) => (
-              <div key={t.id} className={`${cols} border-b border-line px-5 py-3 last:border-b-0 ${t.status === 'in_progress' ? 'border-l-2 border-l-emerald-400 bg-emerald-500/[0.08] hover:bg-emerald-500/[0.12]' : t.escalation_status === 'required' ? 'bg-clay/[0.06] hover:bg-clay/[0.1]' : 'hover:bg-white/[0.02]'}`}>
+              <div key={t.id} className={`${cols} border-b border-line px-5 py-3 last:border-b-0 ${t.paused ? 'opacity-60' : ''} ${t.status === 'in_progress' ? 'border-l-2 border-l-emerald-400 bg-emerald-500/[0.08] hover:bg-emerald-500/[0.12]' : t.escalation_status === 'required' ? 'bg-clay/[0.06] hover:bg-clay/[0.1]' : 'hover:bg-white/[0.02]'}`}>
                 <input
                   type="checkbox"
                   checked={selected.has(t.id)}
@@ -338,7 +340,7 @@ export default function MaintenancePage() {
                     {t.priority === 'urgent' && <span className="ml-2 text-xs text-red-300">🚨 Urgent</span>}
                   </p>
                   <p className="truncate text-xs text-navy/50">
-                    {[t.location ? `⌖ ${t.location}` : null, t.priority, t.status === 'on_hold' ? 'Follow-up' : recurrenceLabel(t), t.status === 'on_hold' ? null : `${t.reminder_count} reminder${t.reminder_count === 1 ? '' : 's'}`, followUpLabel(t)].filter(Boolean).join(' · ')}
+                    {[t.location ? `⌖ ${t.location}` : null, t.priority, t.status === 'on_hold' ? 'Follow-up' : recurrenceLabel(t), t.status === 'on_hold' ? null : `${t.reminder_count} reminder${t.reminder_count === 1 ? '' : 's'}`, followUpLabel(t), t.paused ? '⏸ Paused' : null, t.status !== 'on_hold' && carriesOver(t) ? 'Carries over' : null].filter(Boolean).join(' · ')}
                     {t.escalation_status === 'required' && <span className="ml-2 text-clay">· Needs attention</span>}
                   </p>
                 </button>
@@ -368,6 +370,7 @@ export default function MaintenancePage() {
                 )}
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
                   <button onClick={() => setEditTask(t)} className="text-navy/75 hover:text-navy">Edit</button>
+                  {mode === 'active' && t.status !== 'on_hold' && <PauseSwitch task={t} onToggle={setPaused} />}
                   {mode === 'active' && (
                     <>
                       <button onClick={() => action(t, 'send_now', 'Reminder sent')} className="text-navy/85 hover:text-white">⚡ Send now</button>
@@ -419,5 +422,26 @@ export default function MaintenancePage() {
       )}
       {drawerId && <TaskDrawer taskId={drawerId} staff={staff} timezone={tz} onClose={() => setDrawerId(null)} onChanged={load} />}
     </main>
+  )
+}
+
+
+/** On/off switch that pauses a task: no reminders and no repeating until it is switched back on. */
+function PauseSwitch({ task, onToggle }: { task: Task; onToggle: (t: Task, paused: boolean) => void }) {
+  const paused = Boolean(task.paused)
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={paused}
+      onClick={() => onToggle(task, !paused)}
+      title={paused ? 'Paused — click to switch it back on' : 'Click to pause this task (no reminders, no repeating)'}
+      className="flex items-center gap-1.5 text-navy/75 hover:text-white"
+    >
+      <span className={`relative inline-block h-4 w-7 rounded-full transition-colors ${paused ? 'bg-amber-400/80' : 'bg-white/20'}`}>
+        <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${paused ? 'left-3.5' : 'left-0.5'}`} />
+      </span>
+      {paused ? 'Paused' : 'Pause'}
+    </button>
   )
 }

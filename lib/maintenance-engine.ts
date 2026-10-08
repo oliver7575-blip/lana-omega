@@ -65,6 +65,18 @@ export interface TaskRow {
   next_task_id?: string | null
   next_delay_minutes?: number | null
   next_assign?: string | null
+  paused?: boolean
+  carry_over?: boolean
+}
+
+/**
+ * Tasks that carry over: they never reset at midnight and stay open (day after
+ * day) until finished. That is every task with a follow-up, every follow-up task
+ * (created with carry_over on), and any task whose "Carry over until finished"
+ * switch is on.
+ */
+export function isCarryOver(task: Pick<TaskRow, 'carry_over' | 'next_task_id'>): boolean {
+  return Boolean(task.carry_over) || Boolean(task.next_task_id)
 }
 
 export interface StaffRow {
@@ -151,11 +163,14 @@ async function cancelPendingReminders(ctx: EngineContext, taskId: string) {
     .eq('status', 'pending')
 }
 
-export async function scheduleReminder(ctx: EngineContext, taskId: string, at: Date) {
+export type ReminderKind = 'standard' | 'morning_check'
+
+export async function scheduleReminder(ctx: EngineContext, taskId: string, at: Date, kind: ReminderKind = 'standard') {
   await ctx.db.from('maintenance_reminders').insert({
     tenant_id: ctx.tenantId,
     task_id: taskId,
     scheduled_for: at.toISOString(),
+    kind,
   })
 }
 
@@ -270,6 +285,7 @@ export async function spawnNext(ctx: EngineContext, task: TaskRow): Promise<stri
         next_task_id: task.next_task_id ?? null,
         next_delay_minutes: task.next_delay_minutes ?? 0,
         next_assign: task.next_assign ?? 'finisher',
+        carry_over: task.carry_over ?? false,
       })
       .select('id')
       .single()
@@ -342,6 +358,7 @@ export async function pickStaff(ctx: EngineContext, excludeId?: string): Promise
     .from('maintenance_tasks')
     .select('assigned_to')
     .eq('tenant_id', ctx.tenantId)
+    .eq('paused', false)
     .in('status', ['waiting', 'in_progress'])
     .in('assigned_to', staff.map((s) => s.id))
   const counts = new Map(staff.map((s) => [s.id, 0]))
@@ -349,6 +366,135 @@ export async function pickStaff(ctx: EngineContext, excludeId?: string): Promise
   // Nobody gets a new task while they already have MAX_OPEN_PER_STAFF unfinished ones.
   const withRoom = staff.filter((s) => counts.get(s.id)! < MAX_OPEN_PER_STAFF)
   return [...withRoom].sort((a, b) => (counts.get(a.id)! - counts.get(b.id)!) || a.name.localeCompare(b.name))[0] ?? null
+}
+
+// ---------------------------------------------------------------------------
+// Carry-over: the morning check-in (8:01), pause and resume
+// ---------------------------------------------------------------------------
+
+const MORNING_CHECK_MINUTES = 8 * 60 + 1 // 8:01 AM
+
+/**
+ * The next 8:01 AM (hotel time) on a day this person works — or their quiet-hours
+ * end, if that is later. Days off (weekly and date ranges) are skipped, so a check-in
+ * that would land on a day off goes out on the next working day instead.
+ * `includeToday` allows today's 8:01 when it is still ahead.
+ */
+export function nextMorningCheck(staff: StaffRow | null, tz: string, includeToday: boolean, from: Date = new Date()): Date {
+  const quietEnd = staff ? hhmmToMinutes(staff.quiet_hours_end) : null
+  const minutes = quietEnd !== null && quietEnd > MORNING_CHECK_MINUTES && quietEnd < 12 * 60 ? quietEnd : MORNING_CHECK_MINUTES
+  const p = zonedParts(from, tz)
+  const base = fromZoned(p.year, p.month, p.day, Math.floor(minutes / 60), minutes % 60, tz)
+  for (let i = includeToday ? 0 : 1; i < 60; i++) {
+    const candidate = i === 0 ? base : addLocalDays(base, i, tz)
+    if (candidate.getTime() <= from.getTime() + 60_000) continue
+    if (staff && offToday(staff, tz, candidate)) continue
+    return candidate
+  }
+  return addLocalDays(base, 1, tz)
+}
+
+async function staffOf(ctx: EngineContext, task: TaskRow): Promise<StaffRow | null> {
+  if (!task.assigned_to) return null
+  return (await loadStaff(ctx)).find((s) => s.id === task.assigned_to) ?? null
+}
+
+/**
+ * Next day at 8:01 for an accepted carry-over task (never the same day it was
+ * accepted). Replaces any other pending reminder for the task.
+ */
+export async function scheduleMorningCheck(ctx: EngineContext, task: TaskRow, includeToday = false): Promise<Date> {
+  const staff = await staffOf(ctx, task)
+  const at = nextMorningCheck(staff, ctx.tz, includeToday)
+  await cancelPendingReminders(ctx, task.id)
+  await scheduleReminder(ctx, task.id, at, 'morning_check')
+  return at
+}
+
+/** True when the person messaged our number in the last 24 hours, so free text can be delivered. */
+async function windowOpen(ctx: EngineContext, staff: StaffRow): Promise<boolean> {
+  const { data } = await ctx.db
+    .from('maintenance_messages')
+    .select('created_at')
+    .eq('tenant_id', ctx.tenantId)
+    .eq('staff_id', staff.id)
+    .eq('direction', 'inbound')
+    .order('created_at', { ascending: false })
+    .limit(1)
+  const last = data?.[0]?.created_at ? Date.parse(data[0].created_at as string) : 0
+  // A 10-minute margin: a message exactly 24h old may already be outside WhatsApp's window.
+  return last > 0 && Date.now() - last < 24 * 3600_000 - 10 * 60_000
+}
+
+/** Pauses a task: no reminders, no check-ins, no roll-forward, no repeating — until resumed. */
+export async function pauseTask(ctx: EngineContext, task: TaskRow): Promise<void> {
+  await ctx.db.from('maintenance_tasks').update({ paused: true, updated_at: new Date().toISOString() }).eq('id', task.id)
+  await cancelPendingReminders(ctx, task.id)
+  await logEvent(ctx, task.id, 'paused', 'Task paused — no reminders and no repeating until it is switched back on')
+}
+
+/** Local time of day (HH:MM) of an instant, as minutes. */
+const minutesOfDay = (d: Date, tz: string) => {
+  const p = zonedParts(d, tz)
+  return p.hour * 60 + p.minute
+}
+
+/**
+ * Switches a task back on. It waits for its NEXT scheduled time rather than
+ * reminding right away: the next occurrence for repeating tasks, the next time of
+ * day for one-off tasks, and the next 8:01 check-in for carry-over tasks.
+ */
+export async function resumeTask(ctx: EngineContext, task: TaskRow): Promise<void> {
+  const nowIso = new Date().toISOString()
+  await ctx.db.from('maintenance_tasks').update({ paused: false, updated_at: nowIso }).eq('id', task.id)
+  await cancelPendingReminders(ctx, task.id)
+  const resumed: TaskRow = { ...task, paused: false }
+
+  let detail: string
+  if (isCarryOver(resumed)) {
+    const staff = await staffOf(ctx, resumed)
+    const at = nextMorningCheck(staff, ctx.tz, true)
+    if (resumed.status === 'in_progress') {
+      await scheduleReminder(ctx, resumed.id, at, 'morning_check')
+    } else {
+      await ctx.db.from('maintenance_tasks').update({ status: 'scheduled', reminder_count: 0, last_reminded_at: null }).eq('id', resumed.id)
+      await scheduleReminder(ctx, resumed.id, at)
+    }
+    detail = `Next reminder ${at.toISOString()} (8:01 check-in)`
+    await logEvent(ctx, resumed.id, 'resumed', `Task switched back on; ${detail}`)
+    return
+  }
+
+  const due = resumed.due_at ? new Date(resumed.due_at) : null
+  let next: Date | null = null
+  if (due && due.getTime() > Date.now()) {
+    next = due // still ahead: keep its schedule
+  } else if (resumed.recurrence_rule !== 'none') {
+    next = nextOccurrence(resumed, ctx.tz)
+  } else if (due) {
+    // One-off task whose time has passed: its next occurrence of that time of day.
+    const m = minutesOfDay(due, ctx.tz)
+    const p = zonedParts(new Date(), ctx.tz)
+    let candidate = fromZoned(p.year, p.month, p.day, Math.floor(m / 60), m % 60, ctx.tz)
+    if (candidate.getTime() <= Date.now()) candidate = addLocalDays(candidate, 1, ctx.tz)
+    next = candidate
+  }
+  if (!next) next = addLocalDays(new Date(), 1, ctx.tz)
+
+  await ctx.db
+    .from('maintenance_tasks')
+    .update({
+      due_at: next.toISOString(),
+      series_due_at: resumed.series_due_at ?? resumed.due_at,
+      status: 'scheduled',
+      reminder_count: 0,
+      last_reminded_at: null,
+      escalation_status: 'none',
+      updated_at: nowIso,
+    })
+    .eq('id', resumed.id)
+  await scheduleReminder(ctx, resumed.id, next)
+  await logEvent(ctx, resumed.id, 'resumed', `Task switched back on; waiting for its next scheduled time (${next.toISOString()})`)
 }
 
 // ---------------------------------------------------------------------------
@@ -367,6 +513,20 @@ function formatDue(dueAt: string | null, tz: string): string {
 async function sendStaffText(ctx: EngineContext, staff: StaffRow, taskId: string | null, text: string) {
   if (!ctx.whatsapp) return
   const res = await sendWhatsAppMessage(ctx.whatsapp.phoneNumberId, ctx.whatsapp.credentials, staff.phone, text)
+  await ctx.db.from('maintenance_messages').insert({
+    tenant_id: ctx.tenantId,
+    task_id: taskId,
+    staff_id: staff.id,
+    direction: 'outbound',
+    content: text,
+    delivery_status: res.success ? 'accepted' : 'failed',
+  })
+}
+
+/** Free text with tap buttons (valid inside WhatsApp's 24-hour window, which a button tap just opened). */
+async function sendStaffButtons(ctx: EngineContext, staff: StaffRow, taskId: string | null, text: string, buttons: { id: string; title: string }[]) {
+  if (!ctx.whatsapp) return
+  const res = await sendWhatsAppButtons(ctx.whatsapp.phoneNumberId, ctx.whatsapp.credentials, staff.phone, text, buttons)
   await ctx.db.from('maintenance_messages').insert({
     tenant_id: ctx.tenantId,
     task_id: taskId,
@@ -410,14 +570,19 @@ async function defer(ctx: EngineContext, reminderId: string, taskId: string, unt
  */
 export async function processReminder(
   ctx: EngineContext,
-  reminder: { id: string; task_id: string },
+  reminder: { id: string; task_id: string; kind?: string },
   opts: { force?: boolean } = {}
 ): Promise<ReminderOutcome> {
   const task = await loadTask(ctx, reminder.task_id)
+  // A paused task never sends anything.
+  if (task?.paused) {
+    await ctx.db.from('maintenance_reminders').update({ status: 'cancelled' }).eq('id', reminder.id)
+    return { taskId: reminder.task_id, result: 'cancelled', detail: 'Task is paused' }
+  }
   // Stop reminding once someone has ignored MAX_REMINDERS reminders (the task is
   // flagged for a manager). A task moved to tomorrow after a help request is also
   // flagged, but starts a fresh set of reminders, so it still goes out.
-  const ignoredTooOften = task?.escalation_status === 'required' && (task.reminder_count ?? 0) >= MAX_REMINDERS
+  const ignoredTooOften = reminder.kind !== 'morning_check' && task?.escalation_status === 'required' && (task.reminder_count ?? 0) >= MAX_REMINDERS
   if (!task || !ACTIVE_STATUSES.includes(task.status as never) || ignoredTooOften) {
     await ctx.db.from('maintenance_reminders').update({ status: 'cancelled' }).eq('id', reminder.id)
     return { taskId: reminder.task_id, result: 'cancelled' }
@@ -425,6 +590,7 @@ export async function processReminder(
   if (!ctx.whatsapp) {
     return { taskId: task.id, result: 'skipped', detail: 'WhatsApp is not connected' }
   }
+  if (reminder.kind === 'morning_check') return processMorningCheck(ctx, reminder, task, opts)
   // Until Meta approves the template, reminders go out as plain text (only
   // delivered if the staff member messaged the number in the last 24 hours).
   const useTemplate = await templateReady(ctx)
@@ -471,6 +637,7 @@ export async function processReminder(
         .select('id', { count: 'exact', head: true })
         .eq('tenant_id', ctx.tenantId)
         .eq('assigned_to', staff.id)
+        .eq('paused', false)
         .in('status', ['waiting', 'in_progress'])
         .neq('id', task.id)
       if ((openCount ?? 0) >= MAX_OPEN_PER_STAFF) {
@@ -585,6 +752,9 @@ export async function processReminder(
       .eq('id', task.id)
     await logEvent(ctx, task.id, 'escalation_required', `${staff.name} has received ${count} reminders without completing the task.`)
     await alertMaintenanceContact(ctx, task, `${staff.name} recibió ${count} recordatorios y no ha respondido.`)
+  } else if (isCarryOver(task) && task.status === 'in_progress') {
+    // Carry-over tasks that were accepted are not nudged again the same day.
+    await scheduleMorningCheck(ctx, task)
   } else {
     await scheduleReminder(
       ctx,
@@ -592,6 +762,82 @@ export async function processReminder(
       minutesFromNow(task.status === 'in_progress' ? ACCEPTED_FOLLOW_UP_MINUTES : FOLLOW_UP_MINUTES)
     )
   }
+  return { taskId: task.id, result: 'sent' }
+}
+
+/**
+ * The 8:01 AM check-in for an accepted carry-over task: "are you still working on
+ * it?" with tap buttons. Free text when the person messaged us in the last 24 hours;
+ * otherwise the approved maintenance template. A day off moves it to the next
+ * working day. It repeats every morning until the task is finished.
+ */
+async function processMorningCheck(
+  ctx: EngineContext,
+  reminder: { id: string; task_id: string },
+  task: TaskRow,
+  opts: { force?: boolean }
+): Promise<ReminderOutcome> {
+  if (!ctx.whatsapp) return { taskId: task.id, result: 'skipped', detail: 'WhatsApp is not connected' }
+  const staff = await staffOf(ctx, task)
+  if (!staff || !staff.active) {
+    return defer(ctx, reminder.id, task.id, minutesFromNow(60), 'reminder_deferred', 'No active staff member for the morning check-in; deferred 60 min')
+  }
+  if (!opts.force) {
+    if (offToday(staff, ctx.tz)) {
+      return defer(ctx, reminder.id, task.id, nextMorningCheck(staff, ctx.tz, false), 'reminder_deferred_weekly_day_off',
+        `${staff.name} is off today; the check-in moves to their next working day at 8:01`)
+    }
+    if (inQuietHours(staff, ctx.tz)) {
+      return defer(ctx, reminder.id, task.id, nextMorning(staff, ctx.tz), 'reminder_deferred', `Quiet hours for ${staff.name}; check-in deferred`)
+    }
+  }
+
+  const first = staff.name.split(' ')[0]
+  const inWindow = await windowOpen(ctx, staff)
+  const useTemplate = !inWindow && (await templateReady(ctx))
+  const send = useTemplate
+    ? await sendMaintenanceTemplate(
+        ctx.whatsapp.phoneNumberId,
+        ctx.whatsapp.credentials,
+        staff.phone,
+        { firstName: first, task: `#${task.task_code} ${task.title}`, location: task.location ?? '—', due: formatDue(task.due_at, ctx.tz) },
+        task.id,
+        ctx.choice
+      )
+    : await sendWhatsAppButtons(
+        ctx.whatsapp.phoneNumberId,
+        ctx.whatsapp.credentials,
+        staff.phone,
+        `Buenos días ${first} 👋\n¿Sigues trabajando en la tarea *#${task.task_code}* · ${task.title}?\n📍 ${task.location ?? '—'}`,
+        [
+          { id: `mt:${task.id}:still`, title: 'Sí, sigo' },
+          { id: `mt:${task.id}:done`, title: 'Terminado' },
+        ]
+      )
+
+  await ctx.db.from('maintenance_messages').insert({
+    tenant_id: ctx.tenantId,
+    task_id: task.id,
+    staff_id: staff.id,
+    direction: 'outbound',
+    content: `Seguimiento: ${task.title}`,
+    delivery_status: send.success ? 'accepted' : 'failed',
+  })
+
+  if (!send.success) {
+    await ctx.db.from('maintenance_reminders').update({ status: 'failed', error_message: send.error ?? null }).eq('id', reminder.id)
+    await logEvent(ctx, task.id, 'reminder_failed', `Morning check-in to ${staff.name} failed: ${send.error ?? 'unknown'}`)
+    const { count: failures } = await ctx.db.from('maintenance_reminders').select('id', { count: 'exact', head: true }).eq('task_id', task.id).eq('status', 'failed')
+    if ((failures ?? 0) < 3) await scheduleReminder(ctx, task.id, minutesFromNow(30), 'morning_check')
+    else await scheduleMorningCheck(ctx, task)
+    return { taskId: task.id, result: 'failed', detail: send.error }
+  }
+
+  await ctx.db.from('maintenance_reminders').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', reminder.id)
+  await ctx.db.from('maintenance_tasks').update({ last_reminded_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', task.id)
+  const next = await scheduleMorningCheck(ctx, task)
+  await logEvent(ctx, task.id, 'morning_check_sent',
+    `Morning check-in sent to ${staff.name} (${useTemplate ? 'maintenance template — more than 24 h since their last message' : 'free text with buttons'}); next one ${formatDue(next.toISOString(), ctx.tz)}`)
   return { taskId: task.id, result: 'sent' }
 }
 
@@ -683,6 +929,7 @@ export async function startFollowUp(ctx: EngineContext, finished: TaskRow): Prom
         next_task_id: tpl.next_task_id ?? null,
         next_delay_minutes: tpl.next_delay_minutes ?? 0,
         next_assign: tpl.next_assign ?? 'finisher',
+        carry_over: true,
       })
       .select('id, task_code')
       .single()
@@ -727,6 +974,9 @@ export async function completeTask(ctx: EngineContext, task: TaskRow, how: { sou
       .select('id')
       .eq('tenant_id', ctx.tenantId)
       .eq('assigned_to', task.assigned_to)
+      .eq('paused', false)
+      .eq('carry_over', false) // carry-over tasks keep their own morning schedule
+      .is('next_task_id', null)
       .in('status', ACTIVE_STATUSES as unknown as string[])
       .lte('due_at', new Date().toISOString())
     const ids = (waitingTasks ?? []).map((t) => t.id as string)
@@ -737,6 +987,7 @@ export async function completeTask(ctx: EngineContext, task: TaskRow, how: { sou
         .select('id, task_id')
         .in('task_id', ids)
         .eq('status', 'pending')
+        .eq('kind', 'standard')
         .gt('scheduled_for', soon.toISOString())
         .order('scheduled_for')
         .limit(1)
@@ -751,8 +1002,14 @@ export async function completeTask(ctx: EngineContext, task: TaskRow, how: { sou
 export async function acknowledgeTask(ctx: EngineContext, task: TaskRow, text: string) {
   await ctx.db.from('maintenance_tasks').update({ status: 'in_progress', updated_at: new Date().toISOString() }).eq('id', task.id)
   await cancelPendingReminders(ctx, task.id)
-  await scheduleReminder(ctx, task.id, minutesFromNow(ACCEPTED_FOLLOW_UP_MINUTES))
   await logEvent(ctx, task.id, 'reply_acknowledged', text)
+  if (isCarryOver(task)) {
+    // No reminder the same day it is accepted: the first check-in is the next working morning at 8:01.
+    const at = await scheduleMorningCheck(ctx, { ...task, status: 'in_progress' })
+    await logEvent(ctx, task.id, 'morning_check_scheduled', `Next check-in ${formatDue(at.toISOString(), ctx.tz)}`)
+    return
+  }
+  await scheduleReminder(ctx, task.id, minutesFromNow(ACCEPTED_FOLLOW_UP_MINUTES))
 }
 
 /** "Necesito ayuda": hand the task to someone else (Beta's reassignment rule). */
@@ -763,7 +1020,7 @@ export async function requestHelp(ctx: EngineContext, task: TaskRow, requester: 
     // Nobody can take it: move it to tomorrow and flag it (Needs attention).
     await cancelPendingReminders(ctx, task.id)
     const reason = `${requester.name} asked for help and nobody else is available; moved to tomorrow`
-    if (task.recurrence_rule === 'daily' || task.recurrence_rule === 'interval') {
+    if ((task.recurrence_rule === 'daily' || task.recurrence_rule === 'interval') && !isCarryOver(task)) {
       // Tomorrow already has its own occurrence: close this one and flag the next.
       await ctx.db.from('maintenance_tasks').update({ status: 'cancelled', updated_at: new Date().toISOString() }).eq('id', task.id)
       await logEvent(ctx, task.id, 'escalation_required', reason)
@@ -812,6 +1069,42 @@ export async function requestHelp(ctx: EngineContext, task: TaskRow, requester: 
 // The scheduled run (every 5 minutes)
 // ---------------------------------------------------------------------------
 
+/**
+ * Carry-over tasks are never closed or replaced. This lines up their next reminder
+ * whenever they have none: an accepted task gets its 8:01 check-in; a task nobody
+ * accepted gets a fresh reminder the next working morning once a day has passed.
+ */
+async function ensureCarryOverReminders(ctx: EngineContext, today: string): Promise<void> {
+  const { data: tasks } = await ctx.db
+    .from('maintenance_tasks')
+    .select('*')
+    .eq('tenant_id', ctx.tenantId)
+    .eq('paused', false)
+    .in('status', ACTIVE_STATUSES as unknown as string[])
+    .or('carry_over.eq.true,next_task_id.not.is.null')
+  const list = (tasks ?? []) as TaskRow[]
+  if (!list.length) return
+  const { data: pending } = await ctx.db.from('maintenance_reminders').select('task_id').in('task_id', list.map((t) => t.id)).eq('status', 'pending')
+  const hasPending = new Set((pending ?? []).map((r) => r.task_id as string))
+  for (const t of list) {
+    if (hasPending.has(t.id)) continue
+    if (t.status === 'in_progress') {
+      const at = await scheduleMorningCheck(ctx, t, true)
+      await logEvent(ctx, t.id, 'morning_check_scheduled', `Next check-in ${formatDue(at.toISOString(), ctx.tz)}`)
+      continue
+    }
+    const dueDay = t.due_at ? localDate(new Date(t.due_at), ctx.tz) : today
+    if (dueDay >= today) continue
+    const at = nextMorningCheck(await staffOf(ctx, t), ctx.tz, true)
+    await ctx.db
+      .from('maintenance_tasks')
+      .update({ status: 'scheduled', reminder_count: 0, last_reminded_at: null, carried_over_count: (t.carried_over_count ?? 0) + 1, updated_at: new Date().toISOString() })
+      .eq('id', t.id)
+    await scheduleReminder(ctx, t.id, at)
+    await logEvent(ctx, t.id, 'carried_over', `Still open since ${dueDay}; carried over — next reminder ${formatDue(at.toISOString(), ctx.tz)}`)
+  }
+}
+
 export async function runTenantTick(tenantId: string) {
   const ctx = await loadEngineContext(tenantId)
   const today = localDate(new Date(), ctx.tz)
@@ -831,6 +1124,8 @@ export async function runTenantTick(tenantId: string) {
   let rolled = 0
   for (const t of (open ?? []) as TaskRow[]) {
     if (!t.due_at) continue
+    // Paused tasks and carry-over tasks never reset at midnight — they stay open until finished.
+    if (t.paused || isCarryOver(t)) continue
     const dueDay = localDate(new Date(t.due_at), ctx.tz)
     const nextSlotStarted =
       t.recurrence_rule === 'interval' && (stepOnce(t, new Date(t.due_at), ctx.tz)?.getTime() ?? Infinity) <= Date.now()
@@ -866,10 +1161,13 @@ export async function runTenantTick(tenantId: string) {
     rolled++
   }
 
+  // 1b) Carry-over tasks: make sure each one always has its next reminder lined up.
+  await ensureCarryOverReminders(ctx, today)
+
   // 2) Send due reminders — urgent first, then oldest due.
   const { data: due } = await ctx.db
     .from('maintenance_reminders')
-    .select('id, task_id, scheduled_for')
+    .select('id, task_id, scheduled_for, kind')
     .eq('tenant_id', tenantId)
     .eq('status', 'pending')
     .lte('scheduled_for', new Date().toISOString())
@@ -883,7 +1181,7 @@ export async function runTenantTick(tenantId: string) {
       continue
     }
     seen.add(r.task_id as string)
-    outcomes.push(await processReminder(ctx, { id: r.id as string, task_id: r.task_id as string }))
+    outcomes.push(await processReminder(ctx, { id: r.id as string, task_id: r.task_id as string, kind: r.kind as string }))
   }
   return { tenantId, rolled, outcomes }
 }
@@ -892,7 +1190,7 @@ export async function runTenantTick(tenantId: string) {
 // Staff WhatsApp replies
 // ---------------------------------------------------------------------------
 
-type Action = 'accept' | 'done' | 'help'
+type Action = 'accept' | 'done' | 'help' | 'still'
 const WORDS: Record<string, Action> = {
   ACEPTO: 'accept',
   ACEPTAR: 'accept',
@@ -901,10 +1199,15 @@ const WORDS: Record<string, Action> = {
   HECHO: 'done',
   AYUDA: 'help',
   'NECESITO AYUDA': 'help',
+  'SÍ, SIGO': 'still',
+  'SI, SIGO': 'still',
+  'SÍ SIGO': 'still',
+  'SI SIGO': 'still',
+  SIGO: 'still',
 }
 
 export function parseStaffReply(text: string): { taskId?: string; code?: string; action: Action } | null {
-  const payload = /^mt:([0-9a-f-]{36}):(accept|help|done)$/i.exec(text.trim())
+  const payload = /^mt:([0-9a-f-]{36}):(accept|help|done|still)$/i.exec(text.trim())
   if (payload) return { taskId: payload[1], action: payload[2].toLowerCase() as Action }
   const clean = text.trim().toUpperCase().replace(/\s+/g, ' ').replace(/[.!]+$/, '')
   const withCode = /^#?([0-9A-F]{6}) (.+)$/.exec(clean)
@@ -937,6 +1240,7 @@ export async function handleStaffReply(ctx: EngineContext, staff: StaffRow, text
       .select('*')
       .eq('tenant_id', ctx.tenantId)
       .eq('assigned_to', staff.id)
+      .eq('paused', false)
       .in('status', ['waiting', 'in_progress'])
       .order('last_reminded_at', { ascending: false })
     const list = (data ?? []) as TaskRow[]
@@ -960,8 +1264,33 @@ export async function handleStaffReply(ctx: EngineContext, staff: StaffRow, text
   await ctx.db.from('maintenance_messages').update({ task_id: task.id })
     .eq('staff_id', staff.id).is('task_id', null).eq('direction', 'inbound').gte('created_at', new Date(Date.now() - 60000).toISOString())
 
-  const label = `${task.task_code} ${parsed.action === 'done' ? 'TERMINADO' : parsed.action === 'accept' ? 'ACEPTO' : 'AYUDA'}`
+  // A paused task can still be reported finished, but nothing else.
+  if (task.paused && parsed.action !== 'done') {
+    await sendStaffText(ctx, staff, task.id, `La tarea #${task.task_code} está en pausa por ahora. Gracias.`)
+    return true
+  }
+  // Tapping "Acepto" on a carry-over task already in progress (the template's button) means "I'm still on it".
+  const action: Action = parsed.action === 'accept' && task.status === 'in_progress' && isCarryOver(task) ? 'still' : parsed.action
+  const label = `${task.task_code} ${action === 'done' ? 'TERMINADO' : action === 'accept' ? 'ACEPTO' : action === 'still' ? 'SIGO' : 'AYUDA'}`
   const first = staff.name.split(' ')[0]
+  if (action === 'still') {
+    await logEvent(ctx, task.id, 'reply_still_working', label)
+    // Tomorrow's check-in is already lined up; make sure it is.
+    const { count: pendingChecks } = await ctx.db
+      .from('maintenance_reminders')
+      .select('id', { count: 'exact', head: true })
+      .eq('task_id', task.id)
+      .eq('status', 'pending')
+    if (!pendingChecks) await scheduleMorningCheck(ctx, task)
+    await sendStaffButtons(
+      ctx,
+      staff,
+      task.id,
+      `Gracias ${first} 🙌 Cuando termines la tarea *#${task.task_code}*, toca el botón *Terminado*.`,
+      [{ id: `mt:${task.id}:done`, title: 'Terminado' }]
+    )
+    return true
+  }
   if (parsed.action === 'done') {
     await completeTask(ctx, task, { source: 'whatsapp', text: label })
     await sendStaffText(ctx, staff, task.id, `✅ Anotado #${task.task_code}, gracias ${first}`)

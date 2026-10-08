@@ -34,6 +34,7 @@ export default function TaskModal({ task, staff, timezone, followUps = [], onClo
     season_lead_days: String(task?.season_lead_days ?? 0),
     season_within_frequency: task?.season_within_frequency ?? 'monthly',
     on_hold: task?.status === 'on_hold',
+    carry_over: Boolean(task?.carry_over),
     next_task_id: task?.next_task_id ?? '',
     next_delay_minutes: String(task?.next_delay_minutes ?? 0),
     next_assign: task?.next_assign ?? 'finisher',
@@ -211,6 +212,27 @@ export default function TaskModal({ task, staff, timezone, followUps = [], onClo
             </div>
           )}
         </div>
+
+        {!f.on_hold && (
+          <label className="flex items-start gap-2.5 rounded-xl border border-line bg-paper/40 px-3 py-2.5 text-sm text-navy/85">
+            <input
+              type="checkbox"
+              checked={Boolean(f.next_task_id) || f.carry_over}
+              disabled={Boolean(f.next_task_id)}
+              onChange={(e) => set('carry_over', e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-clay"
+            />
+            <span>
+              <span className="font-semibold text-white">Carry over until finished</span>
+              <span className="block text-xs text-navy/55">
+                {f.next_task_id
+                  ? 'Always on for tasks that start a follow-up.'
+                  : 'Never resets at midnight: the task stays open day after day until it is finished.'}{' '}
+                Once accepted there are no more reminders that day; the next day at 8:01 AM the assigned person is asked if they are still working on it, and again every morning until it is done.
+              </span>
+            </span>
+          </label>
+        )}
 
         {error && <p className="text-sm text-red-300">{error}</p>}
       </div>

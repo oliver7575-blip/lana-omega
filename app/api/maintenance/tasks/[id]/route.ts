@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { maintenanceCaller } from '@/lib/maintenance-auth'
 import { cleanTask, type TaskInput } from '@/lib/maintenance-tasks'
-import { completeTask, loadEngineContext, logEvent, scheduleReminder, type TaskRow } from '@/lib/maintenance-engine'
+import { completeTask, loadEngineContext, logEvent, pauseTask, resumeTask, scheduleReminder, type TaskRow } from '@/lib/maintenance-engine'
 
 export async function GET(_r: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -25,6 +25,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!existing) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
   const ctx = await loadEngineContext(c.tenantId)
   const body = (await request.json()) as TaskInput & { status?: string }
+
+  // Pause switch: stops reminders and repeating until it is switched back on.
+  if (typeof body.paused === 'boolean' && body.paused !== Boolean(existing.paused)) {
+    if (!['scheduled', 'waiting', 'in_progress'].includes(existing.status as string)) {
+      return NextResponse.json({ error: 'Only open tasks can be paused' }, { status: 400 })
+    }
+    if (body.paused) await pauseTask(ctx, existing as TaskRow)
+    else await resumeTask(ctx, existing as TaskRow)
+    return NextResponse.json({ ok: true })
+  }
 
   // Status changes from the dashboard's status menu.
   if (body.status && body.status !== existing.status) {
@@ -68,7 +78,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (dbError) return NextResponse.json({ error: dbError.message }, { status: 500 })
 
   // A new due time replaces the reminder schedule.
-  if (values!.due_at && values!.due_at !== existing.due_at && ['scheduled', 'waiting', 'in_progress'].includes(existing.status) && values!.status !== 'on_hold' && !(existing.status === 'on_hold' && values!.status === 'scheduled')) {
+  if (values!.due_at && values!.due_at !== existing.due_at && ['scheduled', 'waiting', 'in_progress'].includes(existing.status) && !existing.paused && values!.status !== 'on_hold' && !(existing.status === 'on_hold' && values!.status === 'scheduled')) {
     await c.supabase.from('maintenance_reminders').update({ status: 'cancelled' }).eq('task_id', id).eq('status', 'pending')
     const due = new Date(values!.due_at as string)
     await scheduleReminder(ctx, id, due.getTime() > Date.now() ? due : new Date())

@@ -334,7 +334,7 @@ export async function sendMaintenanceTemplate(
 export function parseMaintenancePayload(
   text: string
 ): { taskId: string; action: MaintenanceAction } | null {
-  const m = text.match(/^mt:([0-9a-f-]{36}):(accept|help|done)$/i)
+  const m = text.match(/^mt:([0-9a-f-]{36}):(accept|help|done|still)$/i)
   if (!m) return null
   return { taskId: m[1].toLowerCase(), action: m[2].toLowerCase() as MaintenanceAction }
 }
