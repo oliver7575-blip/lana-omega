@@ -881,7 +881,28 @@ async function alertMaintenanceContact(ctx: EngineContext, task: TaskRow, summar
  * task (which waits on hold as a template) and schedules its reminder after
  * the chosen wait. The template stays on hold for next time.
  */
-export async function startFollowUp(ctx: EngineContext, finished: TaskRow): Promise<string | null> {
+export async function startFollowUp(ctx: EngineContext, original: TaskRow): Promise<string | null> {
+  let finished = original
+  // A follow-up copy remembers the chain as it was when it started. If the chain was
+  // extended afterwards (A → B was edited to A → B → C), use the original task's
+  // CURRENT link, so editing a chain also works for copies that are already open.
+  if (!finished.next_task_id && finished.parent_task_id) {
+    const { data: parent } = await ctx.db
+      .from('maintenance_tasks')
+      .select('next_task_id, next_delay_minutes, next_assign')
+      .eq('id', finished.parent_task_id)
+      .eq('tenant_id', ctx.tenantId)
+      .maybeSingle()
+    if (parent?.next_task_id) {
+      finished = {
+        ...finished,
+        next_task_id: parent.next_task_id as string,
+        next_delay_minutes: (parent.next_delay_minutes as number | null) ?? 0,
+        next_assign: (parent.next_assign as string | null) ?? 'finisher',
+      }
+      await logEvent(ctx, finished.id, 'followup_link_refreshed', 'The chain was extended after this task started; using the current follow-up')
+    }
+  }
   if (!finished.next_task_id) return null
   const { data: tpl } = await ctx.db
     .from('maintenance_tasks')
