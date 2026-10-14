@@ -31,6 +31,9 @@ const DEBOUNCE_MS = 8000
 // from growing without limit.
 const HISTORY_LIMIT = 40
 
+// Marks messages a person on the team wrote, so Lana knows what was already said.
+const STAFF_PREFIX = '[Written by a staff member:]'
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const mode = searchParams.get('hub.mode')
@@ -269,6 +272,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ ignored: true, reason: 'invalid json' })
   }
 
+  // Panel "Hand to Lana and answer": an internal call (CRON_SECRET) asking
+  // Lana to answer the newest guest message in one conversation right now.
+  const internalAuth = request.headers.get('authorization')
+  if (
+    typeof parsedBody.answerConversationId === 'string' &&
+    process.env.CRON_SECRET &&
+    internalAuth === `Bearer ${process.env.CRON_SECRET}`
+  ) {
+    const outcome = await answerConversationNow(parsedBody.answerConversationId)
+    return NextResponse.json(outcome)
+  }
+
   // Each hotel's WhatsApp card can hold the app secret of the Meta app that
   // sends its webhooks (Integrations → WhatsApp → App secret); otherwise the
   // platform default (META_APP_SECRET) is used.
@@ -468,18 +483,63 @@ async function processInbound(msg: ExtractedMessage) {
     return
   }
 
+  await replyToConversation({
+    tenantId,
+    credentials,
+    phoneNumberId,
+    from,
+    guest: guest as GuestRow,
+    conversationId,
+    profileName: msg.profileName,
+  })
+}
+
+type GuestRow = { id: string; name: string | null; [key: string]: unknown }
+
+type ReplyOutcome = { answered: boolean; reason?: string }
+
+/**
+ * Generates and sends Lana's reply to the latest guest message(s) in a
+ * WhatsApp conversation. Used after an inbound message (post-debounce) and by
+ * the panel's "Hand to Lana and answer" button.
+ */
+async function replyToConversation(args: {
+  tenantId: string
+  credentials: EncryptedPayload
+  phoneNumberId: string
+  from: string
+  guest: GuestRow
+  conversationId: string
+  profileName?: string
+}): Promise<ReplyOutcome> {
+  const { tenantId, credentials, phoneNumberId, from, guest, conversationId } = args
+  const msg = { profileName: args.profileName }
+  const supabase = createServiceClient()
+
   // Re-check takeover after the wait, in case staff took over meanwhile.
   const { data: convoNow } = await supabase
     .from('conversations')
     .select('status')
     .eq('id', conversationId)
     .single()
-  if (convoNow?.status === 'human_takeover' || convoNow?.status === 'closed') return
+  if (convoNow?.status === 'human_takeover' || convoNow?.status === 'closed') return { answered: false, reason: 'Conversation is not with Lana' }
+
+  // Only answer when the newest message is from the guest. If a staff member
+  // (or Lana) already wrote after it, there is nothing new to answer.
+  const { data: newest } = await supabase
+    .from('messages')
+    .select('sender_type')
+    .eq('conversation_id', conversationId)
+    .in('sender_type', ['guest', 'lana', 'staff'])
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (newest?.sender_type !== 'guest') return { answered: false, reason: 'No new guest message to answer' }
 
   // WhatsApp switched off under Integrations → Guest channels: the message
   // stays in the inbox for staff, but Lana doesn't reply.
   const { data: channelRow } = await supabase.from('tenants').select('channel_settings').eq('id', tenantId).single()
-  if ((channelRow?.channel_settings as { whatsapp?: boolean } | null)?.whatsapp === false) return
+  if ((channelRow?.channel_settings as { whatsapp?: boolean } | null)?.whatsapp === false) return { answered: false, reason: 'WhatsApp replies are switched off' }
 
   // ---- Tools & context ------------------------------------------------------
 
@@ -757,7 +817,7 @@ async function processInbound(msg: ExtractedMessage) {
     ? `The guest's WhatsApp display name is "${guestName}". This is only a display name — don't treat it as confirming their identity or reservation.\n\n`
     : ''
 
-  const channelInstruction = `\n\nCHANNEL: You are replying on WhatsApp. Keep replies short and conversational. For emphasis use single asterisks (*like this*), never double asterisks, headings, tables or Markdown links — paste URLs as plain text. If several guest messages arrive in a row, answer them together in one reply. Messages in square brackets describe a photo, voice note or other attachment the guest sent.\n\nNO REPLY: If the guest's latest message(s) only close the conversation — a thank-you, "ok", "perfecto", "listo", a farewell, or just an emoji/reaction — with no new question or request, reply with exactly ${NO_REPLY_TOKEN} and nothing else. The guest will then receive no message, which is what we want. Never answer a thank-you with "you're welcome" or another farewell.`
+  const channelInstruction = `\n\nCHANNEL: You are replying on WhatsApp. Keep replies short and conversational. For emphasis use single asterisks (*like this*), never double asterisks, headings, tables or Markdown links — paste URLs as plain text. If several guest messages arrive in a row, answer them together in one reply. Messages in square brackets describe a photo, voice note or other attachment the guest sent. Your own earlier turns that start with ${STAFF_PREFIX} were written by a person on the team, not by you: stay consistent with what they said and never start your reply with that marker.\n\nNO REPLY: If the guest's latest message(s) only close the conversation — a thank-you, "ok", "perfecto", "listo", a farewell, or just an emoji/reaction — with no new question or request, reply with exactly ${NO_REPLY_TOKEN} and nothing else. The guest will then receive no message, which is what we want. Never answer a thank-you with "you're welcome" or another farewell.`
 
   // ---- History (most recent HISTORY_LIMIT messages) --------------------------
 
@@ -765,7 +825,7 @@ async function processInbound(msg: ExtractedMessage) {
     .from('messages')
     .select('sender_type, content')
     .eq('conversation_id', conversationId)
-    .in('sender_type', ['guest', 'lana'])
+    .in('sender_type', ['guest', 'lana', 'staff'])
     .order('created_at', { ascending: false })
     .limit(HISTORY_LIMIT)
 
@@ -777,7 +837,7 @@ async function processInbound(msg: ExtractedMessage) {
 
   const claudeMessages = chronological.map((m) => ({
     role: m.sender_type === 'guest' ? ('user' as const) : ('assistant' as const),
-    content: m.content as string,
+    content: m.sender_type === 'staff' ? `${STAFF_PREFIX} ${m.content as string}` : (m.content as string),
   }))
 
   const systemPrompt =
@@ -837,7 +897,7 @@ async function processInbound(msg: ExtractedMessage) {
       content: fallbackText,
     })
     await sendWhatsAppMessage(phoneNumberId, credentials, from, fallbackText)
-    return
+    return { answered: false, reason: 'Lana could not generate a reply' }
   }
 
   const photoNote = [
@@ -895,4 +955,40 @@ async function processInbound(msg: ExtractedMessage) {
     const res = await sendWhatsAppImage(phoneNumberId, credentials, from, url)
     if (!res.success) console.error('[whatsapp-inbound] photo send failed', res.error)
   }
+  return { answered: true }
+}
+
+/** Loads everything a reply needs for one conversation and answers it now. */
+async function answerConversationNow(conversationId: string): Promise<ReplyOutcome> {
+  const supabase = createServiceClient()
+  const { data: convo } = await supabase
+    .from('conversations')
+    .select('id, tenant_id, guest_id, channel')
+    .eq('id', conversationId)
+    .maybeSingle()
+  if (!convo) return { answered: false, reason: 'Conversation not found' }
+  if (convo.channel !== 'whatsapp') return { answered: false, reason: 'Only WhatsApp conversations can be answered this way' }
+
+  const [{ data: guest }, { data: integration }] = await Promise.all([
+    supabase.from('guests').select('*').eq('id', convo.guest_id).single(),
+    supabase
+      .from('tenant_integrations')
+      .select('status, credentials, config')
+      .eq('tenant_id', convo.tenant_id)
+      .eq('integration_type', 'whatsapp')
+      .maybeSingle(),
+  ])
+  const phoneNumberId = (integration?.config as { phone_number_id?: string } | null)?.phone_number_id
+  if (!guest?.phone) return { answered: false, reason: 'Guest has no WhatsApp number' }
+  if (integration?.status !== 'connected' || !integration.credentials || !phoneNumberId)
+    return { answered: false, reason: 'WhatsApp is not connected' }
+
+  return replyToConversation({
+    tenantId: convo.tenant_id as string,
+    credentials: integration.credentials as EncryptedPayload,
+    phoneNumberId,
+    from: guest.phone as string,
+    guest: guest as GuestRow,
+    conversationId,
+  })
 }

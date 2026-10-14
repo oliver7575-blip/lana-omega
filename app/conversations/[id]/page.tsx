@@ -126,7 +126,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
             {guest?.phone ? ` · ${displayPhone(guest.phone)}` : ''}
           </p>
         </div>
-        <TakeOverButton conversationId={id} status={conversation.status as string} />
+        <TakeOverButton conversationId={id} status={conversation.status as string} channel={conversation.channel as string} />
       </header>
 
       <div className="grid min-h-0 flex-1 lg:grid-cols-[1fr_360px]">

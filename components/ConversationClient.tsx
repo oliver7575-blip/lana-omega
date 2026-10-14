@@ -3,19 +3,47 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-export function TakeOverButton({ conversationId, status }: { conversationId: string; status: string }) {
+export function TakeOverButton({
+  conversationId,
+  status,
+  channel,
+}: {
+  conversationId: string
+  status: string
+  channel?: string
+}) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState<string | null>(null)
 
   async function set(next: string) {
     if (next === 'closed' && !confirm('Close this conversation? A new message from this guest starts a fresh one.')) return
     setBusy(true)
+    setNote(null)
     await fetch(`/api/conversations/${conversationId}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: next }),
     })
     setBusy(false)
+    router.refresh()
+  }
+
+  async function handAndAnswer() {
+    setBusy(true)
+    setNote('Lana is answering…')
+    const res = await fetch(`/api/conversations/${conversationId}/answer`, { method: 'POST' })
+    const text = await res.text()
+    let json: { answered?: boolean; reason?: string; error?: string } = {}
+    try {
+      json = JSON.parse(text)
+    } catch {
+      json = { error: `Unexpected response (${res.status})` }
+    }
+    setBusy(false)
+    if (!res.ok) setNote(json.error ?? 'Could not hand back')
+    else if (json.answered) setNote(null)
+    else setNote(`Handed to Lana. ${json.reason ?? 'Nothing was sent.'}`)
     router.refresh()
   }
 
@@ -30,20 +58,34 @@ export function TakeOverButton({ conversationId, status }: { conversationId: str
       </button>
     )
   }
+
+  const takenOver = status === 'human_takeover'
   return (
-    <div className="flex items-center gap-4">
-      <button onClick={() => set('closed')} disabled={busy} className="text-xs text-navy/50 hover:text-navy">
+    <div className="flex items-start gap-4">
+      <button onClick={() => set('closed')} disabled={busy} className="mt-2 text-xs text-navy/50 hover:text-navy">
         Close
       </button>
-      <button
-        disabled={busy}
-        onClick={() => set(status === 'human_takeover' ? 'active' : 'human_takeover')}
-        className={`rounded-full px-5 py-2 text-sm font-medium text-white transition disabled:opacity-60 ${
-          status === 'human_takeover' ? 'bg-purple-500/30 hover:bg-purple-500/40' : 'bg-ink hover:bg-clay'
-        }`}
-      >
-        {status === 'human_takeover' ? 'Hand back to Lana' : 'Take over'}
-      </button>
+      <div className="flex flex-col items-stretch gap-1.5">
+        <button
+          disabled={busy}
+          onClick={() => set(takenOver ? 'active' : 'human_takeover')}
+          className={`rounded-full px-5 py-2 text-sm font-medium text-white transition disabled:opacity-60 ${
+            takenOver ? 'bg-purple-500/30 hover:bg-purple-500/40' : 'bg-ink hover:bg-clay'
+          }`}
+        >
+          {takenOver ? 'Hand to Lana' : 'Take over'}
+        </button>
+        {takenOver && channel === 'whatsapp' && (
+          <button
+            disabled={busy}
+            onClick={handAndAnswer}
+            className="rounded-full bg-purple-500/30 px-5 py-2 text-sm font-medium text-white transition hover:bg-purple-500/40 disabled:opacity-60"
+          >
+            {busy && note ? 'Answering…' : 'Hand to Lana and answer'}
+          </button>
+        )}
+        {note && <p className="max-w-[220px] text-xs text-navy/60">{note}</p>}
+      </div>
     </div>
   )
 }
