@@ -174,8 +174,53 @@ async function recordInConversation(ctx: MessagingContext, r: GuestReservation, 
   const db = createServiceClient()
   const guest = await findOrCreateGuest(db, ctx.tenantId, r.guestPhone, { name: r.guestName, email: r.guestEmail })
   if (!guest) return
+  // Remember the booking against the guest too, so Lana recognises them when
+  // they answer this message (arrival reminders and post-stay messages used
+  // to log the message only, leaving the guest "unknown").
+  await linkReservation(db, ctx.tenantId, guest.id as string, r)
   const conversationId = await ensureConversation(db, ctx.tenantId, guest.id as string)
   if (conversationId) await logLanaMessage(db, ctx.tenantId, conversationId, text)
+}
+
+/**
+ * Saves a booking as the guest's reservation unless they already have one
+ * that starts later (a guest keeps one saved reservation; a post-stay
+ * message for an old stay must not replace an upcoming booking).
+ */
+async function linkReservation(
+  db: ReturnType<typeof createServiceClient>,
+  tenantId: string,
+  guestId: string,
+  r: GuestReservation & { status?: string }
+) {
+  const { data: saved } = await db
+    .from('guest_reservations')
+    .select('confirmation_number, start_date')
+    .eq('tenant_id', tenantId)
+    .eq('guest_id', guestId)
+    .maybeSingle()
+  const savedStart = (saved?.start_date as string | null) ?? null
+  const thisStart = r.startDate?.slice(0, 10) ?? null
+  const keepSaved =
+    saved &&
+    saved.confirmation_number !== r.reservationID &&
+    savedStart !== null &&
+    thisStart !== null &&
+    savedStart > thisStart
+  if (keepSaved) return
+  await db.from('guest_reservations').upsert(
+    {
+      tenant_id: tenantId,
+      guest_id: guestId,
+      confirmation_number: r.reservationID,
+      status: r.status ?? null,
+      start_date: thisStart,
+      end_date: r.endDate?.slice(0, 10) ?? null,
+      room_label: r.roomTypeName ?? null,
+      synced_at: new Date().toISOString(),
+    },
+    { onConflict: 'tenant_id,guest_id' }
+  )
 }
 
 /**
