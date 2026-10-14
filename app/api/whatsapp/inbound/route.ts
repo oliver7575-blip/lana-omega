@@ -678,22 +678,56 @@ async function processInbound(msg: ExtractedMessage) {
       .eq('guest_id', guest.id)
       .maybeSingle()
 
-    if (savedReservation) {
+    let cb: { api_key: string; propertyId?: string } | null = null
+    try {
+      cb = getCloudbeds()
+    } catch {
+      cb = null
+    }
+    const api_key = cb?.api_key ?? ''
+    const propertyId = cb?.propertyId
+    if (propertyId) {
+      let live: ({ found?: boolean; [key: string]: unknown }) | null = null
       try {
-        const { api_key, propertyId } = getCloudbeds()
-        if (propertyId) {
-          const liveLookup = (await lookupReservation(
-            api_key,
-            propertyId,
-            savedReservation.confirmation_number
-          )) as { found?: boolean; [key: string]: unknown }
-          if (liveLookup?.found) {
-            knownGuestContext = `KNOWN GUEST CONTEXT\n\nThis guest's identity and active reservation have already been confirmed. Their reservation details:\n${JSON.stringify(liveLookup)}\n\nDo not ask them for their name or confirmation number again unless they explicitly want to look up or update a different reservation. Use these details directly.\n\n`
+        if (savedReservation?.confirmation_number) {
+          const saved = (await lookupReservation(api_key, propertyId, savedReservation.confirmation_number as string)) as {
+            found?: boolean
+            [key: string]: unknown
+          }
+          if (saved?.found) live = saved
+        }
+        // No saved booking (or it can't be found any more): their WhatsApp
+        // number is the same one the booking was made with in most cases, so
+        // check Cloudbeds by phone before Lana asks for a confirmation number.
+        // Only an unambiguous single match counts.
+        if (!live) {
+          const byPhone = (await findReservationByPhone(api_key, propertyId, from)) as {
+            found?: boolean
+            [key: string]: unknown
+          }
+          if (byPhone?.found && byPhone.reservationID) {
+            live = byPhone
+            await supabase.from('guest_reservations').upsert(
+              {
+                tenant_id: tenantId,
+                guest_id: guest.id,
+                confirmation_number: String(byPhone.reservationID),
+                status: (byPhone.status as string | undefined) ?? null,
+                start_date: ((byPhone.startDate as string | undefined) ?? '').slice(0, 10) || null,
+                end_date: ((byPhone.endDate as string | undefined) ?? '').slice(0, 10) || null,
+                room_label: (byPhone.roomTypeName as string | undefined) ?? null,
+                synced_at: new Date().toISOString(),
+              },
+              { onConflict: 'tenant_id,guest_id' }
+            )
           }
         }
       } catch {
-        // Best-effort only — if the live check fails, treat the guest as
+        // Best-effort only — if Cloudbeds can't be reached, treat the guest as
         // unidentified rather than trust stale data.
+      }
+      if (live) {
+        knownGuestContext = `KNOWN GUEST CONTEXT\n\nThis guest's identity and active reservation have already been confirmed. Their reservation details:\n${JSON.stringify(live)}\n\nDo not ask them for their name or confirmation number again unless they explicitly want to look up or update a different reservation. Use these details directly — for example, when they share an arrival time, update it on this reservation (reservationID ${String(live.reservationID ?? '')}) straight away.\n\n`
       }
     }
   }
