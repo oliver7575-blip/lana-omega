@@ -43,57 +43,96 @@ export interface ReservationLookupResult {
   error?: string
 }
 
+const CB_V13 = 'https://api.cloudbeds.com/api/v1.3'
+const MAX_PAGES = 10
+
+/**
+ * getReservations returns at most 100 rows per call (pageSize is capped at
+ * 100), so a single call silently misses everything past the first page.
+ * This walks the pages (pageNumber) until a short page, `stop` returns true,
+ * or MAX_PAGES is reached.
+ */
+async function fetchReservationPages(
+  apiKey: string,
+  propertyId: string,
+  filters: string,
+  stop?: (page: Record<string, unknown>[]) => boolean
+): Promise<{ ok: true; rows: Record<string, unknown>[] } | { ok: false; error: string }> {
+  const rows: Record<string, unknown>[] = []
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const url = `${CB_V13}/getReservations?propertyID=${encodeURIComponent(propertyId)}${filters}&pageSize=100&pageNumber=${page}&includeGuestsDetails=true`
+    const response = await fetch(url, { headers: { 'x-api-key': apiKey }, signal: AbortSignal.timeout(15000) })
+    if (!response.ok) {
+      const errText = await response.text()
+      return { ok: false, error: `Cloudbeds API error: ${response.status} ${errText}` }
+    }
+    const data = await response.json()
+    if (!data.success) return { ok: false, error: 'Cloudbeds API returned success=false' }
+    const batch = (data.data ?? []) as Record<string, unknown>[]
+    rows.push(...batch)
+    if (batch.length < 100) break
+    if (stop?.(batch)) break
+  }
+  return { ok: true, rows }
+}
+
+function daysFromToday(offset: number): string {
+  return new Date(Date.now() + offset * 86400000).toISOString().slice(0, 10)
+}
+
+function toLookupResult(match: Record<string, unknown>): ReservationLookupResult {
+  const guestDetail = extractGuestDetail(match)
+  const room = guestDetail?.rooms?.[0]
+  return {
+    found: true,
+    reservationID: match.reservationID as string,
+    guestName: match.guestName as string | undefined,
+    guestEmail: guestDetail?.guestEmail,
+    guestPhone: extractPhone(guestDetail),
+    startDate: match.startDate as string | undefined,
+    endDate: match.endDate as string | undefined,
+    status: match.status as string | undefined,
+    roomName: room?.roomName,
+    roomTypeName: room?.roomTypeName,
+    adults: match.adults as string | undefined,
+    children: match.children as string | undefined,
+    balance: match.balance as number | undefined,
+    sourceName: match.sourceName as string | undefined,
+  }
+}
+
 export async function lookupReservation(
   apiKey: string,
   propertyId: string,
   confirmationNumber: string
 ): Promise<ReservationLookupResult> {
   try {
-    const url = `https://api.cloudbeds.com/api/v1.3/getReservations?propertyID=${encodeURIComponent(propertyId)}&pageSize=100&includeGuestsDetails=true`
+    const wanted = String(confirmationNumber ?? '').trim()
+    if (!wanted) return { found: false }
+    const isMatch = (r: Record<string, unknown>) =>
+      String(r.thirdPartyIdentifier ?? '').trim() === wanted || String(r.reservationID ?? '').trim() === wanted
 
-    const response = await fetch(url, {
-      headers: { 'x-api-key': apiKey },
-    })
-
-    if (!response.ok) {
-      const errText = await response.text()
-      return { found: false, error: `Cloudbeds API error: ${response.status} ${errText}` }
-    }
-
-    const data = await response.json()
-    if (!data.success) {
-      return { found: false, error: 'Cloudbeds API returned success=false' }
-    }
-
-    const reservations = data.data ?? []
-    const match = reservations.find(
-      (r: { thirdPartyIdentifier?: string; reservationID?: string }) =>
-        r.thirdPartyIdentifier === confirmationNumber || r.reservationID === confirmationNumber
+    // 1. Current, upcoming and recent stays (checking out from 120 days ago
+    //    onwards), every page — not just the first 100 rows.
+    const recent = await fetchReservationPages(apiKey, propertyId, `&checkOutFrom=${daysFromToday(-120)}`, (page) =>
+      page.some(isMatch)
     )
+    if (!recent.ok) return { found: false, error: recent.error }
+    const hit = recent.rows.find(isMatch)
+    if (hit) return toLookupResult(hit)
 
-    if (!match) {
-      return { found: false }
+    // 2. Channel-side booking numbers (e.g. a Booking.com number the guest
+    //    copies from their confirmation), via Cloudbeds' own filter.
+    if (/^[A-Za-z0-9-]{4,}$/.test(wanted)) {
+      const bySource = await fetchReservationPages(apiKey, propertyId, `&sourceReservationId=${encodeURIComponent(wanted)}`)
+      if (bySource.ok && bySource.rows.length === 1) return toLookupResult(bySource.rows[0])
+      if (bySource.ok) {
+        const exact = bySource.rows.find(isMatch)
+        if (exact) return toLookupResult(exact)
+      }
     }
 
-    const guestDetail = extractGuestDetail(match)
-    const room = guestDetail?.rooms?.[0]
-
-    return {
-      found: true,
-      reservationID: match.reservationID,
-      guestName: match.guestName,
-      guestEmail: guestDetail?.guestEmail,
-      guestPhone: extractPhone(guestDetail),
-      startDate: match.startDate,
-      endDate: match.endDate,
-      status: match.status,
-      roomName: room?.roomName,
-      roomTypeName: room?.roomTypeName,
-      adults: match.adults,
-      children: match.children,
-      balance: match.balance,
-      sourceName: match.sourceName,
-    }
+    return { found: false }
   } catch (err) {
     return { found: false, error: err instanceof Error ? err.message : 'Unknown error' }
   }
@@ -243,24 +282,11 @@ export async function getDeparturesInWindow(
   date: string
 ): Promise<GetDeparturesResult> {
   try {
-    const url = `https://api.cloudbeds.com/api/v1.3/getReservations?propertyID=${encodeURIComponent(propertyId)}&pageSize=100&includeGuestsDetails=true`
+    // Filter by check-out date in Cloudbeds itself and read every page.
+    const result = await fetchReservationPages(apiKey, propertyId, `&checkOutFrom=${date}&checkOutTo=${date}`)
+    if (!result.ok) return { success: false, departures: [], error: result.error }
 
-    const response = await fetch(url, {
-      headers: { 'x-api-key': apiKey },
-    })
-
-    if (!response.ok) {
-      const errText = await response.text()
-      return { success: false, departures: [], error: `Cloudbeds API error: ${response.status} ${errText}` }
-    }
-
-    const data = await response.json()
-    if (!data.success) {
-      return { success: false, departures: [], error: 'Cloudbeds API returned success=false' }
-    }
-
-    const reservations = (data.data ?? []) as Record<string, unknown>[]
-    const matching = reservations.filter((r) => r.endDate === date)
+    const matching = result.rows.filter((r) => r.endDate === date)
 
     const departures: RecentDeparture[] = matching.map((r) => {
       const guestDetail = extractGuestDetail(r)
@@ -304,24 +330,12 @@ export async function getRecentlyCreatedReservations(
   sinceHoursAgo: number
 ): Promise<GetNewReservationsResult> {
   try {
-    const url = `https://api.cloudbeds.com/api/v1.3/getReservations?propertyID=${encodeURIComponent(propertyId)}&pageSize=100&includeGuestsDetails=true`
-
-    const response = await fetch(url, {
-      headers: { 'x-api-key': apiKey },
-    })
-
-    if (!response.ok) {
-      const errText = await response.text()
-      return { success: false, reservations: [], error: `Cloudbeds API error: ${response.status} ${errText}` }
-    }
-
-    const data = await response.json()
-    if (!data.success) {
-      return { success: false, reservations: [], error: 'Cloudbeds API returned success=false' }
-    }
+    // Every booking still to come checks out from today onwards; read every page.
+    const result = await fetchReservationPages(apiKey, propertyId, `&checkOutFrom=${daysFromToday(0)}`)
+    if (!result.ok) return { success: false, reservations: [], error: result.error }
 
     const cutoff = Date.now() - sinceHoursAgo * 60 * 60 * 1000
-    const all = (data.data ?? []) as Record<string, unknown>[]
+    const all = result.rows
 
     // dateCreated is a plain "YYYY-MM-DD HH:MM:SS" string with no timezone
     // marker in real data seen so far — treated as UTC here for a
@@ -433,13 +447,10 @@ export async function findReservationByPhone(
 ): Promise<ReservationLookupResult & { matches?: number }> {
   try {
     const today = new Date().toISOString().slice(0, 10)
-    const url = `https://api.cloudbeds.com/api/v1.3/getReservations?propertyID=${encodeURIComponent(propertyId)}&checkOutFrom=${today}&pageSize=100&includeGuestsDetails=true`
-    const response = await fetch(url, { headers: { 'x-api-key': apiKey }, signal: AbortSignal.timeout(15000) })
-    if (!response.ok) return { found: false, error: `Cloudbeds API error: ${response.status}` }
-    const data = await response.json()
-    if (!data.success) return { found: false, error: 'Cloudbeds API returned success=false' }
+    const result = await fetchReservationPages(apiKey, propertyId, `&checkOutFrom=${today}`)
+    if (!result.ok) return { found: false, error: result.error }
 
-    const matches = ((data.data ?? []) as Record<string, unknown>[]).filter((r) => {
+    const matches = result.rows.filter((r) => {
       const status = String(r.status ?? '').toLowerCase()
       if (['canceled', 'cancelled', 'no_show', 'checked_out'].includes(status)) return false
       return phonesMatch(extractPhone(extractGuestDetail(r)), phone)
