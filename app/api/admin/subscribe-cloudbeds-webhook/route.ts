@@ -43,11 +43,15 @@ export async function POST(request: Request) {
     }
   )
   const listData = await listResponse.json()
-  const existingSubscriptions: { id?: string; endpointUrl?: string; object?: string; action?: string }[] =
+  // Cloudbeds nests the actual endpoint URL at subscriptionData.url, not a
+  // top-level endpointUrl field — confirmed against a real response after
+  // an earlier version of this filter checked the wrong field and silently
+  // matched nothing, leaving a stale subscription undeleted.
+  const existingSubscriptions: { id?: string; subscriptionData?: { url?: string } }[] =
     listData?.data ?? []
 
   const staleSubscriptions = existingSubscriptions.filter((sub) =>
-    (sub.endpointUrl ?? '').includes('vercel.app')
+    (sub.subscriptionData?.url ?? '').includes('vercel.app')
   )
 
   const deletions: Record<string, unknown>[] = []
