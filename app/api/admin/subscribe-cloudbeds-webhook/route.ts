@@ -29,20 +29,49 @@ export async function POST(request: Request) {
   const { api_key } = decryptCredentials<{ api_key: string }>(cloudbedsIntegration.credentials)
   const propertyId = (cloudbedsIntegration.config as { property_id?: string })?.property_id
 
-  const endpointUrl = `https://lana-omega-soiree-lana.vercel.app/api/webhooks/cloudbeds/${tenantId}`
+  const newEndpointUrl = `https://admin.soiree.mx/api/webhooks/cloudbeds/${tenantId}`
 
-  // endpointUrl/object/action go in the request BODY as form-urlencoded data
-  // (matches Cloudbeds's own real curl example exactly, --data-urlencode).
-  // propertyID goes in the URL query string instead — the docs explicitly
-  // call that one out as a separate, URL-only parameter for multi-property
-  // accounts.
+  // Step 1: list existing subscriptions so we can find and remove any
+  // pointing at the old vercel.app URL before creating a new one — this
+  // avoids a duplicate subscription that would double-fire the webhook on
+  // every new reservation.
+  const listResponse = await fetch(
+    `https://api.cloudbeds.com/api/v1.3/getWebhooks?propertyID=${encodeURIComponent(propertyId ?? '')}`,
+    {
+      method: 'GET',
+      headers: { 'x-api-key': api_key },
+    }
+  )
+  const listData = await listResponse.json()
+  const existingSubscriptions: { id?: string; endpointUrl?: string; object?: string; action?: string }[] =
+    listData?.data ?? []
+
+  const staleSubscriptions = existingSubscriptions.filter((sub) =>
+    (sub.endpointUrl ?? '').includes('vercel.app')
+  )
+
+  const deletions: Record<string, unknown>[] = []
+  for (const sub of staleSubscriptions) {
+    if (!sub.id) continue
+    const deleteResponse = await fetch(
+      `https://api.cloudbeds.com/api/v1.3/deleteWebhook?subscriptionID=${encodeURIComponent(sub.id)}&propertyIDs=${encodeURIComponent(propertyId ?? '')}`,
+      {
+        method: 'DELETE',
+        headers: { 'x-api-key': api_key },
+      }
+    )
+    const deleteData = await deleteResponse.json()
+    deletions.push({ subscriptionId: sub.id, status: deleteResponse.status, data: deleteData })
+  }
+
+  // Step 2: create the new subscription pointing at admin.soiree.mx.
   const body = new URLSearchParams({
-    endpointUrl,
+    endpointUrl: newEndpointUrl,
     object: 'reservation',
     action: 'created',
   })
 
-  const response = await fetch(
+  const createResponse = await fetch(
     `https://api.cloudbeds.com/api/v1.3/postWebhook?propertyID=${encodeURIComponent(propertyId ?? '')}`,
     {
       method: 'POST',
@@ -53,8 +82,11 @@ export async function POST(request: Request) {
       body: body.toString(),
     }
   )
+  const createData = await createResponse.json()
 
-  const data = await response.json()
-
-  return NextResponse.json({ status: response.status, endpointUrl, data })
+  return NextResponse.json({
+    existingSubscriptionsFound: existingSubscriptions,
+    staleSubscriptionsRemoved: deletions,
+    newSubscription: { status: createResponse.status, endpointUrl: newEndpointUrl, data: createData },
+  })
 }
