@@ -9,7 +9,7 @@ import { sendWhatsAppMessage, sendWhatsAppInteractiveButton, sendWhatsAppImage }
 import { downloadWhatsAppMedia, describeImage, transcribeAudio } from '@/lib/whatsapp-media'
 import { verifyMetaSignature } from '@/lib/verify-webhook'
 import { decryptCredentials, type EncryptedPayload } from '@/lib/crypto'
-import { lookupReservation, updateArrivalTime, findReservationByPhone } from '@/lib/cloudbeds'
+import { pmsForTenant } from '@/lib/pms'
 import { notifyStaff } from '@/lib/escalation'
 import { parseEscalationContacts, findEscalationContact } from '@/lib/escalation-contacts'
 import { buildRoomPhotosTool } from '@/lib/room-photos'
@@ -549,29 +549,14 @@ async function replyToConversation(args: {
     .eq('id', tenantId)
     .single()
 
-  const { data: cloudbedsIntegration } = await supabase
-    .from('tenant_integrations')
-    .select('status, credentials, config')
-    .eq('tenant_id', tenantId)
-    .eq('integration_type', 'pms_cloudbeds')
-    .maybeSingle()
+  // The hotel's PMS (Cloudbeds, …) — null if none is connected.
+  const pms = await pmsForTenant(supabase, tenantId)
 
-  const cloudbedsReady = cloudbedsIntegration?.status === 'connected'
-  const getCloudbeds = () => {
-    const { api_key } = decryptCredentials<{ api_key: string }>(cloudbedsIntegration!.credentials)
-    const propertyId = (cloudbedsIntegration!.config as { property_id?: string })?.property_id
-    return { api_key, propertyId }
-  }
-
-  const reservationTool = cloudbedsReady
+  const reservationTool = pms
     ? {
         lookupReservation: async (confirmationNumber?: string) => {
-          const { api_key, propertyId } = getCloudbeds()
-          if (!propertyId) {
-            return { found: false, error: 'No property_id configured for this tenant' }
-          }
           if (!confirmationNumber) {
-            const byPhone = await findReservationByPhone(api_key, propertyId, from)
+            const byPhone = await pms.findReservationByPhone(from)
             if (!byPhone.found && !byPhone.error) {
               return {
                 found: false,
@@ -583,20 +568,15 @@ async function replyToConversation(args: {
             }
             return byPhone
           }
-          return lookupReservation(api_key, propertyId, confirmationNumber)
+          return pms.lookupReservation(confirmationNumber)
         },
       }
     : undefined
 
-  const arrivalUpdateTool = cloudbedsReady
+  const arrivalUpdateTool = pms
     ? {
-        updateArrivalTime: async (input: { confirmationNumber: string; arrivalTime: string }) => {
-          const { api_key, propertyId } = getCloudbeds()
-          if (!propertyId) {
-            return { success: false, error: 'No property_id configured for this tenant' }
-          }
-          return updateArrivalTime(api_key, propertyId, input.confirmationNumber, input.arrivalTime)
-        },
+        updateArrivalTime: async (input: { confirmationNumber: string; arrivalTime: string }) =>
+          pms.updateArrivalTime(input.confirmationNumber, input.arrivalTime),
       }
     : undefined
 
@@ -641,7 +621,8 @@ async function replyToConversation(args: {
       : undefined
 
   // Payment links (direct bookings only; the server enforces who qualifies and the amounts).
-  const paymentTool = reservationTool
+  // Cloudbeds Pay-by-Link only for now — other PMSs get no payment tool.
+  const paymentTool = pms?.cloudbeds
     ? makePaymentTool({
         tenantId,
         conversationId: conversationId as string,
@@ -709,12 +690,7 @@ async function replyToConversation(args: {
     },
   }
 
-  const roomPhotosTool = cloudbedsReady
-    ? (() => {
-        const { api_key, propertyId } = getCloudbeds()
-        return propertyId ? buildRoomPhotosTool(api_key, propertyId) : undefined
-      })()
-    : undefined
+  const roomPhotosTool = pms ? buildRoomPhotosTool(pms) : undefined
 
   const contactDirectory = (tenant?.contact_directory as ContactDirectoryEntry[]) ?? []
   const contactButtonTool = contactDirectory.length > 0 ? { enabled: true as const } : undefined
@@ -730,7 +706,7 @@ async function replyToConversation(args: {
       : ''
 
   let knownGuestContext = ''
-  if (cloudbedsReady) {
+  if (pms) {
     const { data: savedReservation } = await supabase
       .from('guest_reservations')
       .select('confirmation_number')
@@ -738,19 +714,11 @@ async function replyToConversation(args: {
       .eq('guest_id', guest.id)
       .maybeSingle()
 
-    let cb: { api_key: string; propertyId?: string } | null = null
-    try {
-      cb = getCloudbeds()
-    } catch {
-      cb = null
-    }
-    const api_key = cb?.api_key ?? ''
-    const propertyId = cb?.propertyId
-    if (propertyId) {
+    {
       let live: ({ found?: boolean; [key: string]: unknown }) | null = null
       try {
         if (savedReservation?.confirmation_number) {
-          const saved = (await lookupReservation(api_key, propertyId, savedReservation.confirmation_number as string)) as {
+          const saved = (await pms.lookupReservation(savedReservation.confirmation_number as string)) as {
             found?: boolean
             [key: string]: unknown
           }
@@ -758,10 +726,10 @@ async function replyToConversation(args: {
         }
         // No saved booking (or it can't be found any more): their WhatsApp
         // number is the same one the booking was made with in most cases, so
-        // check Cloudbeds by phone before Lana asks for a confirmation number.
+        // check the PMS by phone before Lana asks for a confirmation number.
         // Only an unambiguous single match counts.
         if (!live) {
-          const byPhone = (await findReservationByPhone(api_key, propertyId, from)) as {
+          const byPhone = (await pms.findReservationByPhone(from)) as {
             found?: boolean
             [key: string]: unknown
           }

@@ -5,8 +5,8 @@ import { NextResponse, after } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { verifyMetaSignature } from '@/lib/verify-webhook'
 import { generateReply, NO_REPLY_TOKEN } from '@/lib/anthropic'
-import { decryptCredentials, type EncryptedPayload } from '@/lib/crypto'
-import { lookupReservation } from '@/lib/cloudbeds'
+import { type EncryptedPayload } from '@/lib/crypto'
+import { pmsForTenant } from '@/lib/pms'
 import { notifyStaff } from '@/lib/escalation'
 import { parseEscalationContacts, findEscalationContact } from '@/lib/escalation-contacts'
 import { buildRoomPhotosTool } from '@/lib/room-photos'
@@ -193,26 +193,26 @@ async function handleMessage(tenantId: string, conn: InstagramConnection, accoun
   if ((tenant?.channel_settings as { instagram?: boolean } | null)?.instagram === false) return
 
   // ---- Tools ------------------------------------------------------------------
-  const { data: integrations } = await supabase
-    .from('tenant_integrations')
-    .select('integration_type, status, credentials, config')
-    .eq('tenant_id', tenantId)
-    .in('integration_type', ['pms_cloudbeds', 'whatsapp'])
-  const cloudbeds = integrations?.find((i) => i.integration_type === 'pms_cloudbeds' && i.status === 'connected')
+  const [{ data: integrations }, pms] = await Promise.all([
+    supabase
+      .from('tenant_integrations')
+      .select('integration_type, status, credentials, config')
+      .eq('tenant_id', tenantId)
+      .eq('integration_type', 'whatsapp'),
+    // The hotel's PMS (Cloudbeds, …) — null if none is connected.
+    pmsForTenant(supabase, tenantId),
+  ])
   const whatsapp = integrations?.find((i) => i.integration_type === 'whatsapp' && i.status === 'connected')
-  const propertyId = (cloudbeds?.config as { property_id?: string } | null)?.property_id
-  const cbKey = cloudbeds?.credentials ? decryptCredentials<{ api_key: string }>(cloudbeds.credentials as EncryptedPayload).api_key : null
 
-  const reservationTool =
-    cbKey && propertyId
-      ? {
-          lookupReservation: async (confirmationNumber?: string) =>
-            confirmationNumber
-              ? lookupReservation(cbKey, propertyId, confirmationNumber)
-              : { found: false, note: 'On Instagram there is no phone number to match — ask the guest for their confirmation number.' },
-        }
-      : undefined
-  const roomPhotosTool = cbKey && propertyId ? buildRoomPhotosTool(cbKey, propertyId) : undefined
+  const reservationTool = pms
+    ? {
+        lookupReservation: async (confirmationNumber?: string) =>
+          confirmationNumber
+            ? pms.lookupReservation(confirmationNumber)
+            : { found: false, note: 'On Instagram there is no phone number to match — ask the guest for their confirmation number.' },
+      }
+    : undefined
+  const roomPhotosTool = pms ? buildRoomPhotosTool(pms) : undefined
 
   const contacts = parseEscalationContacts(tenant?.escalation_contacts)
   const waPhoneId = (whatsapp?.config as { phone_number_id?: string } | null)?.phone_number_id
@@ -269,7 +269,8 @@ async function handleMessage(tenantId: string, conn: InstagramConnection, accoun
     buildBookingLinkInstruction(tenant?.booking_config as Record<string, unknown>) +
     channelInstruction
 
-  const paymentTool = reservationTool
+  // Cloudbeds Pay-by-Link only for now — other PMSs get no payment tool.
+  const paymentTool = pms?.cloudbeds
     ? makePaymentTool({
         tenantId,
         conversationId,

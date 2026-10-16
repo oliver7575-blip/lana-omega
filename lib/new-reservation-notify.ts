@@ -1,6 +1,5 @@
 import { createServiceClient } from './supabase/service'
-import { decryptCredentials } from './crypto'
-import { lookupReservation } from './cloudbeds'
+import { pmsForTenant } from './pms'
 import {
   daysUntil,
   isActiveReservation,
@@ -10,29 +9,19 @@ import {
 } from './guest-messages'
 
 /**
- * Runs when Cloudbeds reports a new booking: sends the new-reservation
+ * Runs when the hotel's PMS reports a new booking: sends the new-reservation
  * message, and — if arrival is 2 days away or less — the arrival
  * information right away too, since the daily 2-day job would miss it.
  */
 export async function processNewReservation(tenantId: string, reservationID: string) {
   const supabase = createServiceClient()
 
-  const { data: cloudbeds } = await supabase
-    .from('tenant_integrations')
-    .select('status, credentials, config')
-    .eq('tenant_id', tenantId)
-    .eq('integration_type', 'pms_cloudbeds')
-    .maybeSingle()
-
-  if (cloudbeds?.status !== 'connected') {
-    return { step: 'integration_check', ok: false, detail: 'Cloudbeds not connected' }
+  const pms = await pmsForTenant(supabase, tenantId)
+  if (!pms) {
+    return { step: 'integration_check', ok: false, detail: 'No PMS connected (or it is missing its property ID)' }
   }
 
-  const { api_key } = decryptCredentials<{ api_key: string }>(cloudbeds.credentials)
-  const propertyId = (cloudbeds.config as { property_id?: string })?.property_id
-  if (!propertyId) return { step: 'config_check', ok: false, detail: 'Missing property_id' }
-
-  const lookup = await lookupReservation(api_key, propertyId, reservationID)
+  const lookup = await pms.lookupReservation(reservationID)
   if (!lookup.found || !lookup.reservationID) {
     return { step: 'lookup', ok: false, detail: 'Reservation not found', lookup }
   }

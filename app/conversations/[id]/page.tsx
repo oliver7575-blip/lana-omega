@@ -1,8 +1,8 @@
 import Link from 'next/link'
 import { requireStaff } from '@/lib/staff-context'
 import { displayPhone } from '@/lib/inbox'
-import { decryptCredentials } from '@/lib/crypto'
-import { lookupReservation } from '@/lib/cloudbeds'
+import { pmsForTenant } from '@/lib/pms'
+import type { ReservationLookupResult } from '@/lib/cloudbeds'
 import {
   AssignmentSelect,
   Composer,
@@ -72,19 +72,13 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
         : Promise.resolve({ data: null }),
     ])
 
-  // The guest's reservation, live from Cloudbeds (and cached for the inbox pill).
-  let reservation: Awaited<ReturnType<typeof lookupReservation>> | null = null
+  // The guest's reservation, live from the hotel's PMS (and cached for the inbox pill).
+  let reservation: ReservationLookupResult | null = null
   if (saved?.confirmation_number) {
-    const { data: cb } = await supabase
-      .from('tenant_integrations')
-      .select('status, credentials, config')
-      .eq('integration_type', 'pms_cloudbeds')
-      .maybeSingle()
-    const propertyId = (cb?.config as { property_id?: string } | null)?.property_id
-    if (cb?.status === 'connected' && propertyId) {
+    const pms = await pmsForTenant(supabase, conversation.tenant_id as string)
+    if (pms) {
       try {
-        const { api_key } = decryptCredentials<{ api_key: string }>(cb.credentials)
-        reservation = await lookupReservation(api_key, propertyId, saved.confirmation_number as string)
+        reservation = await pms.lookupReservation(saved.confirmation_number as string)
         if (reservation.found) {
           await supabase
             .from('guest_reservations')

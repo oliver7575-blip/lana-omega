@@ -4,8 +4,7 @@ import { makeReviewTool } from '@/lib/reviews'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { generateReply } from '@/lib/anthropic'
-import { decryptCredentials } from '@/lib/crypto'
-import { lookupReservation, updateArrivalTime } from '@/lib/cloudbeds'
+import { pmsForTenant } from '@/lib/pms'
 import { notifyStaff } from '@/lib/escalation'
 import { parseEscalationContacts, findEscalationContact } from '@/lib/escalation-contacts'
 import { buildRoomPhotosTool } from '@/lib/room-photos'
@@ -182,50 +181,27 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     )
   }
 
-  const { data: cloudbedsIntegration } = await supabase
-    .from('tenant_integrations')
-    .select('status, credentials, config')
-    .eq('tenant_id', tenantId)
-    .eq('integration_type', 'pms_cloudbeds')
-    .maybeSingle()
+  // The hotel's PMS (Cloudbeds, …) — null if none is connected.
+  const pms = await pmsForTenant(supabase, tenantId)
 
-  const reservationTool =
-    cloudbedsIntegration?.status === 'connected'
-      ? {
-          lookupReservation: async (confirmationNumber?: string) => {
-            // Website visitors have no phone on file, so a number is required here.
-            if (!confirmationNumber) {
-              return { found: false, note: 'Ask the guest for their confirmation number.' }
-            }
-            const { api_key } = decryptCredentials<{ api_key: string }>(
-              cloudbedsIntegration.credentials
-            )
-            const propertyId = (cloudbedsIntegration.config as { property_id?: string })
-              ?.property_id
-            if (!propertyId) {
-              return { found: false, error: 'No property_id configured for this tenant' }
-            }
-            return lookupReservation(api_key, propertyId, confirmationNumber)
-          },
-        }
-      : undefined
+  const reservationTool = pms
+    ? {
+        lookupReservation: async (confirmationNumber?: string) => {
+          // Website visitors have no phone on file, so a number is required here.
+          if (!confirmationNumber) {
+            return { found: false, note: 'Ask the guest for their confirmation number.' }
+          }
+          return pms.lookupReservation(confirmationNumber)
+        },
+      }
+    : undefined
 
-  const arrivalUpdateTool =
-    cloudbedsIntegration?.status === 'connected'
-      ? {
-          updateArrivalTime: async (input: { confirmationNumber: string; arrivalTime: string }) => {
-            const { api_key } = decryptCredentials<{ api_key: string }>(
-              cloudbedsIntegration.credentials
-            )
-            const propertyId = (cloudbedsIntegration.config as { property_id?: string })
-              ?.property_id
-            if (!propertyId) {
-              return { success: false, error: 'No property_id configured for this tenant' }
-            }
-            return updateArrivalTime(api_key, propertyId, input.confirmationNumber, input.arrivalTime)
-          },
-        }
-      : undefined
+  const arrivalUpdateTool = pms
+    ? {
+        updateArrivalTime: async (input: { confirmationNumber: string; arrivalTime: string }) =>
+          pms.updateArrivalTime(input.confirmationNumber, input.arrivalTime),
+      }
+    : undefined
 
   // A widget guest has no WhatsApp of their own — staff escalation and
   // waitlist notifications still need to reach staff over WhatsApp, so the
@@ -343,7 +319,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   }
 
   let knownGuestContext = ''
-  if (cloudbedsIntegration?.status === 'connected') {
+  if (pms) {
     const { data: savedReservation } = await supabase
       .from('guest_reservations')
       .select('confirmation_number')
@@ -353,14 +329,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
 
     if (savedReservation) {
       try {
-        const { api_key } = decryptCredentials<{ api_key: string }>(
-          cloudbedsIntegration.credentials
-        )
-        const propertyId = (cloudbedsIntegration.config as { property_id?: string })?.property_id
-        if (propertyId) {
-          const liveLookup = (await lookupReservation(
-            api_key,
-            propertyId,
+        {
+          const liveLookup = (await pms.lookupReservation(
             savedReservation.confirmation_number
           )) as { found?: boolean; [key: string]: unknown }
           if (liveLookup?.found) {
@@ -461,14 +431,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     buildKnowledgeBaseSection(tenant.knowledge_base as string | null) +
     buildBookingLinkInstruction(tenant.booking_config as Record<string, unknown>)
 
-  let roomPhotosTool: ReturnType<typeof buildRoomPhotosTool> | undefined
-  if (cloudbedsIntegration?.status === 'connected') {
-    const { api_key } = decryptCredentials<{ api_key: string }>(cloudbedsIntegration.credentials)
-    const propertyId = (cloudbedsIntegration.config as { property_id?: string })?.property_id
-    if (propertyId) roomPhotosTool = buildRoomPhotosTool(api_key, propertyId)
-  }
+  const roomPhotosTool = pms ? buildRoomPhotosTool(pms) : undefined
 
-  const paymentTool = reservationTool
+  // Cloudbeds Pay-by-Link only for now — other PMSs get no payment tool.
+  const paymentTool = pms?.cloudbeds
     ? makePaymentTool({
         tenantId,
         conversationId: conversationId as string,

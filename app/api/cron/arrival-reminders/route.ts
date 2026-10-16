@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { decryptCredentials } from '@/lib/crypto'
-import { getArrivalsInWindow } from '@/lib/cloudbeds'
+import { pmsForTenant } from '@/lib/pms'
 import { isActiveReservation, loadMessagingContext, sendGuestMessage } from '@/lib/guest-messages'
 
 export const maxDuration = 60
@@ -23,22 +22,13 @@ export async function GET(request: Request) {
   const results: Record<string, unknown>[] = []
 
   for (const tenant of tenants ?? []) {
-    const { data: cloudbeds } = await supabase
-      .from('tenant_integrations')
-      .select('status, credentials, config')
-      .eq('tenant_id', tenant.id)
-      .eq('integration_type', 'pms_cloudbeds')
-      .maybeSingle()
-    if (cloudbeds?.status !== 'connected') continue
-
-    const { api_key } = decryptCredentials<{ api_key: string }>(cloudbeds.credentials)
-    const propertyId = (cloudbeds.config as { property_id?: string })?.property_id
-    if (!propertyId) continue
+    const pms = await pmsForTenant(supabase, tenant.id)
+    if (!pms) continue
 
     const ctx = await loadMessagingContext(tenant.id)
     if (!ctx) continue
 
-    const arrivals = await getArrivalsInWindow(api_key, propertyId, targetDate)
+    const arrivals = await pms.getArrivalsInWindow(targetDate)
     if (!arrivals.success) {
       results.push({ tenantId: tenant.id, error: arrivals.error })
       continue

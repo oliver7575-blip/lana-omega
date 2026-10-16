@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { decryptCredentials, type EncryptedPayload } from '@/lib/crypto'
-import { lookupReservation } from '@/lib/cloudbeds'
+import { pmsFromIntegration } from '@/lib/pms'
 import { checkInstagram, instagramConnection } from '@/lib/instagram'
 
 // Give the function room to finish: without this, a slow external call can
@@ -64,20 +64,9 @@ async function checkCloudbeds(
   const propertyId = config?.property_id
   if (!propertyId) return { ok: false, error: 'No property_id configured' }
 
-  const { api_key } = decryptCredentials<{ api_key: string }>(
-    credentials as Parameters<typeof decryptCredentials>[0]
-  )
-
-  // A deliberately fake confirmation number: "found: false" with no error
-  // means the API was reachable and the key was accepted, which is all a
-  // health check needs to know.
-  const result = await withTimeout(
-    lookupReservation(api_key, propertyId, '__healthcheck__'),
-    10000,
-    'Cloudbeds request'
-  )
-  if (result.error) return { ok: false, error: result.error.slice(0, 300) }
-  return { ok: true, detail: 'API reachable, key accepted' }
+  const pms = pmsFromIntegration({ integration_type: 'pms_cloudbeds', status: 'connected', credentials, config })
+  if (!pms) return { ok: false, error: 'Could not read the saved Cloudbeds credentials — reconnect Cloudbeds' }
+  return withTimeout(pms.testConnection(), 10000, 'Cloudbeds request')
 }
 
 async function checkDeepgram(credentials: unknown): Promise<CheckResult> {

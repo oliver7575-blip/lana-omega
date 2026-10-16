@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { decryptCredentials } from '@/lib/crypto'
-import { getRecentlyCreatedReservations } from '@/lib/cloudbeds'
+import { pmsForTenant } from '@/lib/pms'
 import { sendWhatsAppMessage } from '@/lib/whatsapp-send'
 import { generateReply } from '@/lib/anthropic'
 
@@ -21,12 +20,7 @@ export async function GET(request: Request) {
   const results: Record<string, unknown>[] = []
 
   for (const tenant of tenants ?? []) {
-    const { data: cloudbedsIntegration } = await supabase
-      .from('tenant_integrations')
-      .select('status, credentials, config')
-      .eq('tenant_id', tenant.id)
-      .eq('integration_type', 'pms_cloudbeds')
-      .maybeSingle()
+    const pms = await pmsForTenant(supabase, tenant.id)
 
     const { data: whatsappIntegration } = await supabase
       .from('tenant_integrations')
@@ -35,18 +29,16 @@ export async function GET(request: Request) {
       .eq('integration_type', 'whatsapp')
       .maybeSingle()
 
-    if (cloudbedsIntegration?.status !== 'connected' || whatsappIntegration?.status !== 'connected') {
+    if (!pms || whatsappIntegration?.status !== 'connected') {
       continue
     }
 
-    const { api_key } = decryptCredentials<{ api_key: string }>(cloudbedsIntegration.credentials)
-    const propertyId = (cloudbedsIntegration.config as { property_id?: string })?.property_id
     const phoneNumberId = (whatsappIntegration.config as { phone_number_id?: string })
       ?.phone_number_id
 
-    if (!propertyId || !phoneNumberId) continue
+    if (!phoneNumberId) continue
 
-    const newReservationsResult = await getRecentlyCreatedReservations(api_key, propertyId, 3)
+    const newReservationsResult = await pms.getRecentlyCreatedReservations(3)
     if (!newReservationsResult.success) {
       results.push({ tenantId: tenant.id, error: newReservationsResult.error })
       continue
