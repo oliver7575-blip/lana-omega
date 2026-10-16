@@ -6,18 +6,20 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { decryptCredentials, type EncryptedPayload } from '../crypto'
 import { cloudbedsAdapter } from './cloudbeds'
+import { lodgifyAdapter } from './lodgify'
 import type { PmsAdapter } from './types'
 
 export type { PmsAdapter, PmsKind } from './types'
 
 /** Integration types that are a PMS, in order of preference if (wrongly) more than one is connected. */
-export const PMS_INTEGRATION_TYPES = ['pms_cloudbeds'] as const
+export const PMS_INTEGRATION_TYPES = ['pms_cloudbeds', 'pms_lodgify'] as const
 
 export function isPmsIntegrationType(type: string): boolean {
   return (PMS_INTEGRATION_TYPES as readonly string[]).includes(type)
 }
 
 interface IntegrationRow {
+  tenant_id?: string
   integration_type: string
   status: string | null
   credentials: unknown
@@ -47,6 +49,18 @@ export function pmsFromIntegration(row: IntegrationRow | null | undefined): PmsA
       }
       return cloudbedsAdapter(apiKey, propertyId)
     }
+    case 'pms_lodgify': {
+      if (!row.tenant_id) return null
+      let apiKey: string
+      try {
+        apiKey = decryptCredentials<{ api_key: string }>(row.credentials as EncryptedPayload).api_key
+      } catch (err) {
+        console.error('[pms] could not decrypt Lodgify credentials', err)
+        return null
+      }
+      if (!apiKey) return null
+      return lodgifyAdapter(row.tenant_id, { apiKey, propertyId: config.property_id?.trim() || undefined })
+    }
     default:
       return null
   }
@@ -62,7 +76,7 @@ export function pmsFromIntegration(row: IntegrationRow | null | undefined): PmsA
 export async function pmsForTenant(db: SupabaseClient, tenantId?: string | null): Promise<PmsAdapter | null> {
   let query = db
     .from('tenant_integrations')
-    .select('integration_type, status, credentials, config')
+    .select('tenant_id, integration_type, status, credentials, config')
     .in('integration_type', PMS_INTEGRATION_TYPES as unknown as string[])
     .eq('status', 'connected')
   if (tenantId) query = query.eq('tenant_id', tenantId)

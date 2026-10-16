@@ -7,6 +7,7 @@ import InboxList from './InboxList'
 const INTEGRATION_LABELS: Record<string, string> = {
   whatsapp: 'WhatsApp',
   pms_cloudbeds: 'Cloudbeds',
+  pms_lodgify: 'Lodgify',
   instagram: 'Instagram',
   email: 'Email',
   transcription_deepgram: 'Voice notes (Deepgram)',

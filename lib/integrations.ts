@@ -3,6 +3,7 @@ export const INTEGRATION_TYPES = [
   'instagram',
   'email',
   'pms_cloudbeds',
+  'pms_lodgify',
   'transcription_deepgram',
   'costs_anthropic',
 ] as const
@@ -69,6 +70,15 @@ export const INTEGRATIONS: IntegrationDef[] = [
     label: 'Cloudbeds (PMS)',
     credentialFields: [{ key: 'api_key', label: 'API Key', type: 'password' }],
     configFields: [{ key: 'property_id', label: 'Property ID', type: 'text' }],
+  },
+  {
+    // Vacation-rental PMS. One API key per Lodgify account (Settings → Public
+    // API; needs a plan with API access). Property ID is only needed when the
+    // account holds more than one property.
+    type: 'pms_lodgify',
+    label: 'Lodgify (PMS)',
+    credentialFields: [{ key: 'api_key', label: 'API Key (Lodgify → Settings → Public API)', type: 'password' }],
+    configFields: [{ key: 'property_id', label: 'Property ID (only if the Lodgify account has several properties)', type: 'text' }],
   },
   {
     // Lets the concierge understand guests' WhatsApp voice notes. Without it,

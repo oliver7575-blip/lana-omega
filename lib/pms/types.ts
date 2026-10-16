@@ -30,7 +30,7 @@ export type {
 }
 
 /** Which PMS a tenant uses. Matches tenant_integrations.integration_type without the "pms_" prefix. */
-export type PmsKind = 'cloudbeds'
+export type PmsKind = 'cloudbeds' | 'lodgify'
 
 export interface PmsAdapter {
   kind: PmsKind

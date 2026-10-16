@@ -73,6 +73,7 @@ export default function SettingsPage() {
 
   const [bookingEngineCode, setBookingEngineCode] = useState('')
   const [bookingCurrency, setBookingCurrency] = useState('')
+  const [bookingUrl, setBookingUrl] = useState('')
   const [savingBooking, setSavingBooking] = useState(false)
   const [bookingMessage, setBookingMessage] = useState<string | null>(null)
 
@@ -108,6 +109,7 @@ export default function SettingsPage() {
       const booking = json.tenant.booking_config ?? {}
       setBookingEngineCode(booking.booking_engine_code ?? '')
       setBookingCurrency(booking.currency ?? '')
+      setBookingUrl(booking.booking_url ?? '')
     }
     setLoading(false)
   }
@@ -202,6 +204,7 @@ export default function SettingsPage() {
         booking_config: {
           booking_engine_code: bookingEngineCode,
           currency: bookingCurrency,
+          booking_url: bookingUrl,
         },
       }),
     })
@@ -528,9 +531,10 @@ export default function SettingsPage() {
         <div style={{ marginTop: 32, border: '1px solid #232a40', borderRadius: 8, padding: 16 }}>
           <h2 style={{ marginTop: 0, fontSize: 18 }}>Booking link</h2>
           <p style={{ fontSize: 13, color: 'rgba(231,233,240,0.55)', marginTop: 0 }}>
-            Lets your AI concierge send guests a real link to check availability and book, using
-            your Cloudbeds booking engine. Find your booking engine code in Cloudbeds under
-            Booking Engine settings — it's the short code in your booking engine's own URL.
+            Lets your AI concierge send guests a real link to check availability and book.
+            Cloudbeds hotels: enter the booking engine code (Cloudbeds → Booking Engine settings —
+            the short code in the booking engine's own URL). Other systems (e.g. Lodgify): leave
+            the code empty and enter your booking website instead.
           </p>
           <div style={{ marginBottom: 8 }}>
             <label>Booking engine code</label>
@@ -539,6 +543,16 @@ export default function SettingsPage() {
               value={bookingEngineCode}
               onChange={(e) => setBookingEngineCode(e.target.value)}
               placeholder="e.g. NadQ8y"
+              style={{ width: '100%', padding: 8 }}
+            />
+          </div>
+          <div style={{ marginBottom: 8 }}>
+            <label>Booking website (if not using a Cloudbeds code)</label>
+            <br />
+            <input
+              value={bookingUrl}
+              onChange={(e) => setBookingUrl(e.target.value)}
+              placeholder="e.g. https://yourhotel.lodgify.com"
               style={{ width: '100%', padding: 8 }}
             />
           </div>

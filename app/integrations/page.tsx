@@ -16,7 +16,7 @@ interface IntegrationStatus {
   last_error: string | null
 }
 
-const TESTABLE: IntegrationType[] = ['whatsapp', 'pms_cloudbeds', 'transcription_deepgram', 'costs_anthropic', 'instagram']
+const TESTABLE: IntegrationType[] = ['whatsapp', 'pms_cloudbeds', 'pms_lodgify', 'transcription_deepgram', 'costs_anthropic', 'instagram']
 
 export default function IntegrationsPage() {
   const [statuses, setStatuses] = useState<Record<string, IntegrationStatus>>({})

@@ -69,6 +69,12 @@ async function checkCloudbeds(
   return withTimeout(pms.testConnection(), 10000, 'Cloudbeds request')
 }
 
+async function checkLodgify(row: { tenant_id?: string; credentials: unknown; config: unknown }): Promise<CheckResult> {
+  const pms = pmsFromIntegration({ integration_type: 'pms_lodgify', status: 'connected', ...row })
+  if (!pms) return { ok: false, error: 'Could not read the saved Lodgify credentials — reconnect Lodgify' }
+  return withTimeout(pms.testConnection(), 15000, 'Lodgify request')
+}
+
 async function checkDeepgram(credentials: unknown): Promise<CheckResult> {
   const { api_key } = decryptCredentials<{ api_key: string }>(
     credentials as Parameters<typeof decryptCredentials>[0]
@@ -105,7 +111,7 @@ async function checkAnthropicAdmin(credentials: EncryptedPayload): Promise<Check
   return { ok: true, detail: 'Admin key accepted — Claude costs will show on the Costs page' }
 }
 
-const TESTABLE_TYPES = ['whatsapp', 'pms_cloudbeds', 'transcription_deepgram', 'costs_anthropic', 'instagram']
+const TESTABLE_TYPES = ['whatsapp', 'pms_cloudbeds', 'pms_lodgify', 'transcription_deepgram', 'costs_anthropic', 'instagram']
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -129,7 +135,7 @@ export async function POST(request: Request) {
   // RLS scopes this to the caller's own tenant automatically.
   const { data: row } = await supabase
     .from('tenant_integrations')
-    .select('status, credentials, config')
+    .select('tenant_id, status, credentials, config')
     .eq('integration_type', integrationType)
     .maybeSingle()
 
@@ -148,6 +154,8 @@ export async function POST(request: Request) {
             ? await checkAnthropicAdmin(row.credentials)
             : integrationType === 'instagram'
               ? await checkInstagram(instagramConnection(row.credentials, row.config))
+            : integrationType === 'pms_lodgify'
+              ? await checkLodgify(row)
             : await checkCloudbeds(row.credentials, row.config as Record<string, string> | null)
   } catch (err) {
     result = { ok: false, error: err instanceof Error ? err.message : 'Check failed unexpectedly' }

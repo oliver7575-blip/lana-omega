@@ -63,7 +63,7 @@ export async function PATCH(request: Request) {
     ai_persona_prompt?: string
     knowledge_base?: string
     escalation_contacts?: unknown
-    booking_config?: { booking_engine_code?: string; currency?: string }
+    booking_config?: { booking_engine_code?: string; currency?: string; booking_url?: string }
     post_stay_enabled?: boolean
     activate?: boolean
   }
@@ -108,7 +108,7 @@ export async function PATCH(request: Request) {
     ai_persona_prompt?: string
     knowledge_base?: string | null
     escalation_contacts?: EscalationContact[]
-    booking_config?: { booking_engine_code?: string; currency?: string }
+    booking_config?: { booking_engine_code?: string; currency?: string; booking_url?: string }
     post_stay_enabled?: boolean
   } = {}
   if (typeof body.name === 'string' && body.name.trim()) updates.name = body.name.trim()
@@ -137,8 +137,13 @@ export async function PATCH(request: Request) {
   if (body.booking_config && typeof body.booking_config === 'object') {
     const code = body.booking_config.booking_engine_code?.trim()
     const currency = body.booking_config.currency?.trim()
+    const url = body.booking_config.booking_url?.trim()
+    if (url && !/^https:\/\/[^\s]+$/i.test(url)) {
+      return NextResponse.json({ error: 'The booking website must be a full https:// address' }, { status: 400 })
+    }
     updates.booking_config = {
       ...(code ? { booking_engine_code: code } : {}),
+      ...(url ? { booking_url: url } : {}),
       ...(currency ? { currency: currency.toLowerCase() } : {}),
     }
   }
