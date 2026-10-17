@@ -108,6 +108,54 @@ function peopleOf(b: Raw): { adults?: string; children?: string } {
   return seen ? { adults: String(adults), children: String(children) } : {}
 }
 
+/**
+ * Lodgify `source` values → the channel names guests and staff use.
+ * (Real data: "AirbnbIntegration", "BookingCom", "Manual".)
+ */
+const SOURCE_LABELS: Record<string, string> = {
+  airbnb: 'Airbnb',
+  airbnbintegration: 'Airbnb',
+  bookingcom: 'Booking.com',
+  expedia: 'Expedia',
+  homeaway: 'Vrbo',
+  nineflats: '9flats',
+  oh: 'Website',
+  manual: 'Direct (entered manually)',
+  publicapi: 'Direct (API)',
+  email: 'Email',
+  facebookmessenger: 'Facebook Messenger',
+  ical: 'iCal',
+  other: 'Other',
+}
+
+export function sourceLabel(b: Raw): string | undefined {
+  const source = str(b.source)
+  if (!source) return undefined
+  return SOURCE_LABELS[source.toLowerCase()] ?? source
+}
+
+/**
+ * The channel's own confirmation number(s), which guests quote far more often
+ * than Lodgify's id. Real data: Airbnb puts JSON in source_text with
+ * "confirmationCode"; Booking.com puts "resNumber|otherNumber".
+ */
+export function channelCodes(b: Raw): string[] {
+  const text = str(b.source_text)
+  if (!text) return []
+  if (text.startsWith('{')) {
+    try {
+      const j = JSON.parse(text) as Record<string, unknown>
+      return [str(j.confirmationCode), str(j.reservationId), str(j.reservation_id)].filter((c): c is string => !!c)
+    } catch {
+      return []
+    }
+  }
+  return text
+    .split(/[|,;\s]+/)
+    .map((c) => c.trim())
+    .filter((c) => /^[A-Za-z0-9-]{4,}$/.test(c))
+}
+
 export function toLookupResult(b: Raw, roomNames?: Map<string, string>): ReservationLookupResult {
   const g = guestOf(b)
   const firstRoom = ((b.rooms as Raw[] | undefined) ?? [])[0]
@@ -124,7 +172,8 @@ export function toLookupResult(b: Raw, roomNames?: Map<string, string>): Reserva
     roomTypeName: roomTypeId ? (roomNames?.get(roomTypeId) ?? undefined) : undefined,
     ...peopleOf(b),
     balance: amount(b.amount_due),
-    sourceName: str(b.source_text) ?? str(b.source),
+    sourceName: sourceLabel(b),
+    channelConfirmation: channelCodes(b)[0],
   }
 }
 
@@ -196,17 +245,37 @@ async function roomNames(auth: LodgifyAuth): Promise<Map<string, string>> {
 
 export async function lookupReservation(auth: LodgifyAuth, confirmationNumber: string): Promise<ReservationLookupResult> {
   try {
-    const wanted = String(confirmationNumber ?? '').trim().replace(/^#/, '').replace(/^B(?=\d+$)/i, '')
-    if (!/^\d{1,12}$/.test(wanted)) return { found: false }
-    const r = await lodgifyFetch(auth, `/v2/reservations/bookings/${wanted}`)
-    if (!r.ok) {
-      // 404 = no such booking: a normal "not found", not an outage.
-      if (r.status === 404 || r.status === 400) return { found: false }
-      return { found: false, error: r.error }
+    const raw = String(confirmationNumber ?? '').trim().replace(/^#/, '')
+    if (!raw) return { found: false }
+
+    // 1. Lodgify's own booking id (shown as "B12345" in places).
+    const asId = raw.replace(/^B(?=\d+$)/i, '')
+    if (/^\d{1,9}$/.test(asId)) {
+      const r = await lodgifyFetch(auth, `/v2/reservations/bookings/${asId}`)
+      if (r.ok) {
+        const b = r.data as Raw | null
+        if (b && b.id !== undefined && inProperty(auth, b)) return toLookupResult(b, await roomNames(auth))
+      } else if (r.status !== 404 && r.status !== 400) {
+        return { found: false, error: r.error }
+      }
     }
-    const b = r.data as Raw | null
-    if (!b || b.id === undefined || !inProperty(auth, b)) return { found: false }
-    return toLookupResult(b, await roomNames(auth))
+
+    // 2. A channel confirmation number (Booking.com, Airbnb, …) on a current
+    //    or upcoming stay.
+    const wanted = raw.toLowerCase()
+    if (!/^[a-z0-9-]{4,}$/.test(wanted)) return { found: false }
+    const [current, upcoming] = await Promise.all([
+      listBookings(auth, 'stayFilter=Current'),
+      listBookings(auth, 'stayFilter=Upcoming'),
+    ])
+    if (!current.ok) return { found: false, error: current.error }
+    if (!upcoming.ok) return { found: false, error: upcoming.error }
+    const hits = [...current.rows, ...upcoming.rows].filter((b) =>
+      channelCodes(b).some((c) => c.toLowerCase() === wanted)
+    )
+    // Prefer a live booking over a cancelled copy of the same code.
+    const best = hits.find((b) => mapLodgifyStatus(b) !== 'canceled') ?? hits[0]
+    return best ? toLookupResult(best, await roomNames(auth)) : { found: false }
   } catch (err) {
     return { found: false, error: err instanceof Error ? err.message : 'Unknown error' }
   }
@@ -362,6 +431,11 @@ export async function testConnection(auth: LodgifyAuth): Promise<{ ok: boolean; 
 /** One raw booking, unmodified — for checking real field names (debug only). */
 export async function getBookingRaw(auth: LodgifyAuth, id: string) {
   return lodgifyFetch(auth, `/v2/reservations/bookings/${encodeURIComponent(id)}`)
+}
+
+/** The account's properties with their ids and names (debug only). */
+export async function listPropertiesRaw(auth: LodgifyAuth) {
+  return lodgifyFetch(auth, '/v2/properties?page=1&size=50')
 }
 
 /** The first few upcoming bookings, raw (debug only). */

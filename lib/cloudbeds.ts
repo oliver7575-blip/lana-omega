@@ -40,6 +40,8 @@ export interface ReservationLookupResult {
   children?: string
   balance?: number
   sourceName?: string
+  /** The booking channel's own confirmation number (Booking.com, Airbnb…), when the PMS keeps it separately. */
+  channelConfirmation?: string
   error?: string
 }
 

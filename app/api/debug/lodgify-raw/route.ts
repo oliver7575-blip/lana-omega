@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { decryptCredentials, type EncryptedPayload } from '@/lib/crypto'
-import { getBookingRaw, listUpcomingRaw, listWebhooks } from '@/lib/lodgify'
+import { getBookingRaw, listPropertiesRaw, listUpcomingRaw, listWebhooks } from '@/lib/lodgify'
 import { pmsForTenant } from '@/lib/pms'
 
 /**
@@ -11,6 +11,8 @@ import { pmsForTenant } from '@/lib/pms'
  *
  *   GET /api/debug/lodgify-raw?tenantId=<uuid>              → first 3 upcoming bookings + webhooks
  *   GET /api/debug/lodgify-raw?tenantId=<uuid>&id=<booking> → one booking
+ *   GET …&lookup=<any confirmation number> → what Lana's lookup returns
+ *   GET …&phone=<number>                  → what Lana's phone match returns
  */
 export async function GET(request: Request) {
   if (!process.env.CRON_SECRET || request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -39,6 +41,21 @@ export async function GET(request: Request) {
     const [raw, mapped] = await Promise.all([getBookingRaw(auth, id), pms?.lookupReservation(id)])
     return NextResponse.json({ raw, mapped })
   }
-  const [upcoming, webhooks] = await Promise.all([listUpcomingRaw(auth, 3), listWebhooks(auth)])
-  return NextResponse.json({ status: integration.status, propertyId: propertyId ?? null, upcoming, webhooks })
+  const lookup = params.get('lookup')
+  if (lookup) return NextResponse.json({ lookup, mapped: await pms?.lookupReservation(lookup) })
+  const phone = params.get('phone')
+  if (phone) return NextResponse.json({ phone, mapped: await pms?.findReservationByPhone(phone) })
+
+  const [properties, upcoming, webhooks] = await Promise.all([
+    listPropertiesRaw(auth),
+    listUpcomingRaw(auth, 3),
+    listWebhooks(auth),
+  ])
+  const props = properties.ok
+    ? ((Array.isArray(properties.data) ? properties.data : ((properties.data as { items?: unknown[] })?.items ?? [])) as {
+        id?: number
+        name?: string
+      }[]).map((p) => ({ id: p.id, name: p.name }))
+    : properties
+  return NextResponse.json({ status: integration.status, propertyId: propertyId ?? null, properties: props, upcoming, webhooks })
 }
