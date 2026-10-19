@@ -18,17 +18,21 @@ export async function GET() {
     .single()
   if (!staff) return NextResponse.json({ error: 'No tenant' }, { status: 404 })
 
-  const [{ data: tenant }, { count: newEscalations }, unreadReservations, unread, { count: paymentsAttention }] = await Promise.all([
+  const [{ data: tenant }, { count: newEscalations }, unreadReservations, unread, { count: paymentsAttention }, { data: tenants }] = await Promise.all([
     supabase.from('tenants').select('name').eq('id', staff.tenant_id).single(),
     supabase.from('escalations').select('id', { count: 'exact', head: true }).eq('status', 'new'),
     unreadConversationIds(supabase, staff.id as string, { reservationsOnly: true }).then((ids) => ids.length),
     unreadCounts(supabase, staff.id as string),
     supabase.from('payment_requests').select('id', { count: 'exact', head: true }).in('status', ['needs_review', 'paid_unverified']),
+    // Every hotel this login belongs to (for the hotel switcher).
+    supabase.rpc('my_tenants'),
   ])
 
   return NextResponse.json({
     email: user.email ?? '',
     tenantName: tenant?.name ?? '',
+    tenantId: staff.tenant_id,
+    tenants: ((tenants ?? []) as { tenant_id: string; name: string }[]).map((t) => ({ id: t.tenant_id, name: t.name })),
     unreadReservations,
     unreadEmails: unread.emails,
     unreadReviews: unread.reviews,

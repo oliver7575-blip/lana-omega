@@ -29,6 +29,8 @@ const LEGACY = ['/settings', '/staff', '/waitlist', '/integrations', '/automatio
 interface ShellInfo {
   email: string
   tenantName: string
+  tenantId?: string
+  tenants?: { id: string; name: string }[]
   unreadReservations: number
   unreadEmails: number
   unreadReviews: number
@@ -42,6 +44,7 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
   const [info, setInfo] = useState<ShellInfo | null>(null)
   const [open, setOpen] = useState(false)
   const [tick, setTick] = useState(0)
+  const [switching, setSwitching] = useState(false)
 
   const bare = BARE.some((p) => pathname.startsWith(p))
 
@@ -85,6 +88,35 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
   const isInbox = pathname.startsWith('/inbox') || pathname.startsWith('/conversations')
   const isReservations = pathname.startsWith('/reservations')
   const legacy = LEGACY.some((p) => pathname.startsWith(p))
+
+  // Multi-hotel logins: switch hotel, then reload so every page and the live
+  // updates follow the newly selected hotel.
+  async function switchHotel(tenantId: string) {
+    if (!tenantId || tenantId === info?.tenantId) return
+    setSwitching(true)
+    try {
+      const res = await fetch('/api/tenants', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenantId }),
+      })
+      if (!res.ok) {
+        const text = await res.text()
+        let msg = 'Could not switch hotel'
+        try {
+          msg = (JSON.parse(text) as { error?: string }).error ?? msg
+        } catch {}
+        alert(msg)
+        setSwitching(false)
+        return
+      }
+      // Hotel-specific pages (a conversation, a task…) don't exist in the other hotel.
+      window.location.assign('/inbox')
+    } catch {
+      alert('Could not switch hotel')
+      setSwitching(false)
+    }
+  }
 
   async function signOut() {
     await createClient().auth.signOut()
@@ -132,6 +164,22 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
         <p className="font-display text-[23px] uppercase italic tracking-tight text-white">
           {info?.tenantName ?? '\u00a0'}
         </p>
+        {info?.tenants && info.tenants.length > 1 && (
+          <select
+            aria-label="Switch hotel"
+            value={info.tenantId ?? ''}
+            disabled={switching}
+            onChange={(e) => switchHotel(e.target.value)}
+            className="mt-2 w-full rounded-md border border-line bg-paper px-2 py-1 text-[12px] text-navy focus:outline-none"
+          >
+            {info.tenants.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        )}
+        {switching && <p className="mt-1 text-[11px] text-navy/60">Switching…</p>}
       </div>
 
       <div className="space-y-1">
@@ -176,7 +224,9 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
       <LiveRefresh tables={['messages', 'escalations']} onChange={() => setTick((t) => t + 1)} pollMs={60000} />
       {/* Mobile top bar */}
       <div className="flex items-center justify-between border-b border-line px-4 py-3 md:hidden">
-        <p className="font-display text-lg italic text-clay">Lana · admin</p>
+        <p className="font-display text-lg italic text-clay">
+          Lana · admin{info?.tenants && info.tenants.length > 1 ? ` · ${info.tenantName}` : ''}
+        </p>
         <button onClick={() => setOpen(true)} aria-label="Open menu" className="text-navy">
           <MenuIcon />
         </button>

@@ -187,7 +187,13 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: deleteError.message }, { status: 500 })
   }
 
-  await serviceClient.auth.admin.deleteUser(targetRow.auth_uid)
+  // Only delete the login itself if it no longer belongs to any hotel —
+  // one person can work for several hotels.
+  const { count: otherHotels } = await serviceClient
+    .from('staff_users')
+    .select('id', { count: 'exact', head: true })
+    .eq('auth_uid', targetRow.auth_uid)
+  if (!otherHotels) await serviceClient.auth.admin.deleteUser(targetRow.auth_uid)
 
   return NextResponse.json({ success: true })
 }

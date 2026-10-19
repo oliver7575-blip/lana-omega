@@ -230,8 +230,13 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: deleteError.message }, { status: 500 })
   }
 
+  // Delete each login only if it doesn't also belong to another hotel.
   for (const staff of allStaff ?? []) {
-    await serviceClient.auth.admin.deleteUser(staff.auth_uid)
+    const { count: otherHotels } = await serviceClient
+      .from('staff_users')
+      .select('id', { count: 'exact', head: true })
+      .eq('auth_uid', staff.auth_uid)
+    if (!otherHotels) await serviceClient.auth.admin.deleteUser(staff.auth_uid)
   }
 
   return NextResponse.json({ success: true })
