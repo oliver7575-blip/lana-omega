@@ -33,7 +33,18 @@ export async function PATCH(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const body = (await request.json()) as { id?: string; status?: string; category?: string }
+  const body = (await request.json()) as { id?: string; ids?: string[]; status?: string; category?: string }
+
+  // Bulk status change (select-all / select-some, then "Mark handled" or "Move back to To handle").
+  if (Array.isArray(body.ids)) {
+    const ids = body.ids.filter((id) => /^[0-9a-f-]{36}$/i.test(id))
+    if (!ids.length) return NextResponse.json({ error: 'No emails given' }, { status: 400 })
+    if (body.status !== 'new' && body.status !== 'done') return NextResponse.json({ error: 'Nothing to change' }, { status: 400 })
+    const { error } = await supabase.from('inbound_emails').update({ status: body.status }).in('id', ids)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ ok: true, count: ids.length })
+  }
+
   if (!body.id || !/^[0-9a-f-]{36}$/i.test(body.id)) return NextResponse.json({ error: 'Unknown email' }, { status: 400 })
   const update: Record<string, string> = {}
   if (body.status === 'new' || body.status === 'done') update.status = body.status
