@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { cbApi, statusColor, statusLabel } from './shared'
 
 type Json = Record<string, unknown>
@@ -84,6 +85,8 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
   const [guestProfile, setGuestProfile] = useState<Json | null>(null)
   const [guestError, setGuestError] = useState<string | null>(null)
   const [guestLoading, setGuestLoading] = useState(false)
+  const [messagesBusy, setMessagesBusy] = useState(false)
+  const router = useRouter()
 
   function apply(d: Detail) {
     setR(d)
@@ -121,6 +124,18 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
       .then((j) => setGuestProfile(j.profile))
       .catch((e) => setGuestError(e instanceof Error ? e.message : 'Could not load guest details'))
       .finally(() => setGuestLoading(false))
+  }
+
+  async function goToMessages() {
+    setMessagesBusy(true)
+    setError(null)
+    try {
+      const j = await cbApi<{ conversationId: string }>(`/api/cloudbeds/reservation/${id}/conversation`)
+      router.push(`/conversations/${j.conversationId}`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not open this guest’s messages')
+      setMessagesBusy(false)
+    }
   }
 
   const color = statusColor(r?.status ?? '')
@@ -167,6 +182,10 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
                     Reservation details
                   </a>
                 )}
+                <button disabled={messagesBusy} onClick={goToMessages}
+                  className="rounded-full border border-gray-300 px-4 py-1.5 text-sm font-semibold text-[#14213d] hover:bg-gray-50 disabled:opacity-60">
+                  {messagesBusy ? 'Opening…' : 'Messages'}
+                </button>
               </div>
 
               <p className="mb-1.5 mt-4 text-sm font-semibold">Estimated arrival time</p>

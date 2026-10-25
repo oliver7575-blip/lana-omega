@@ -107,6 +107,7 @@ export interface ReservationDetail {
   reservationID: string
   guestName: string
   guestEmail: string | null
+  guestPhone: string | null
   status: string
   source: string | null
   startDate: string
@@ -157,6 +158,7 @@ export async function getReservationDetail(cb: CB, reservationID: string): Promi
     reservationID: String(d.reservationID ?? reservationID),
     guestName: String(d.guestName ?? ''),
     guestEmail: (d.guestEmail as string) ?? null,
+    guestPhone: (d.guestPhone as string) || (d.guestCellPhone as string) || null,
     status: String(d.status ?? ''),
     source: (d.source as string) ?? null,
     startDate: String(d.startDate ?? ''),
