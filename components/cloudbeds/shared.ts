@@ -8,6 +8,24 @@ export interface DashRow {
   endDate: string
 }
 
+export interface ReservationRoomRef {
+  roomTypeID: string
+  roomTypeName: string
+  roomID: string | null
+  roomName: string | null
+}
+
+export interface ReservationSummary {
+  reservationID: string
+  guestID: string | null
+  guestName: string
+  startDate: string
+  endDate: string
+  status: string
+  total: number | null
+  rooms: ReservationRoomRef[]
+}
+
 export const statusLabel = (s: string) => s.replace(/_/g, ' ')
 
 /** Colours used by Beta's Cloudbeds pages. */
@@ -42,3 +60,11 @@ export async function cbApi<T>(url: string, method = 'GET', body?: unknown): Pro
 
 /** "28/09/2026" for a YYYY-MM-DD date. */
 export const dmy = (d: string) => (d ? `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}` : '')
+
+/** "September 28, 2026" for a YYYY-MM-DD date. */
+export const longDate = (d: string) =>
+  d ? new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : ''
+
+/** Whole nights between two YYYY-MM-DD dates. */
+export const nights = (start: string, end: string) =>
+  start && end ? Math.max(0, Math.round((Date.parse(`${end}T12:00:00Z`) - Date.parse(`${start}T12:00:00Z`)) / 86400000)) : null

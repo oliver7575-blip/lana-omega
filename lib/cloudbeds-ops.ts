@@ -107,6 +107,7 @@ export interface ReservationDetail {
   reservationID: string
   guestName: string
   guestEmail: string | null
+  guestPhone: string | null
   status: string
   source: string | null
   startDate: string
@@ -157,6 +158,7 @@ export async function getReservationDetail(cb: CB, reservationID: string): Promi
     reservationID: String(d.reservationID ?? reservationID),
     guestName: String(d.guestName ?? ''),
     guestEmail: (d.guestEmail as string) ?? null,
+    guestPhone: (d.guestPhone as string) || (d.guestCellPhone as string) || null,
     status: String(d.status ?? ''),
     source: (d.source as string) ?? null,
     startDate: String(d.startDate ?? ''),
@@ -206,6 +208,60 @@ export async function unassignRoom(cb: CB, reservationID: string, roomID?: strin
       newRoomID: '',
     })
   }
+}
+
+/** Moves one room of the reservation to a different physical room (same action Cloudbeds uses to unassign, with a target instead of blank). */
+export async function assignRoom(
+  cb: CB,
+  reservationID: string,
+  subReservationID: string,
+  reservationRoomID: string | null,
+  newRoomID: string
+) {
+  await cbPost(cb, 'postRoomAssign', { reservationID, subReservationID, reservationRoomID: reservationRoomID ?? '', newRoomID })
+}
+
+export interface AvailableRoom {
+  id: string
+  name: string
+}
+
+/** Physical rooms of a room type that are free for [start, end) — for the panel's "change room" picker. */
+export async function availableRoomsOfType(
+  cb: CB,
+  roomTypeID: string,
+  start: string,
+  end: string,
+  excludeReservationID: string
+): Promise<AvailableRoom[]> {
+  const [roomsJson, reservations, blocksJson] = await Promise.all([
+    cbGet(cb, 'getRooms', { propertyIDs: cb.propertyId, pageSize: 100 }),
+    listReservations(cb, { checkInTo: end, checkOutFrom: start, includeAllRooms: true }),
+    cbGet(cb, 'getRoomBlocks', { propertyID: cb.propertyId, startDate: start, endDate: end }).catch(() => ({ data: {} })),
+  ])
+
+  const allRooms: AvailableRoom[] = []
+  for (const prop of (roomsJson.data as Json[]) ?? []) {
+    for (const r of (prop.rooms as Json[]) ?? []) {
+      if (r.isVirtual) continue
+      if (String(r.roomTypeID) === roomTypeID) allRooms.push({ id: String(r.roomID), name: String(r.roomName ?? '') })
+    }
+  }
+
+  const occupied = new Set<string>()
+  for (const r of reservations) {
+    if (!ACTIVE(r.status) || String(r.reservationID) === excludeReservationID) continue
+    for (const room of (r.rooms as Json[]) ?? []) {
+      if (room.roomID) occupied.add(String(room.roomID))
+    }
+  }
+  for (const b of (((blocksJson.data ?? {}) as Json).roomBlocks as Json[]) ?? []) {
+    for (const room of (b.rooms as Json[]) ?? []) occupied.add(String(room.roomID))
+  }
+
+  return allRooms
+    .filter((r) => !occupied.has(r.id))
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
 }
 
 export async function setArrivalTime(cb: CB, reservationID: string, time: string) {
@@ -526,6 +582,106 @@ export function cloudbedsLinks(propertyId: string) {
     newReservation: `https://hotels.cloudbeds.com/connect/${propertyId}#/newReservation`,
     reservation: (id: string) => `https://hotels.cloudbeds.com/connect/${propertyId}#/reservations/${id}`,
   }
+}
+
+// ---------------------------------------------------------------------------
+// Reservations list (the panel's Reservations page)
+// ---------------------------------------------------------------------------
+
+export interface ReservationRoomRef {
+  roomTypeID: string
+  roomTypeName: string
+  roomID: string | null
+  roomName: string | null
+}
+
+export interface ReservationSummary {
+  reservationID: string
+  guestID: string | null
+  guestName: string
+  startDate: string
+  endDate: string
+  status: string
+  total: number | null
+  rooms: ReservationRoomRef[]
+}
+
+function roomRefs(r: Json): ReservationRoomRef[] {
+  return ((r.rooms as Json[]) ?? []).map((x) => ({
+    roomTypeID: String(x.roomTypeID ?? ''),
+    roomTypeName: String(x.roomTypeName ?? ''),
+    roomID: (x.roomID as string) || null,
+    roomName: (x.roomName as string) || null,
+  }))
+}
+
+/** A page of reservations, most recently BOOKED first, for the panel's Reservations list. */
+export async function listReservationsSummary(
+  cb: CB,
+  page: number
+): Promise<{ rows: ReservationSummary[]; hasMore: boolean }> {
+  const pageSize = 50
+  // Cheap: list fields only, up to 1000 reservations, then sort by booking date —
+  // Cloudbeds' own pageNumber order isn't booking-date order, so this has to be
+  // pulled and sorted here rather than paginated directly from the API.
+  const all = await listReservations(cb, { includeAllRooms: true, status: 'confirmed' }, 10)
+  const sorted = all
+    .map((r) => ({
+      reservationID: String(r.reservationID ?? ''),
+      guestID: (r.guestID as string) ?? null,
+      guestName: String(r.guestName ?? ''),
+      startDate: String(r.startDate ?? ''),
+      endDate: String(r.endDate ?? ''),
+      status: String(r.status ?? ''),
+      rooms: roomRefs(r),
+      dateCreated: String(r.dateCreated ?? ''),
+    }))
+    .sort((a, b) => b.dateCreated.localeCompare(a.dateCreated))
+  const start = (Math.max(1, page) - 1) * pageSize
+  const slice = sorted.slice(start, start + pageSize)
+
+  // Amount isn't on the list response — one detail call per shown row, bounded concurrency.
+  const totals = await mapLimit(slice, 8, async (r) => {
+    try {
+      return (await getReservationDetail(cb, r.reservationID)).total
+    } catch {
+      return null
+    }
+  })
+  const rows: ReservationSummary[] = slice.map(({ dateCreated: _dateCreated, ...r }, i) => ({ ...r, total: totals[i] }))
+  return { rows, hasMore: start + pageSize < sorted.length }
+}
+
+/** Every field Cloudbeds holds on a guest's profile — home phone, country, email preferences, ID, notes, etc. */
+export async function getGuestProfile(cb: CB, guestID: string): Promise<Record<string, unknown>> {
+  const json = await cbGet(cb, 'getGuest', { propertyID: cb.propertyId, guestID })
+  return (json.data ?? {}) as Json
+}
+
+/**
+ * The guest's phone/email, read the way the rest of the app already reads
+ * them reliably: nested at getReservations' guestList[guestID] (confirmed
+ * against real data) — NOT flat on getReservation/getGuest, which don't
+ * carry it the same way for this account.
+ */
+export async function getReservationGuestContact(
+  cb: CB,
+  reservationID: string
+): Promise<{ phone: string | null; email: string | null }> {
+  const json = await cbGet(cb, 'getReservations', {
+    propertyID: cb.propertyId,
+    reservationID,
+    includeGuestsDetails: true,
+    pageSize: 1,
+  })
+  const match = ((json.data as Json[]) ?? [])[0]
+  if (!match) return { phone: null, email: null }
+  const guestID = match.guestID as string | undefined
+  const guestList = (match.guestList as Record<string, Json>) ?? {}
+  const g = guestID ? guestList[guestID] : undefined
+  const phone = ((g?.guestPhone as string) || (g?.guestCellPhone as string) || '').trim() || null
+  const email = ((g?.guestEmail as string) || '').trim() || null
+  return { phone, email }
 }
 
 // ---------------------------------------------------------------------------

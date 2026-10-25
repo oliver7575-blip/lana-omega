@@ -1,7 +1,57 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { cbApi, statusColor, statusLabel } from './shared'
+
+type Json = Record<string, unknown>
+
+/** "guestHomePhone" → "Home Phone". Strips a leading "guest" and splits camelCase. */
+function humanize(key: string): string {
+  const stripped = key.replace(/^guest/, '') || key
+  const spaced = stripped.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase())
+  return spaced.trim() || key
+}
+
+function valueText(v: unknown): string | null {
+  if (v === null || v === undefined || v === '') return null
+  if (typeof v === 'string' || typeof v === 'number') return String(v)
+  if (typeof v === 'boolean') return v ? 'Yes' : 'No'
+  if (Array.isArray(v)) {
+    if (v.length === 0) return null
+    const parts = v.map((item) => {
+      if (item && typeof item === 'object') {
+        const o = item as Json
+        const label = (o.field ?? o.name ?? o.label) as string | undefined
+        const val = (o.value ?? o.text) as string | undefined
+        if (label !== undefined) return val !== undefined ? `${label}: ${val}` : String(label)
+        return JSON.stringify(o)
+      }
+      return String(item)
+    })
+    return parts.join(' · ')
+  }
+  if (typeof v === 'object') return null // nested objects skipped — flat fields cover the common case
+  return String(v)
+}
+
+/** Every field Cloudbeds holds on the guest's profile, shown as plain label/value rows. */
+function GuestProfileFields({ profile }: { profile: Json }) {
+  const rows = Object.entries(profile)
+    .map(([k, v]) => [humanize(k), valueText(v)] as const)
+    .filter(([, v]) => v !== null)
+  if (rows.length === 0) return <p className="text-sm text-gray-500">No further guest details on file.</p>
+  return (
+    <div className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
+      {rows.map(([label, value]) => (
+        <div key={label}>
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</p>
+          <p className="text-sm text-[#14213d]">{value}</p>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 interface Detail {
   reservationID: string
@@ -32,6 +82,11 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
   const [time, setTime] = useState('')
   const [checkin, setCheckin] = useState('')
   const [checkout, setCheckout] = useState('')
+  const [guestProfile, setGuestProfile] = useState<Json | null>(null)
+  const [guestError, setGuestError] = useState<string | null>(null)
+  const [guestLoading, setGuestLoading] = useState(false)
+  const [messagesBusy, setMessagesBusy] = useState(false)
+  const router = useRouter()
 
   function apply(d: Detail) {
     setR(d)
@@ -59,6 +114,29 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
       setError(e instanceof Error ? e.message : 'Cloudbeds error')
     }
     setBusy(false)
+  }
+
+  function loadGuest() {
+    if (guestProfile || guestLoading) return
+    setGuestLoading(true)
+    setGuestError(null)
+    cbApi<{ profile: Json }>(`/api/cloudbeds/reservation/${id}/guest`)
+      .then((j) => setGuestProfile(j.profile))
+      .catch((e) => setGuestError(e instanceof Error ? e.message : 'Could not load guest details'))
+      .finally(() => setGuestLoading(false))
+  }
+
+  async function goToMessages() {
+    setMessagesBusy(true)
+    setError(null)
+    try {
+      const j = await cbApi<{ conversationId: string }>(`/api/cloudbeds/reservation/${id}/conversation`)
+      onClose()
+      router.push(`/conversations/${j.conversationId}`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not open this guest’s messages')
+      setMessagesBusy(false)
+    }
   }
 
   const color = statusColor(r?.status ?? '')
@@ -105,6 +183,10 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
                     Reservation details
                   </a>
                 )}
+                <button disabled={messagesBusy} onClick={goToMessages}
+                  className="rounded-full border border-gray-300 px-4 py-1.5 text-sm font-semibold text-[#14213d] hover:bg-gray-50 disabled:opacity-60">
+                  {messagesBusy ? 'Opening…' : 'Messages'}
+                </button>
               </div>
 
               <p className="mb-1.5 mt-4 text-sm font-semibold">Estimated arrival time</p>
@@ -134,6 +216,15 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
                   className="mt-3 w-full rounded-md bg-[#3b6fe0] py-2 text-sm font-semibold text-white hover:bg-[#2f5fcc] disabled:opacity-50">
                   Save stay dates
                 </button>
+              </details>
+
+              <details className="mt-4 border-t border-gray-200 pt-3" onToggle={(e) => e.currentTarget.open && loadGuest()}>
+                <summary className="cursor-pointer text-sm font-semibold">Guest details</summary>
+                <div className="mt-3">
+                  {guestLoading && <p className="text-sm text-gray-500">Loading…</p>}
+                  {guestError && <p className="text-sm text-red-600">{guestError}</p>}
+                  {guestProfile && <GuestProfileFields profile={guestProfile} />}
+                </div>
               </details>
             </div>
           </div>
