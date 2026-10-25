@@ -7,8 +7,8 @@ export type DailyCosts = Record<string, number>
 export interface MonthCosts {
   month: string // "YYYY-MM"
   days: string[]
-  claude: { available: boolean; error?: string; daily: DailyCosts; total: number }
-  meta: { available: boolean; error?: string; daily: DailyCosts; total: number }
+  claude: { available: boolean; error?: string; daily: DailyCosts; total: number; currency: string }
+  meta: { available: boolean; error?: string; daily: DailyCosts; total: number; currency: string }
 }
 
 const sum = (d: DailyCosts) => Object.values(d).reduce((a, b) => a + b, 0)
@@ -55,8 +55,18 @@ export async function claudeDaily(
   return out
 }
 
-/** Meta: WhatsApp Business Account pricing analytics (conversation/message charges). */
-export async function metaDaily(wabaId: string, accessToken: string, startIso: string, endIso: string): Promise<DailyCosts> {
+/**
+ * Meta: WhatsApp Business Account pricing analytics (conversation/message charges).
+ * Meta reports `cost` in whichever currency the WABA's ad account is billed in — not
+ * necessarily USD — so each data point's `currency` is read and returned too, instead
+ * of assuming it matches Claude's (always-USD) costs.
+ */
+export async function metaDaily(
+  wabaId: string,
+  accessToken: string,
+  startIso: string,
+  endIso: string
+): Promise<{ daily: DailyCosts; currency: string | null }> {
   const start = Math.floor(Date.parse(startIso) / 1000)
   const end = Math.floor(Date.parse(endIso) / 1000)
   const field = `pricing_analytics.start(${start}).end(${end}).granularity(DAILY)`
@@ -66,15 +76,19 @@ export async function metaDaily(wabaId: string, accessToken: string, startIso: s
     cache: 'no-store',
   })
   if (!res.ok) throw new Error(`Meta pricing analytics failed: ${res.status} ${(await res.text()).slice(0, 200)}`)
-  const json = (await res.json()) as { pricing_analytics?: { data?: { data_points?: { start: number; cost?: number }[] }[] } }
+  const json = (await res.json()) as {
+    pricing_analytics?: { data?: { data_points?: { start: number; cost?: number; currency?: string }[] }[] }
+  }
   const out: DailyCosts = {}
+  let currency: string | null = null
   for (const group of json.pricing_analytics?.data ?? []) {
     for (const p of group.data_points ?? []) {
       const day = new Date(p.start * 1000).toISOString().slice(0, 10)
       out[day] = (out[day] ?? 0) + Number(p.cost ?? 0)
+      if (p.currency) currency = p.currency
     }
   }
-  return out
+  return { daily: out, currency }
 }
 
 /** One month's daily costs for a hotel, live from Anthropic and Meta, saved as snapshots. */
@@ -94,8 +108,8 @@ export async function monthCosts(tenantId: string, month: string): Promise<Month
   const result: MonthCosts = {
     month,
     days: days.reverse(),
-    claude: { available: false, daily: {}, total: 0 },
-    meta: { available: false, daily: {}, total: 0 },
+    claude: { available: false, daily: {}, total: 0, currency: 'USD' },
+    meta: { available: false, daily: {}, total: 0, currency: 'USD' },
   }
 
   const { data: admin } = await db
@@ -128,7 +142,9 @@ export async function monthCosts(tenantId: string, month: string): Promise<Month
   if (wa?.status === 'connected' && wa.credentials && wabaId) {
     try {
       const { access_token } = decryptCredentials<{ access_token: string }>(wa.credentials as EncryptedPayload)
-      result.meta.daily = await metaDaily(wabaId, access_token, startIso, endIso)
+      const { daily, currency } = await metaDaily(wabaId, access_token, startIso, endIso)
+      result.meta.daily = daily
+      if (currency) result.meta.currency = currency
       result.meta.available = true
     } catch (err) {
       result.meta.error = err instanceof Error ? err.message : 'Meta costs unavailable'
@@ -137,27 +153,42 @@ export async function monthCosts(tenantId: string, month: string): Promise<Month
     result.meta.error = 'Connect WhatsApp (with its Business Account ID) to show Meta costs'
   }
 
-  // Keep a daily record (and fall back to it if a provider is unreachable).
+  // Keep a daily record (and fall back to it if a provider is unreachable). The
+  // currency is saved alongside each row — Meta's own billing currency, not assumed USD.
   const rows = [
-    ...(result.claude.available ? Object.entries(result.claude.daily).map(([d, v]) => ({ provider: 'claude', d, v })) : []),
-    ...(result.meta.available ? Object.entries(result.meta.daily).map(([d, v]) => ({ provider: 'meta', d, v })) : []),
+    ...(result.claude.available
+      ? Object.entries(result.claude.daily).map(([d, v]) => ({ provider: 'claude', d, v, currency: result.claude.currency }))
+      : []),
+    ...(result.meta.available
+      ? Object.entries(result.meta.daily).map(([d, v]) => ({ provider: 'meta', d, v, currency: result.meta.currency }))
+      : []),
   ]
   if (rows.length) {
     await db.from('cost_snapshots').upsert(
-      rows.map((r) => ({ tenant_id: tenantId, snapshot_date: r.d, provider: r.provider, daily_cost_usd: r.v, collected_at: new Date().toISOString() })),
+      rows.map((r) => ({
+        tenant_id: tenantId,
+        snapshot_date: r.d,
+        provider: r.provider,
+        daily_cost_usd: r.v,
+        currency: r.currency,
+        collected_at: new Date().toISOString(),
+      })),
       { onConflict: 'tenant_id,snapshot_date,provider' }
     )
   }
   if (!result.claude.available || !result.meta.available) {
     const { data: saved } = await db
       .from('cost_snapshots')
-      .select('provider, snapshot_date, daily_cost_usd')
+      .select('provider, snapshot_date, daily_cost_usd, currency')
       .eq('tenant_id', tenantId)
       .gte('snapshot_date', days[days.length - 1] ?? month + '-01')
       .lte('snapshot_date', days[0] ?? month + '-31')
     for (const s of saved ?? []) {
       const target = s.provider === 'claude' ? result.claude : result.meta
-      if (!target.available) target.daily[s.snapshot_date as string] = Number(s.daily_cost_usd)
+      if (!target.available) {
+        target.daily[s.snapshot_date as string] = Number(s.daily_cost_usd)
+        if (s.currency) target.currency = s.currency as string
+      }
     }
   }
 

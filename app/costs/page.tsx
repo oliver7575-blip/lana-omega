@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react'
 
-interface Provider { available: boolean; error?: string; daily: Record<string, number>; total: number }
+interface Provider { available: boolean; error?: string; daily: Record<string, number>; total: number; currency: string }
 interface Data { month: string; days: string[]; claude: Provider; meta: Provider }
 
-const usd = (n: number) => `$${n.toFixed(2)}`
+const SYMBOLS: Record<string, string> = { USD: '$', MXN: 'MX$', EUR: '€', GBP: '£' }
+const fmt = (n: number, currency: string) => `${SYMBOLS[currency] ?? currency + ' '}${n.toFixed(2)}`
 
 function shiftMonth(month: string, by: number) {
   const [y, m] = month.split('-').map(Number)
@@ -42,12 +43,15 @@ export default function CostsPage() {
       <div>
         <p className="font-semibold text-white">{title} cost {isCurrent ? 'this month' : `in ${monthLabel}`}</p>
         <p className="text-sm text-navy/55">
-          {!p ? 'Loading…' : p.available ? (isCurrent ? 'Live month-to-date total' : 'Month total') : p.error ?? 'Unavailable'}
+          {!p ? 'Loading…' : p.available ? (isCurrent ? `Live month-to-date total · ${p.currency}` : `Month total · ${p.currency}`) : p.error ?? 'Unavailable'}
         </p>
       </div>
-      <p className="text-2xl font-semibold text-white">{p ? usd(p.total) : '—'}</p>
+      <p className="text-2xl font-semibold text-white">{p ? fmt(p.total, p.currency) : '—'}</p>
     </div>
   )
+
+  // Meta and Claude are only addable when they're actually reported in the same currency.
+  const sameCurrency = data ? data.meta.currency === data.claude.currency : true
 
   return (
     <main className="px-5 py-6 md:px-8">
@@ -69,11 +73,16 @@ export default function CostsPage() {
         <div className="mb-6 space-y-3">
           {card('Meta', data?.meta)}
           {card('Claude', data?.claude)}
-          {data && (
+          {data && sameCurrency && (
             <div className="flex items-center justify-between rounded-2xl border border-clay/30 bg-clay/5 px-6 py-3">
               <p className="font-semibold text-white">Total</p>
-              <p className="text-xl font-semibold text-clay">{usd(data.meta.total + data.claude.total)}</p>
+              <p className="text-xl font-semibold text-clay">{fmt(data.meta.total + data.claude.total, data.claude.currency)}</p>
             </div>
+          )}
+          {data && !sameCurrency && (
+            <p className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-sm text-amber-200">
+              Meta is reporting in {data.meta.currency} and Claude in {data.claude.currency} — not added together here to avoid mixing currencies.
+            </p>
           )}
         </div>
 
@@ -83,7 +92,10 @@ export default function CostsPage() {
             <p className="text-sm text-navy/55">Days in UTC, as reported by Anthropic and Meta. Saved daily.</p>
           </div>
           <div className="grid grid-cols-[1fr_1fr_1fr_1fr] border-b border-line px-6 py-2.5 text-[11px] font-semibold uppercase tracking-[.13em] text-navy/50">
-            <span>Date</span><span className="text-right">Meta</span><span className="text-right">Claude</span><span className="text-right">Total</span>
+            <span>Date</span>
+            <span className="text-right">Meta {data ? `(${data.meta.currency})` : ''}</span>
+            <span className="text-right">Claude {data ? `(${data.claude.currency})` : ''}</span>
+            <span className="text-right">Total</span>
           </div>
           {!data && !error && <p className="px-6 py-8 text-center text-sm text-navy/50">Loading…</p>}
           {data?.days.map((d) => {
@@ -92,9 +104,9 @@ export default function CostsPage() {
             return (
               <div key={d} className="grid grid-cols-[1fr_1fr_1fr_1fr] border-b border-line px-6 py-2.5 text-sm last:border-0">
                 <span className="text-navy/85">{d}</span>
-                <span className="text-right text-navy/85">{usd(meta)}</span>
-                <span className="text-right text-navy/85">{usd(claude)}</span>
-                <span className="text-right text-white">{usd(meta + claude)}</span>
+                <span className="text-right text-navy/85">{fmt(meta, data.meta.currency)}</span>
+                <span className="text-right text-navy/85">{fmt(claude, data.claude.currency)}</span>
+                <span className="text-right text-white">{sameCurrency ? fmt(meta + claude, data.claude.currency) : '—'}</span>
               </div>
             )
           })}
