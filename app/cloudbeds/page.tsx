@@ -29,10 +29,10 @@ const TABS = [
 
 function Card({ title, onRefresh, children }: { title: string; onRefresh: () => void; children: React.ReactNode }) {
   return (
-    <section className="min-w-0 rounded-lg border-t-[3px] border-[#3d62e8] bg-white px-2.5 py-2.5 shadow-[0_1px_3px_rgba(15,23,42,0.10)] sm:px-3 sm:py-3">
-      <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-[13px] font-semibold text-[#14213d]">{title}</h2>
-        <button onClick={onRefresh} title="Refresh" className="text-[13px] text-[#14213d] hover:text-[#3d62e8]">↻</button>
+    <section className="min-w-0 rounded-lg border-t-[3px] border-[#3d62e8] bg-white px-2 py-2 shadow-[0_1px_3px_rgba(15,23,42,0.10)] sm:px-2.5 sm:py-2.5">
+      <div className="mb-1.5 flex items-center justify-between">
+        <h2 className="text-[12px] font-semibold text-[#14213d]">{title}</h2>
+        <button onClick={onRefresh} title="Refresh" className="text-[12px] text-[#14213d] hover:text-[#3d62e8]">↻</button>
       </div>
       {children}
     </section>
@@ -44,7 +44,7 @@ function Tabs({ items, value, onChange }: { items: { key: string; label: string 
     <div className="flex overflow-x-auto bg-[#f1f2f4]">
       {items.map((t) => (
         <button key={t.key} onClick={() => onChange(t.key)}
-          className={`shrink-0 px-2.5 py-1 text-[11px] text-[#14213d] sm:px-3 ${value === t.key ? 'bg-[#e4e6ea]' : 'hover:bg-[#e9ebee]'}`}>
+          className={`shrink-0 px-2 py-0.5 text-[10px] text-[#14213d] sm:px-2.5 ${value === t.key ? 'bg-[#e4e6ea]' : 'hover:bg-[#e9ebee]'}`}>
           {t.label}
         </button>
       ))}
@@ -110,69 +110,69 @@ export default function DashviewPage() {
 
   const [guestFilter, setGuestFilter] = useState('')
   const shownRows = rows?.filter((r) => !guestFilter.trim() || r.guestName.toLowerCase().includes(guestFilter.trim().toLowerCase())) ?? null
-  const thc = 'border-r border-white px-2 py-1 text-left text-[10px] font-semibold uppercase tracking-wide text-[#14213d] last:border-r-0'
-  const tdc = 'px-2 py-1 text-[12px] text-[#14213d]'
+  const thc = 'border-r border-white px-1.5 py-0.5 text-left text-[9px] font-semibold uppercase tracking-wide text-[#14213d] last:border-r-0'
+  const tdc = 'px-1.5 py-0.5 text-[11px] text-[#14213d]'
 
   return (
-    <div className="p-1.5 md:p-2">
-      <div className="min-h-[calc(100vh-1.5rem)] min-w-0 overflow-hidden rounded-2xl bg-[#f2f3f5] px-2.5 py-3 text-[#14213d] sm:px-4 sm:py-4">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2.5">
-          <h1 className="text-[16px] font-semibold tracking-tight sm:text-[18px]">{todayLabel || 'Dashboard'}</h1>
-          <div className="flex flex-wrap items-center gap-2">
+    <div className="p-1 md:p-1.5">
+      <div className="min-h-[calc(100vh-1.5rem)] min-w-0 overflow-hidden rounded-2xl bg-[#f2f3f5] px-2 py-2.5 text-[#14213d] sm:px-3 sm:py-3">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <h1 className="text-[14px] font-semibold tracking-tight sm:text-[15px]">{todayLabel || 'Dashboard'}</h1>
+          <div className="flex flex-wrap items-center gap-1.5">
             <Link href="/cloudbeds/calendar" title="Reservation calendar"
-              className="flex h-7 w-8 items-center justify-center rounded-md bg-[#e4e6ea] text-[#14213d] shadow-sm hover:bg-[#d9dce1]">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M3 9h18M8 2v4M16 2v4" /></svg>
+              className="flex h-6 w-7 items-center justify-center rounded-md bg-[#e4e6ea] text-[#14213d] shadow-sm hover:bg-[#d9dce1]">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M3 9h18M8 2v4M16 2v4" /></svg>
             </Link>
             <button onClick={() => { loadSummary(); loadList(); setOverbookings(null) }} title="Refresh (also updates automatically)"
-              className="flex h-7 w-8 items-center justify-center rounded-md bg-[#e4e6ea] text-[13px] text-[#14213d] shadow-sm hover:bg-[#d9dce1]">↻</button>
+              className="flex h-6 w-7 items-center justify-center rounded-md bg-[#e4e6ea] text-[12px] text-[#14213d] shadow-sm hover:bg-[#d9dce1]">↻</button>
             {summary && (
               <button onClick={() => setCreating(true)}
-                className="rounded-full bg-[#5cc3a5] px-3.5 py-1 text-[11px] font-medium uppercase tracking-wide text-white hover:bg-[#4bb294]">
+                className="rounded-full bg-[#5cc3a5] px-3 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white hover:bg-[#4bb294]">
                 Create new reservation
               </button>
             )}
           </div>
         </div>
 
-        {summaryError && <p className="mb-4 rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{summaryError}</p>}
+        {summaryError && <p className="mb-3 rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{summaryError}</p>}
 
-        <div className="mb-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4 xl:gap-2.5">
+        <div className="mb-2 grid gap-1.5 sm:grid-cols-2 xl:grid-cols-4 xl:gap-2">
           {[
             { n: summary?.arrivals, label: 'Arrivals', color: '#3aa99f', icon: ICONS.bell },
             { n: summary?.departures, label: 'Departures', color: '#e0622d', icon: ICONS.out },
             { n: summary?.stayovers, label: 'Stay overs', color: '#7a5af8', icon: ICONS.moon },
             { n: summary?.roomsOccupied, label: 'Accommodations booked', color: '#3d62e8', pct: summary?.percentageOccupied },
           ].map((c) => (
-            <div key={c.label} className="relative min-h-[58px] rounded-lg bg-white px-3 py-2 shadow-[0_1px_3px_rgba(15,23,42,0.10)]">
-              <p className="text-[17px] leading-none" style={{ color: c.color }}>{c.n ?? '—'}</p>
-              <p className="mt-2 text-[10.5px] font-semibold uppercase tracking-wide">{c.label}</p>
+            <div key={c.label} className="relative min-h-[44px] rounded-lg bg-white px-2.5 py-1.5 shadow-[0_1px_3px_rgba(15,23,42,0.10)]">
+              <p className="text-[14px] leading-none" style={{ color: c.color }}>{c.n ?? '—'}</p>
+              <p className="mt-1.5 text-[9px] font-semibold uppercase tracking-wide">{c.label}</p>
               {c.pct !== undefined ? (
-                <span className="absolute right-3 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-[#eef0f2] text-[10px] text-[#44506a]">
+                <span className="absolute right-2.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-[#eef0f2] text-[9px] text-[#44506a]">
                   {c.pct.toFixed(2)}%
                 </span>
               ) : (
-                <span className="absolute right-3 top-2 scale-[0.8]">{c.icon}</span>
+                <span className="absolute right-2.5 top-1.5 scale-[0.65]">{c.icon}</span>
               )}
             </div>
           ))}
         </div>
 
-        <div className="mb-3 grid gap-3 xl:grid-cols-2 xl:gap-3.5">
+        <div className="mb-2 grid gap-2 xl:grid-cols-2 xl:gap-2.5">
           <Card title="Reservations" onRefresh={loadList}>
             <Tabs items={TABS} value={tab} onChange={setTab} />
-            <div className="mb-1.5 mt-1.5 flex flex-wrap items-end gap-x-3 gap-y-1.5">
+            <div className="mb-1 mt-1 flex flex-wrap items-end gap-x-2.5 gap-y-1">
               <div className="flex">
                 {(['today', 'tomorrow'] as const).map((d) => (
                   <button key={d} onClick={() => setDay(d)}
-                    className={`border-b-[2px] px-2.5 py-1 text-[12px] font-medium capitalize ${day === d ? 'border-[#3d62e8] text-[#3d62e8]' : 'border-transparent text-[#14213d]'}`}>
+                    className={`border-b-[2px] px-2 py-0.5 text-[11px] font-medium capitalize ${day === d ? 'border-[#3d62e8] text-[#3d62e8]' : 'border-transparent text-[#14213d]'}`}>
                     {d}
                   </button>
                 ))}
               </div>
-              <label className="flex w-full max-w-[220px] items-center border-b border-gray-400 pb-0.5">
+              <label className="flex w-full max-w-[200px] items-center border-b border-gray-400 pb-0.5">
                 <input value={guestFilter} onChange={(e) => setGuestFilter(e.target.value)} placeholder="Guest Name"
-                  className="min-w-0 flex-1 bg-transparent px-2 text-[12px] text-[#14213d] outline-none placeholder:text-gray-400" />
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.4"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+                  className="min-w-0 flex-1 bg-transparent px-1.5 text-[11px] text-[#14213d] outline-none placeholder:text-gray-400" />
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.4"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
               </label>
             </div>
             <div className="overflow-x-auto">
@@ -182,13 +182,13 @@ export default function DashviewPage() {
                 </thead>
                 <tbody>
                   <tr aria-hidden="true"><td colSpan={5} className="h-1 p-0" /></tr>
-                  {shownRows === null && <tr><td colSpan={5} className="py-4 text-center text-[12px] text-gray-500">Loading…</td></tr>}
-                  {shownRows?.length === 0 && <tr><td colSpan={5} className="py-4 text-center text-[12px] text-[#14213d]">{listError ?? 'None available'}</td></tr>}
+                  {shownRows === null && <tr><td colSpan={5} className="py-3 text-center text-[11px] text-gray-500">Loading…</td></tr>}
+                  {shownRows?.length === 0 && <tr><td colSpan={5} className="py-3 text-center text-[11px] text-[#14213d]">{listError ?? 'None available'}</td></tr>}
                   {shownRows?.map((r) => (
                     <tr key={r.reservationID} onClick={() => setOpen(r.reservationID)} className="cursor-pointer hover:bg-[#f7f8fa]">
-                      <td className={`${tdc} min-w-[140px]`}>
-                        <span className="inline-flex items-center gap-1.5 text-[#3d62e8] hover:underline">
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#14213d" strokeWidth="2"><path d="M4 20h4L19 9l-4-4L4 16v4Z" /><path d="M14 6l4 4" /></svg>
+                      <td className={`${tdc} min-w-[130px]`}>
+                        <span className="inline-flex items-center gap-1 text-[#3d62e8] hover:underline">
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#14213d" strokeWidth="2"><path d="M4 20h4L19 9l-4-4L4 16v4Z" /><path d="M14 6l4 4" /></svg>
                           {r.guestName}
                         </span>
                       </td>
@@ -213,20 +213,20 @@ export default function DashviewPage() {
             />
             {activity !== 'overbookings' ? (
               <>
-                <div className="my-2 grid grid-cols-3 gap-2 px-1.5">
-                  <div><p className="text-[18px] leading-none text-[#3d62e8] sm:text-[20px]">{act?.count ?? '—'}</p><p className="mt-1.5 text-[10.5px] font-semibold uppercase">{activity === 'sales' ? 'Booked today' : 'Cancelled today'}</p></div>
-                  <div><p className="text-[18px] leading-none text-[#3d62e8] sm:text-[20px]">{act?.roomNights ?? '—'}</p><p className="mt-1.5 text-[10.5px] font-semibold uppercase">Room nights</p></div>
-                  <div><p className="text-[18px] leading-none text-[#3d62e8] sm:text-[20px]">{act ? mxn(act.revenue) : '—'}</p><p className="mt-1.5 text-[10.5px] font-semibold uppercase">Revenue</p></div>
+                <div className="my-1.5 grid grid-cols-3 gap-1.5 px-1">
+                  <div><p className="text-[14px] leading-none text-[#3d62e8] sm:text-[15px]">{act?.count ?? '—'}</p><p className="mt-1 text-[9px] font-semibold uppercase">{activity === 'sales' ? 'Booked today' : 'Cancelled today'}</p></div>
+                  <div><p className="text-[14px] leading-none text-[#3d62e8] sm:text-[15px]">{act?.roomNights ?? '—'}</p><p className="mt-1 text-[9px] font-semibold uppercase">Room nights</p></div>
+                  <div><p className="text-[14px] leading-none text-[#3d62e8] sm:text-[15px]">{act ? mxn(act.revenue) : '—'}</p><p className="mt-1 text-[9px] font-semibold uppercase">Revenue</p></div>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-[#f1f2f4]"><tr><th className={thc}>Guest</th><th className={thc}>Revenue</th><th className={thc}>Check-in</th><th className={thc}>Nights</th></tr></thead>
                     <tbody>
                       <tr aria-hidden="true"><td colSpan={4} className="h-1 p-0" /></tr>
-                      {act?.rows.length === 0 && <tr><td colSpan={4} className="py-3 text-center text-[12px] text-[#14213d]">None available</td></tr>}
+                      {act?.rows.length === 0 && <tr><td colSpan={4} className="py-2.5 text-center text-[11px] text-[#14213d]">None available</td></tr>}
                       {act?.rows.map((r) => (
                         <tr key={r.reservationID} onClick={() => setOpen(r.reservationID)} className="cursor-pointer hover:bg-[#f7f8fa]">
-                          <td className={`${tdc} min-w-[130px] text-[#3d62e8]`}>{r.guestName}</td>
+                          <td className={`${tdc} min-w-[110px] text-[#3d62e8]`}>{r.guestName}</td>
                           <td className={tdc}>{mxn(r.revenue)}</td>
                           <td className={tdc}>{r.checkIn}</td>
                           <td className={tdc}>{r.nights}</td>
@@ -237,11 +237,11 @@ export default function DashviewPage() {
                 </div>
               </>
             ) : (
-              <div className="mt-2 text-[12px]">
-                {overbookings === null && <p className="py-4 text-center text-gray-500">Checking the next 30 days…</p>}
-                {overbookings?.length === 0 && <p className="py-4 text-center">None available</p>}
+              <div className="mt-1.5 text-[11px]">
+                {overbookings === null && <p className="py-3 text-center text-gray-500">Checking the next 30 days…</p>}
+                {overbookings?.length === 0 && <p className="py-3 text-center">None available</p>}
                 {overbookings?.map((o, i) => (
-                  <p key={i} className="border-b border-gray-100 py-1">
+                  <p key={i} className="border-b border-gray-100 py-0.5">
                     Two stays share room {o.roomID}:{' '}
                     {o.reservationIDs.map((id) => (
                       <button key={id} onClick={() => setOpen(id)} className="mr-2 text-[#3d62e8] hover:underline">#{id}</button>
