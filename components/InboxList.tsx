@@ -44,16 +44,7 @@ export default function InboxList({ rows }: { rows: InboxListRow[] }) {
 
   return (
     <>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-line bg-surface px-4 py-2.5 sm:px-5">
-        <label className="flex items-center gap-3 text-sm text-navy/80">
-          <input
-            type="checkbox"
-            checked={allUnreadSelected}
-            onChange={() => setSelected(allUnreadSelected ? new Set() : new Set(unreadRows.map((r) => r.id)))}
-            className="h-4 w-4 accent-clay"
-          />
-          Select unread messages
-        </label>
+      <div className="mb-3 flex flex-wrap items-center justify-end gap-3 rounded-2xl border border-line bg-surface px-4 py-2.5 sm:px-5">
         <div className="flex gap-2">
           <button
             disabled={selected.size === 0 || busy}
@@ -70,6 +61,15 @@ export default function InboxList({ rows }: { rows: InboxListRow[] }) {
             Mark all as read
           </button>
         </div>
+        <label className="flex items-center gap-3 text-sm text-navy/80">
+          Select unread messages
+          <input
+            type="checkbox"
+            checked={allUnreadSelected}
+            onChange={() => setSelected(allUnreadSelected ? new Set() : new Set(unreadRows.map((r) => r.id)))}
+            className="h-4 w-4 accent-clay"
+          />
+        </label>
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-line bg-surface">
@@ -78,18 +78,6 @@ export default function InboxList({ rows }: { rows: InboxListRow[] }) {
           const unread = isUnread(r)
           return (
             <div key={r.id} className="flex items-center gap-3 border-b border-line px-4 py-3 last:border-b-0 hover:bg-white/[0.03] sm:px-5">
-              <input
-                type="checkbox"
-                checked={selected.has(r.id)}
-                onChange={() => {
-                  const next = new Set(selected)
-                  if (next.has(r.id)) next.delete(r.id)
-                  else next.add(r.id)
-                  setSelected(next)
-                }}
-                className="h-4 w-4 shrink-0 accent-clay"
-                aria-label="Select conversation"
-              />
               <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${unread ? 'bg-[#ef4d3f]' : 'bg-[#35b876]'}`} title={unread ? 'Unread' : 'Read'} />
               <Link href={`/conversations/${r.id}`} className="flex min-w-0 flex-1 items-center gap-3">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-paper font-display text-base italic text-white">
@@ -124,6 +112,18 @@ export default function InboxList({ rows }: { rows: InboxListRow[] }) {
                   <span className="text-xs text-navy/50">{r.ago}</span>
                 </div>
               </div>
+              <input
+                type="checkbox"
+                checked={selected.has(r.id)}
+                onChange={() => {
+                  const next = new Set(selected)
+                  if (next.has(r.id)) next.delete(r.id)
+                  else next.add(r.id)
+                  setSelected(next)
+                }}
+                className="h-4 w-4 shrink-0 accent-clay"
+                aria-label="Select conversation"
+              />
             </div>
           )
         })}
