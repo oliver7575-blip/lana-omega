@@ -529,6 +529,55 @@ export function cloudbedsLinks(propertyId: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Reservations list (the panel's Reservations page)
+// ---------------------------------------------------------------------------
+
+export interface ReservationSummary {
+  reservationID: string
+  guestID: string | null
+  guestName: string
+  startDate: string
+  endDate: string
+  status: string
+  total: number | null
+  room: string
+}
+
+/** A page of reservations, newest stay first, for the panel's Reservations list. */
+export async function listReservationsSummary(
+  cb: CB,
+  page: number
+): Promise<{ rows: ReservationSummary[]; hasMore: boolean }> {
+  const pageSize = 50
+  const json = await cbGet(cb, 'getReservations', {
+    propertyID: cb.propertyId,
+    pageSize,
+    pageNumber: Math.max(1, page),
+    includeAllRooms: true,
+  })
+  const data = (json.data as Json[]) ?? []
+  const rows = data
+    .map((r) => ({
+      reservationID: String(r.reservationID ?? ''),
+      guestID: (r.guestID as string) ?? null,
+      guestName: String(r.guestName ?? ''),
+      startDate: String(r.startDate ?? ''),
+      endDate: String(r.endDate ?? ''),
+      status: String(r.status ?? ''),
+      total: typeof r.total === 'number' ? r.total : r.total ? Number(r.total) : null,
+      room: roomLabel(r),
+    }))
+    .sort((a, b) => b.startDate.localeCompare(a.startDate))
+  return { rows, hasMore: data.length === pageSize }
+}
+
+/** Every field Cloudbeds holds on a guest's profile — home phone, country, email preferences, ID, notes, etc. */
+export async function getGuestProfile(cb: CB, guestID: string): Promise<Json> {
+  const json = await cbGet(cb, 'getGuest', { propertyID: cb.propertyId, guestID })
+  return (json.data ?? {}) as Json
+}
+
+// ---------------------------------------------------------------------------
 // New reservations
 // ---------------------------------------------------------------------------
 

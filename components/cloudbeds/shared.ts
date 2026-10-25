@@ -8,6 +8,17 @@ export interface DashRow {
   endDate: string
 }
 
+export interface ReservationSummary {
+  reservationID: string
+  guestID: string | null
+  guestName: string
+  startDate: string
+  endDate: string
+  status: string
+  total: number | null
+  room: string
+}
+
 export const statusLabel = (s: string) => s.replace(/_/g, ' ')
 
 /** Colours used by Beta's Cloudbeds pages. */

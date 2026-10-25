@@ -1,10 +1,22 @@
 import { NextResponse } from 'next/server'
 import { cloudbedsForCaller } from '@/lib/cloudbeds-caller'
-import { createReservation, type NewReservation } from '@/lib/cloudbeds-ops'
+import { createReservation, listReservationsSummary, type NewReservation } from '@/lib/cloudbeds-ops'
 
 export const maxDuration = 60
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/
+
+/** Lists reservations for the panel's Reservations page. ?page=1,2,… */
+export async function GET(request: Request) {
+  const c = await cloudbedsForCaller()
+  if ('error' in c) return c.error
+  const page = Number(new URL(request.url).searchParams.get('page') ?? '1') || 1
+  try {
+    return NextResponse.json(await listReservationsSummary(c.cb, page))
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Cloudbeds error' }, { status: 502 })
+  }
+}
 
 /** Creates a reservation in Cloudbeds from the Dashboard's "Create new reservation" window. */
 export async function POST(request: Request) {
