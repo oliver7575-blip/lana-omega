@@ -653,9 +653,19 @@ export async function listReservationsSummary(
 }
 
 /** Every field Cloudbeds holds on a guest's profile — home phone, country, email preferences, ID, notes, etc. */
-export async function getGuestProfile(cb: CB, guestID: string): Promise<Json> {
+export async function getGuestProfile(cb: CB, guestID: string): Promise<Record<string, unknown>> {
   const json = await cbGet(cb, 'getGuest', { propertyID: cb.propertyId, guestID })
   return (json.data ?? {}) as Json
+}
+
+/** The best phone number on a guest profile — field name varies, so this checks the likely ones, then scans for anything "phone"-like. */
+export function guestProfilePhone(profile: Record<string, unknown>): string | null {
+  for (const key of ['guestCellPhone', 'guestPhone', 'cellPhone', 'phone', 'guestHomePhone', 'homePhone']) {
+    const v = profile[key]
+    if (typeof v === 'string' && v.trim()) return v.trim()
+  }
+  const hit = Object.entries(profile).find(([k, v]) => /phone/i.test(k) && typeof v === 'string' && v.trim())
+  return hit ? (hit[1] as string).trim() : null
 }
 
 // ---------------------------------------------------------------------------
