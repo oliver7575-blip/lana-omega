@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import ReservationModal from './ReservationModal'
 import SearchBar from './SearchBar'
-import { cbApi, dmy, mxn, statusLabel, type ReservationSummary } from './shared'
+import { cbApi, longDate, mxn, nights, statusLabel, type ReservationSummary } from './shared'
 
 export default function ReservationsList() {
   const [rows, setRows] = useState<ReservationSummary[]>([])
@@ -54,26 +54,28 @@ export default function ReservationsList() {
               <th className={thc}>Guest</th>
               <th className={thc}>Check-in</th>
               <th className={thc}>Check-out</th>
+              <th className={thc}>Nights</th>
               <th className={thc}>Amount</th>
               <th className={thc}>Status</th>
             </tr>
           </thead>
           <tbody>
-            <tr aria-hidden="true"><td colSpan={5} className="h-1.5 p-0" /></tr>
+            <tr aria-hidden="true"><td colSpan={6} className="h-1.5 p-0" /></tr>
             {rows.length === 0 && !loading && (
-              <tr><td colSpan={5} className="py-6 text-center text-[13px] text-gray-500">No reservations found.</td></tr>
+              <tr><td colSpan={6} className="py-6 text-center text-[13px] text-gray-500">No reservations found.</td></tr>
             )}
             {rows.map((r) => (
               <tr key={r.reservationID} onClick={() => setOpen(r.reservationID)} className="cursor-pointer border-t border-gray-100 hover:bg-[#f7f8fa]">
                 <td className={`${tdc} min-w-[160px] font-medium text-[#3d62e8]`}>{r.guestName || '—'}</td>
-                <td className={tdc}>{dmy(r.startDate)}</td>
-                <td className={tdc}>{dmy(r.endDate)}</td>
+                <td className={`${tdc} whitespace-nowrap`}>{longDate(r.startDate)}</td>
+                <td className={`${tdc} whitespace-nowrap`}>{longDate(r.endDate)}</td>
+                <td className={tdc}>{nights(r.startDate, r.endDate) ?? '—'}</td>
                 <td className={tdc}>{mxn(r.total)}</td>
                 <td className={`${tdc} capitalize`}>{statusLabel(r.status)}</td>
               </tr>
             ))}
             {loading && (
-              <tr><td colSpan={5} className="py-6 text-center text-[13px] text-gray-500">Loading…</td></tr>
+              <tr><td colSpan={6} className="py-6 text-center text-[13px] text-gray-500">Loading…</td></tr>
             )}
           </tbody>
         </table>

@@ -543,20 +543,17 @@ export interface ReservationSummary {
   room: string
 }
 
-/** A page of reservations, newest stay first, for the panel's Reservations list. */
+/** A page of reservations, most recently BOOKED first, for the panel's Reservations list. */
 export async function listReservationsSummary(
   cb: CB,
   page: number
 ): Promise<{ rows: ReservationSummary[]; hasMore: boolean }> {
   const pageSize = 50
-  const json = await cbGet(cb, 'getReservations', {
-    propertyID: cb.propertyId,
-    pageSize,
-    pageNumber: Math.max(1, page),
-    includeAllRooms: true,
-  })
-  const data = (json.data as Json[]) ?? []
-  const rows = data
+  // Cheap: list fields only, up to 1000 reservations, then sort by booking date —
+  // Cloudbeds' own pageNumber order isn't booking-date order, so this has to be
+  // pulled and sorted here rather than paginated directly from the API.
+  const all = await listReservations(cb, { includeAllRooms: true }, 10)
+  const sorted = all
     .map((r) => ({
       reservationID: String(r.reservationID ?? ''),
       guestID: (r.guestID as string) ?? null,
@@ -564,11 +561,23 @@ export async function listReservationsSummary(
       startDate: String(r.startDate ?? ''),
       endDate: String(r.endDate ?? ''),
       status: String(r.status ?? ''),
-      total: typeof r.total === 'number' ? r.total : r.total ? Number(r.total) : null,
       room: roomLabel(r),
+      dateCreated: String(r.dateCreated ?? ''),
     }))
-    .sort((a, b) => b.startDate.localeCompare(a.startDate))
-  return { rows, hasMore: data.length === pageSize }
+    .sort((a, b) => b.dateCreated.localeCompare(a.dateCreated))
+  const start = (Math.max(1, page) - 1) * pageSize
+  const slice = sorted.slice(start, start + pageSize)
+
+  // Amount isn't on the list response — one detail call per shown row, bounded concurrency.
+  const totals = await mapLimit(slice, 8, async (r) => {
+    try {
+      return (await getReservationDetail(cb, r.reservationID)).total
+    } catch {
+      return null
+    }
+  })
+  const rows: ReservationSummary[] = slice.map(({ dateCreated: _dateCreated, ...r }, i) => ({ ...r, total: totals[i] }))
+  return { rows, hasMore: start + pageSize < sorted.length }
 }
 
 /** Every field Cloudbeds holds on a guest's profile — home phone, country, email preferences, ID, notes, etc. */
