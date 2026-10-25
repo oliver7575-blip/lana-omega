@@ -188,9 +188,9 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
           {sub('/cloudbeds', 'Dashboard', pathname === '/cloudbeds')}
           {sub('/cloudbeds/calendar', 'Calendar', pathname.startsWith('/cloudbeds/calendar'))}
         </div>
-        {item('/inbox', 'Messages', MailIcon, isInbox)}
+        {item('/reservations', 'Reservations', ListIcon, isReservations, info?.unreadReservations)}
         <div className="ml-8 border-l border-line pl-2">
-          {sub('/reservations', 'Reservations', isReservations, info?.unreadReservations)}
+          {sub('/inbox', 'Messages', isInbox)}
           {sub('/email-inquiries', 'Email Inquiries', pathname.startsWith('/email-inquiries'), info?.unreadEmails)}
         </div>
         {item('/escalations', 'Escalations', AlertIcon, pathname.startsWith('/escalations'), info?.newEscalations)}
