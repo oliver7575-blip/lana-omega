@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { cloudbedsForCaller } from '@/lib/cloudbeds-caller'
-import { getGuestProfile, getReservationDetail, getReservationRaw, guestProfilePhone } from '@/lib/cloudbeds-ops'
+import { getReservationDetail, getReservationGuestContact } from '@/lib/cloudbeds-ops'
 import { createClient } from '@/lib/supabase/server'
 import { findOrCreateGuest, ensureConversation } from '@/lib/guest-records'
 
@@ -21,16 +21,14 @@ export async function GET(_r: Request, { params }: { params: Promise<{ id: strin
   if (!staff) return NextResponse.json({ error: 'No tenant record found' }, { status: 404 })
 
   try {
-    const [reservation, raw] = await Promise.all([getReservationDetail(c.cb, id), getReservationRaw(c.cb, id)])
-    const guestID = raw.guestID as string | undefined
-    const profile = guestID ? await getGuestProfile(c.cb, guestID).catch(() => ({})) : {}
-    const phone = guestProfilePhone(profile) ?? reservation.guestPhone
+    const [reservation, contact] = await Promise.all([getReservationDetail(c.cb, id), getReservationGuestContact(c.cb, id)])
+    const phone = contact.phone ?? reservation.guestPhone
     if (!phone) {
       return NextResponse.json({ error: 'This guest has no phone number on file.' }, { status: 404 })
     }
     const guest = await findOrCreateGuest(supabase, staff.tenant_id as string, phone, {
       name: reservation.guestName,
-      email: reservation.guestEmail ?? undefined,
+      email: contact.email ?? reservation.guestEmail ?? undefined,
     })
     if (!guest) return NextResponse.json({ error: 'Could not match this guest to a WhatsApp number.' }, { status: 404 })
     const conversationId = await ensureConversation(supabase, staff.tenant_id as string, guest.id as string)

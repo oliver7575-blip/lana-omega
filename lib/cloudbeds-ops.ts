@@ -658,14 +658,30 @@ export async function getGuestProfile(cb: CB, guestID: string): Promise<Record<s
   return (json.data ?? {}) as Json
 }
 
-/** The best phone number on a guest profile — field name varies, so this checks the likely ones, then scans for anything "phone"-like. */
-export function guestProfilePhone(profile: Record<string, unknown>): string | null {
-  for (const key of ['guestCellPhone', 'guestPhone', 'cellPhone', 'phone', 'guestHomePhone', 'homePhone']) {
-    const v = profile[key]
-    if (typeof v === 'string' && v.trim()) return v.trim()
-  }
-  const hit = Object.entries(profile).find(([k, v]) => /phone/i.test(k) && typeof v === 'string' && v.trim())
-  return hit ? (hit[1] as string).trim() : null
+/**
+ * The guest's phone/email, read the way the rest of the app already reads
+ * them reliably: nested at getReservations' guestList[guestID] (confirmed
+ * against real data) — NOT flat on getReservation/getGuest, which don't
+ * carry it the same way for this account.
+ */
+export async function getReservationGuestContact(
+  cb: CB,
+  reservationID: string
+): Promise<{ phone: string | null; email: string | null }> {
+  const json = await cbGet(cb, 'getReservations', {
+    propertyID: cb.propertyId,
+    reservationID,
+    includeGuestsDetails: true,
+    pageSize: 1,
+  })
+  const match = ((json.data as Json[]) ?? [])[0]
+  if (!match) return { phone: null, email: null }
+  const guestID = match.guestID as string | undefined
+  const guestList = (match.guestList as Record<string, Json>) ?? {}
+  const g = guestID ? guestList[guestID] : undefined
+  const phone = ((g?.guestPhone as string) || (g?.guestCellPhone as string) || '').trim() || null
+  const email = ((g?.guestEmail as string) || '').trim() || null
+  return { phone, email }
 }
 
 // ---------------------------------------------------------------------------

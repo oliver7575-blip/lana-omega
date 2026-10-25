@@ -131,6 +131,7 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
     setError(null)
     try {
       const j = await cbApi<{ conversationId: string }>(`/api/cloudbeds/reservation/${id}/conversation`)
+      onClose()
       router.push(`/conversations/${j.conversationId}`)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not open this guest’s messages')
