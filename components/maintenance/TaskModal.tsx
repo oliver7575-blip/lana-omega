@@ -24,6 +24,7 @@ export default function TaskModal({ task, staff, timezone, followUps = [], onClo
     priority: task?.priority ?? 'routine',
     assigned_to: task?.assigned_to ?? '',
     lock_assignee: task?.lock_assignee ?? false,
+    excluded_staff_id: task?.excluded_staff_id ?? '',
     due_local: task?.due_at ? localParts(task.due_at, timezone).dateTime : defaultDue,
     recurrence_rule: task?.recurrence_rule ?? 'none',
     interval_hours: String(task?.interval_hours ?? 2),
@@ -122,6 +123,17 @@ export default function TaskModal({ task, staff, timezone, followUps = [], onClo
               <option value="interval">Every X hours</option>
             </select>
           </div>
+        </div>
+
+        <div>
+          <label className={labelCls}>Never assign to</label>
+          <select className={inputCls} value={f.excluded_staff_id} onChange={(e) => set('excluded_staff_id', e.target.value)}>
+            <option value="">Nobody excluded</option>
+            {staff.filter((s) => s.active || s.id === f.excluded_staff_id).map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-navy/55">Skipped whenever this task is auto-assigned or automatically reassigned (e.g. a day off or too many open tasks). Can't be the same person as "Assign to".</p>
         </div>
 
         {!f.on_hold && f.recurrence_rule === 'interval' && (

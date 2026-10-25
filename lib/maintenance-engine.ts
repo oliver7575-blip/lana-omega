@@ -67,6 +67,7 @@ export interface TaskRow {
   next_assign?: string | null
   paused?: boolean
   carry_over?: boolean
+  excluded_staff_id?: string | null
 }
 
 /**
@@ -351,8 +352,10 @@ export async function loadStaff(ctx: EngineContext): Promise<StaffRow[]> {
 /** A staff member can have at most this many unfinished (waiting / in progress) tasks. */
 export const MAX_OPEN_PER_STAFF = 2
 
-export async function pickStaff(ctx: EngineContext, excludeId?: string): Promise<StaffRow | null> {
-  const staff = (await loadStaff(ctx)).filter((s) => s.active && s.id !== excludeId && !offToday(s, ctx.tz))
+export async function pickStaff(ctx: EngineContext, excludeId?: string | null, alsoExcludeId?: string | null): Promise<StaffRow | null> {
+  const staff = (await loadStaff(ctx)).filter(
+    (s) => s.active && s.id !== excludeId && s.id !== alsoExcludeId && !offToday(s, ctx.tz)
+  )
   if (staff.length === 0) return null
   const { data: open } = await ctx.db
     .from('maintenance_tasks')
@@ -599,7 +602,7 @@ export async function processReminder(
   const staffList = await loadStaff(ctx)
   let staff = staffList.find((s) => s.id === task.assigned_to) ?? null
   if (!staff || !staff.active) {
-    const picked = await pickStaff(ctx)
+    const picked = await pickStaff(ctx, task.excluded_staff_id)
     if (!picked) {
       return defer(ctx, reminder.id, task.id, minutesFromNow(60), 'reminder_deferred', 'No staff available right now; reminder deferred 60 min')
     }
@@ -613,7 +616,7 @@ export async function processReminder(
     const off = offToday(staff, ctx.tz)
     if (off === 'weekly') {
       if (!task.lock_assignee) {
-        const other = await pickStaff(ctx, staff.id)
+        const other = await pickStaff(ctx, staff.id, task.excluded_staff_id)
         if (other) {
           await ctx.db.from('maintenance_tasks').update({ assigned_to: other.id }).eq('id', task.id)
           await logEvent(ctx, task.id, 'assigned', `${staff.name} is off today; reassigned to ${other.name}`)
@@ -642,7 +645,7 @@ export async function processReminder(
         .neq('id', task.id)
       if ((openCount ?? 0) >= MAX_OPEN_PER_STAFF) {
         if (!task.lock_assignee) {
-          const other = await pickStaff(ctx, staff.id)
+          const other = await pickStaff(ctx, staff.id, task.excluded_staff_id)
           if (other) {
             await ctx.db.from('maintenance_tasks').update({ assigned_to: other.id }).eq('id', task.id)
             await logEvent(ctx, task.id, 'assigned', `${staff.name} already has ${MAX_OPEN_PER_STAFF} open tasks; reassigned to ${other.name}`)
@@ -946,6 +949,8 @@ export async function startFollowUp(ctx: EngineContext, original: TaskRow): Prom
         recurrence_rule: 'none',
         parent_task_id: tpl.id,
         created_by: tpl.created_by,
+        // The template's own "never assign to" setting carries over to each copy.
+        excluded_staff_id: tpl.excluded_staff_id ?? null,
         // Chains: the copy carries the template's own follow-up (A → B → C).
         next_task_id: tpl.next_task_id ?? null,
         next_delay_minutes: tpl.next_delay_minutes ?? 0,
@@ -1036,7 +1041,7 @@ export async function acknowledgeTask(ctx: EngineContext, task: TaskRow, text: s
 /** "Necesito ayuda": hand the task to someone else (Beta's reassignment rule). */
 export async function requestHelp(ctx: EngineContext, task: TaskRow, requester: StaffRow, text: string): Promise<boolean> {
   await logEvent(ctx, task.id, 'reply_needs_help', text)
-  const other = await pickStaff(ctx, requester.id)
+  const other = await pickStaff(ctx, requester.id, task.excluded_staff_id)
   if (!other) {
     // Nobody can take it: move it to tomorrow and flag it (Needs attention).
     await cancelPendingReminders(ctx, task.id)

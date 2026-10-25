@@ -8,6 +8,7 @@ export interface Task {
   status: 'scheduled' | 'waiting' | 'in_progress' | 'done' | 'cancelled' | 'on_hold'
   assigned_to: string | null
   lock_assignee: boolean
+  excluded_staff_id?: string | null
   due_at: string | null
   recurrence_rule: string
   interval_hours: number | null

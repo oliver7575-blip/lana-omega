@@ -39,6 +39,7 @@ export default function TaskDrawer({ taskId, staff, timezone, onClose, onChanged
 
   const t = d?.task
   const assignee = t?.assigned_to ? staff.find((s) => s.id === t.assigned_to)?.name ?? '—' : 'Auto-assign'
+  const excluded = t?.excluded_staff_id ? staff.find((s) => s.id === t.excluded_staff_id)?.name ?? null : null
   const box = 'rounded-xl border border-line bg-paper/40 px-4 py-3'
   const boxLabel = 'text-[10px] font-semibold uppercase tracking-[.13em] text-navy/50'
 
@@ -84,6 +85,9 @@ export default function TaskDrawer({ taskId, staff, timezone, onClose, onChanged
               <div className={box}><p className={boxLabel}>Assigned to</p><p className="mt-1 text-sm text-white">{assignee}</p></div>
               <div className={box}><p className={boxLabel}>Deadline</p><p className="mt-1 text-sm text-white">{fmtDateTime(t.due_at, timezone)}</p></div>
               <div className={box}><p className={boxLabel}>Reminders</p><p className="mt-1 text-sm text-white">{t.reminder_count}</p></div>
+              {excluded && (
+                <div className={`${box} col-span-2`}><p className={boxLabel}>Never assign to</p><p className="mt-1 text-sm text-white">{excluded}</p></div>
+              )}
             </div>
 
             <h3 className="mb-2 mt-6 text-sm font-semibold text-white">Reminder schedule</h3>

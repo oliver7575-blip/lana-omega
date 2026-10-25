@@ -8,6 +8,8 @@ export interface TaskInput {
   priority?: string
   assigned_to?: string | null
   lock_assignee?: boolean
+  /** A staff member who must never get this task, whether auto-assigned or reassigned. */
+  excluded_staff_id?: string | null
   due_local?: string | null // "YYYY-MM-DDTHH:MM" in the hotel's timezone
   recurrence_rule?: string
   interval_hours?: number | string | null
@@ -46,6 +48,13 @@ export function cleanTask(body: TaskInput, partial: boolean, tz: string): { valu
   if (body.priority !== undefined) v.priority = body.priority === 'urgent' ? 'urgent' : 'routine'
   if (body.assigned_to !== undefined) v.assigned_to = body.assigned_to || null
   if (body.lock_assignee !== undefined) v.lock_assignee = Boolean(body.lock_assignee)
+  if (body.excluded_staff_id !== undefined) v.excluded_staff_id = body.excluded_staff_id || null
+
+  const nextAssignedTo = v.assigned_to !== undefined ? v.assigned_to : undefined
+  const nextExcluded = v.excluded_staff_id !== undefined ? v.excluded_staff_id : undefined
+  if (nextAssignedTo && nextExcluded && nextAssignedTo === nextExcluded) {
+    return { error: "Can't assign a task to someone it's also set to never go to" }
+  }
 
   if (!partial || body.due_local !== undefined) {
     const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(body.due_local ?? '')
