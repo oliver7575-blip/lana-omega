@@ -622,7 +622,7 @@ export async function listReservationsSummary(
   // Cheap: list fields only, up to 1000 reservations, then sort by booking date —
   // Cloudbeds' own pageNumber order isn't booking-date order, so this has to be
   // pulled and sorted here rather than paginated directly from the API.
-  const all = await listReservations(cb, { includeAllRooms: true }, 10)
+  const all = await listReservations(cb, { includeAllRooms: true, status: 'confirmed' }, 10)
   const sorted = all
     .map((r) => ({
       reservationID: String(r.reservationID ?? ''),
