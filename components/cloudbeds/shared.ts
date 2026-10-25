@@ -8,6 +8,13 @@ export interface DashRow {
   endDate: string
 }
 
+export interface ReservationRoomRef {
+  roomTypeID: string
+  roomTypeName: string
+  roomID: string | null
+  roomName: string | null
+}
+
 export interface ReservationSummary {
   reservationID: string
   guestID: string | null
@@ -16,7 +23,7 @@ export interface ReservationSummary {
   endDate: string
   status: string
   total: number | null
-  room: string
+  rooms: ReservationRoomRef[]
 }
 
 export const statusLabel = (s: string) => s.replace(/_/g, ' ')

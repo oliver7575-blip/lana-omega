@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import ReservationModal from './ReservationModal'
+import RoomCell from './RoomCell'
 import { cbApi, longDate, mxn, nights, statusLabel, type ReservationSummary } from './shared'
 
 export default function ReservationsList() {
@@ -60,13 +61,15 @@ export default function ReservationsList() {
                 <th className="px-4 py-2.5 sm:px-5">Check-in</th>
                 <th className="px-4 py-2.5 sm:px-5">Check-out</th>
                 <th className="px-4 py-2.5 sm:px-5">Nights</th>
+                <th className="px-4 py-2.5 sm:px-5">Room Type</th>
+                <th className="px-4 py-2.5 sm:px-5">Room Number</th>
                 <th className="px-4 py-2.5 sm:px-5">Amount</th>
                 <th className="px-4 py-2.5 sm:px-5">Status</th>
               </tr>
             </thead>
             <tbody>
               {shownRows.length === 0 && !loading && (
-                <tr><td colSpan={6} className="px-6 py-10 text-center text-sm text-navy/50">No reservations found.</td></tr>
+                <tr><td colSpan={8} className="px-6 py-10 text-center text-sm text-navy/50">No reservations found.</td></tr>
               )}
               {shownRows.map((r) => (
                 <tr key={r.reservationID} onClick={() => setOpen(r.reservationID)}
@@ -75,12 +78,24 @@ export default function ReservationsList() {
                   <td className="whitespace-nowrap px-4 py-3 sm:px-5">{longDate(r.startDate)}</td>
                   <td className="whitespace-nowrap px-4 py-3 sm:px-5">{longDate(r.endDate)}</td>
                   <td className="px-4 py-3 sm:px-5">{nights(r.startDate, r.endDate) ?? '—'}</td>
+                  <td className="px-4 py-3 sm:px-5">
+                    {r.rooms.length ? [...new Set(r.rooms.map((x) => x.roomTypeName).filter(Boolean))].join(', ') || '—' : '—'}
+                  </td>
+                  <td className="px-4 py-3 sm:px-5">
+                    {r.rooms.length ? (
+                      <span className="flex flex-wrap gap-1">
+                        {r.rooms.map((room, i) => (
+                          <RoomCell key={room.roomID ?? `${room.roomTypeID}-${i}`} reservationID={r.reservationID} room={room} onChanged={refresh} />
+                        ))}
+                      </span>
+                    ) : '—'}
+                  </td>
                   <td className="px-4 py-3 sm:px-5">{mxn(r.total)}</td>
                   <td className="px-4 py-3 capitalize text-navy/80 sm:px-5">{statusLabel(r.status)}</td>
                 </tr>
               ))}
               {loading && (
-                <tr><td colSpan={6} className="px-6 py-10 text-center text-sm text-navy/50">Loading…</td></tr>
+                <tr><td colSpan={8} className="px-6 py-10 text-center text-sm text-navy/50">Loading…</td></tr>
               )}
             </tbody>
           </table>
