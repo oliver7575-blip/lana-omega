@@ -93,9 +93,8 @@ export async function handleArrivalEmail(tenantId: string, mail: ArrivalMail, ar
     .eq('id', tenantId)
     .single<ReplyTenant>()
 
-  let replySent = false
   if (saved && tenant) {
-    replySent = await replyToGuest(db, tenantId, tenant, mail, arrival, time, kind, situation)
+    await replyToGuest(db, tenantId, tenant, mail, arrival, time, kind, situation)
   }
 
   // ---- 3. Arrivals outside check-in hours → alert staff ---------------------
@@ -112,8 +111,11 @@ export async function handleArrivalEmail(tenantId: string, mail: ArrivalMail, ar
     await db.from('inbound_emails').update({ action_detail: notes.join(' · ') }).eq('id', mail.id)
   }
 
-  // A plain "we'll arrive around X" that was saved and answered needs nothing more.
-  if (saved && replySent && kind === 'stated' && situation !== 'special') {
+  // An arrival time that was received and saved to Cloudbeds is handled, full stop —
+  // even when it also needed a reply-sent check, an early-check-in note, or a staff
+  // alert for an off-hours arrival above: those are side notes, not a reason to leave
+  // the email sitting in "To handle".
+  if (saved) {
     await db.from('inbound_emails').update({ status: 'done' }).eq('id', mail.id)
   }
 }

@@ -50,6 +50,8 @@ export default function EmailInquiriesPage() {
   const [open, setOpen] = useState<string | null>(null)
   const [lastChecked, setLastChecked] = useState<string | null>(null)
   const [lastError, setLastError] = useState<string | null>(null)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
 
   const load = useCallback(() => {
     fetch(`/api/email-inquiries${showAutomated ? '?automated=1' : ''}`)
@@ -79,6 +81,24 @@ export default function EmailInquiriesPage() {
     await fetch('/api/item-reads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'email', ids, read }) })
   }
 
+  async function bulkSetStatus(ids: string[], status: 'new' | 'done') {
+    if (!ids.length) return
+    setBulkBusy(true)
+    setEmails((list) => list.map((e) => (ids.includes(e.id) ? { ...e, status } : e)))
+    setSelected(new Set())
+    await fetch('/api/email-inquiries', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids, status }) })
+    setBulkBusy(false)
+  }
+
+  function toggleSelected(id: string) {
+    setSelected((s) => {
+      const next = new Set(s)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
   const inView = useMemo(() => emails.filter((e) => e.status === view && (e.category !== 'automated' || showAutomated)), [emails, view, showAutomated])
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: inView.length }
@@ -87,6 +107,11 @@ export default function EmailInquiriesPage() {
   }, [inView])
   const visible = inView.filter((e) => filter === 'all' || e.category === filter)
   const unreadVisible = visible.filter((e) => !e.read)
+  const visibleIds = useMemo(() => visible.map((e) => e.id), [visible])
+  const selectedVisible = visibleIds.filter((id) => selected.has(id))
+  const allVisibleSelected = visibleIds.length > 0 && selectedVisible.length === visibleIds.length
+
+  useEffect(() => { setSelected(new Set()) }, [view, filter, showAutomated])
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-8">
@@ -135,6 +160,43 @@ export default function EmailInquiriesPage() {
         </div>
       </div>
 
+      {visible.length > 0 && (
+        <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-navy/60">
+          <label className="flex items-center gap-1.5">
+            <input
+              type="checkbox"
+              checked={allVisibleSelected}
+              onChange={(e) => setSelected(e.target.checked ? new Set(visibleIds) : new Set())}
+              className="accent-clay"
+            />
+            Select all {visibleIds.length}
+          </label>
+          {selectedVisible.length > 0 && (
+            <>
+              <span>{selectedVisible.length} selected</span>
+              {view === 'new' ? (
+                <button
+                  disabled={bulkBusy}
+                  onClick={() => bulkSetStatus(selectedVisible, 'done')}
+                  className="rounded-lg border border-line px-3 py-1 text-navy hover:bg-line/40 disabled:opacity-50"
+                >
+                  Mark handled
+                </button>
+              ) : (
+                <button
+                  disabled={bulkBusy}
+                  onClick={() => bulkSetStatus(selectedVisible, 'new')}
+                  className="rounded-lg border border-line px-3 py-1 text-navy hover:bg-line/40 disabled:opacity-50"
+                >
+                  Move back to &quot;To handle&quot;
+                </button>
+              )}
+              <button onClick={() => setSelected(new Set())} className="text-navy/40 hover:text-navy">Clear</button>
+            </>
+          )}
+        </div>
+      )}
+
       {loading && <p className="mt-6 text-sm text-navy/55">Loading…</p>}
       {!loading && visible.length === 0 && <p className="mt-6 text-sm text-navy/55">Nothing here.</p>}
 
@@ -144,34 +206,42 @@ export default function EmailInquiriesPage() {
           const replySubject = e.subject?.toLowerCase().startsWith('re:') ? e.subject : `Re: ${e.subject ?? ''}`
           return (
             <div key={e.id} className="bg-surface/30">
-              <button
-                onClick={() => {
-                  setOpen(expanded ? null : e.id)
-                  if (!expanded && !e.read) markRead([e.id], true)
-                }}
-                className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-surface/60"
-              >
-                <span title={e.read ? 'Read' : 'Unread'} className={`mt-2 h-2 w-2 shrink-0 rounded-full ${e.read ? 'bg-emerald-400/60' : 'bg-[#ef4d3f]'}`} />
-                <span className={`mt-0.5 shrink-0 rounded-md px-2 py-0.5 text-[11px] ${COLOR[e.category] ?? COLOR.other}`}>{LABEL[e.category] ?? e.category}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex flex-wrap items-baseline justify-between gap-x-3">
-                    <span className={`truncate text-sm text-white ${e.read ? 'font-medium' : 'font-bold'}`}>{e.from_name || e.from_email || 'Unknown sender'}</span>
-                    <span className="shrink-0 text-[11px] text-navy/45">{new Date(e.received_at).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+              <div className="flex items-start gap-2 px-2">
+                <input
+                  type="checkbox"
+                  checked={selected.has(e.id)}
+                  onChange={() => toggleSelected(e.id)}
+                  className="mt-4 shrink-0 accent-clay"
+                />
+                <button
+                  onClick={() => {
+                    setOpen(expanded ? null : e.id)
+                    if (!expanded && !e.read) markRead([e.id], true)
+                  }}
+                  className="flex w-full min-w-0 items-start gap-3 px-2 py-3 text-left hover:bg-surface/60"
+                >
+                  <span title={e.read ? 'Read' : 'Unread'} className={`mt-2 h-2 w-2 shrink-0 rounded-full ${e.read ? 'bg-emerald-400/60' : 'bg-[#ef4d3f]'}`} />
+                  <span className={`mt-0.5 shrink-0 rounded-md px-2 py-0.5 text-[11px] ${COLOR[e.category] ?? COLOR.other}`}>{LABEL[e.category] ?? e.category}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-baseline justify-between gap-x-3">
+                      <span className={`truncate text-sm text-white ${e.read ? 'font-medium' : 'font-bold'}`}>{e.from_name || e.from_email || 'Unknown sender'}</span>
+                      <span className="shrink-0 text-[11px] text-navy/45">{new Date(e.received_at).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                    </span>
+                    <span className="block truncate text-sm text-navy/85">{e.subject}</span>
+                    {e.summary && <span className="mt-0.5 block text-xs text-navy/55">{e.summary}</span>}
+                    {e.action && (
+                      <span className={`mt-1.5 block rounded-md px-2 py-1 text-xs ${e.action === 'arrival_saved' ? 'bg-emerald-500/10 text-emerald-200' : 'bg-amber-500/10 text-amber-200'}`}>
+                        {e.action === 'arrival_saved' ? '✓ ' : '⚠ '}{e.action_detail}
+                      </span>
+                    )}
+                    {e.reply_status && (
+                      <span className={`mt-1 block rounded-md px-2 py-1 text-xs ${e.reply_status === 'sent' ? 'bg-emerald-500/10 text-emerald-200' : 'bg-amber-500/10 text-amber-200'}`}>
+                        {e.reply_status === 'sent' ? '✉ Lana replied · ' : '✉ Not sent · '}{e.reply_detail}
+                      </span>
+                    )}
                   </span>
-                  <span className="block truncate text-sm text-navy/85">{e.subject}</span>
-                  {e.summary && <span className="mt-0.5 block text-xs text-navy/55">{e.summary}</span>}
-                  {e.action && (
-                    <span className={`mt-1.5 block rounded-md px-2 py-1 text-xs ${e.action === 'arrival_saved' ? 'bg-emerald-500/10 text-emerald-200' : 'bg-amber-500/10 text-amber-200'}`}>
-                      {e.action === 'arrival_saved' ? '✓ ' : '⚠ '}{e.action_detail}
-                    </span>
-                  )}
-                  {e.reply_status && (
-                    <span className={`mt-1 block rounded-md px-2 py-1 text-xs ${e.reply_status === 'sent' ? 'bg-emerald-500/10 text-emerald-200' : 'bg-amber-500/10 text-amber-200'}`}>
-                      {e.reply_status === 'sent' ? '✉ Lana replied · ' : '✉ Not sent · '}{e.reply_detail}
-                    </span>
-                  )}
-                </span>
-              </button>
+                </button>
+              </div>
               {expanded && (
                 <div className="border-t border-line px-4 pb-4 pt-3">
                   <p className="text-xs text-navy/50">{e.from_email}</p>

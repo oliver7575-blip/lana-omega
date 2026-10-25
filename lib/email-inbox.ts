@@ -3,7 +3,7 @@ import { simpleParser } from 'mailparser'
 import { createServiceClient } from './supabase/service'
 import { decryptCredentials, type EncryptedPayload } from './crypto'
 import { handleArrivalEmail, type ArrivalInfo } from './arrival-email'
-import { answerGeneralEmail, REPLY_TENANT_COLUMNS, type ReplyMail, type ReplyTenant } from './email-reply'
+import { answerGeneralEmail, canReplyToAddress, REPLY_TENANT_COLUMNS, type ReplyMail, type ReplyTenant } from './email-reply'
 
 /**
  * Reads the hotel's inbox (read-only: nothing is moved, deleted or marked as
@@ -103,6 +103,10 @@ export async function pollInbox(tenantId: string): Promise<PollResult> {
         if (dup) continue
 
         const sorted = await sortEmail(fromEmail, from?.name ?? '', subject, text, parsed.headers)
+        const replyTo = parsed.replyTo?.value?.[0]?.address ?? null
+        // No address to reply to at all (no sender, or a no-reply/mailer address with no other reply-to) —
+        // there's nothing a person could do by email either, so it's handled from the start.
+        const noWayToReply = !canReplyToAddress(replyTo || fromEmail)
         const { data: row } = await db
           .from('inbound_emails')
           .insert({
@@ -116,12 +120,14 @@ export async function pollInbox(tenantId: string): Promise<PollResult> {
             received_at: receivedAt,
             category: sorted.category,
             summary: sorted.summary,
-            status: sorted.category === 'automated' ? 'done' : 'new',
+            status: sorted.category === 'automated' || noWayToReply ? 'done' : 'new',
           })
           .select('id')
           .single()
         if (row && sorted.category !== 'automated') filed++
         // Guest emails: save an arrival time if they gave one, and answer them when the knowledge base covers it.
+        // (handleArrivalEmail/answerGeneralEmail each re-check the reply address themselves and degrade
+        // gracefully — e.g. an arrival time still gets saved to Cloudbeds even with no way to email back.)
         if (row && ['inquiry', 'reservation', 'other'].includes(sorted.category)) {
           const precedence = String(parsed.headers.get('precedence') ?? '').toLowerCase()
           const autoSubmitted = String(parsed.headers.get('auto-submitted') ?? 'no').toLowerCase()
@@ -129,7 +135,7 @@ export async function pollInbox(tenantId: string): Promise<PollResult> {
             id: row.id as string,
             fromEmail,
             fromName: from?.name ?? '',
-            replyTo: parsed.replyTo?.value?.[0]?.address ?? null,
+            replyTo,
             messageId,
             references: Array.isArray(parsed.references) ? parsed.references.join(' ') : parsed.references ?? null,
             subject,
@@ -139,7 +145,7 @@ export async function pollInbox(tenantId: string): Promise<PollResult> {
             await handleArrivalEmail(tenantId, mail, sorted.arrival)
           } else {
             tenantRow ??= (await db.from('tenants').select(REPLY_TENANT_COLUMNS).eq('id', tenantId).single<ReplyTenant>()).data
-            if (tenantRow) await answerGeneralEmail(db, tenantId, tenantRow, mail, text)
+            if (tenantRow) await answerGeneralEmail(db, tenantId, tenantRow, mail, text, sorted.category)
           }
         }
         if (row && sorted.category === 'review') {
