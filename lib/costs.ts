@@ -57,9 +57,11 @@ export async function claudeDaily(
 
 /**
  * Meta: WhatsApp Business Account pricing analytics (conversation/message charges).
- * Meta reports `cost` in whichever currency the WABA's ad account is billed in — not
- * necessarily USD — so each data point's `currency` is read and returned too, instead
- * of assuming it matches Claude's (always-USD) costs.
+ * Meta reports `cost` in whichever currency the WABA actually bills in — not
+ * necessarily USD. The `currency` embedded in each pricing_analytics data point is
+ * NOT reliable (seen reporting "USD" while the account's real balance and payment
+ * history, in Meta Business Suite, are in MXN) — the WABA node's own top-level
+ * `currency` field is the account's real billing currency, so that's what's used.
  */
 export async function metaDaily(
   wabaId: string,
@@ -69,26 +71,28 @@ export async function metaDaily(
 ): Promise<{ daily: DailyCosts; currency: string | null }> {
   const start = Math.floor(Date.parse(startIso) / 1000)
   const end = Math.floor(Date.parse(endIso) / 1000)
-  const field = `pricing_analytics.start(${start}).end(${end}).granularity(DAILY)`
-  const res = await fetch(`https://graph.facebook.com/v21.0/${wabaId}?fields=${encodeURIComponent(field)}`, {
+  const pricingField = `pricing_analytics.start(${start}).end(${end}).granularity(DAILY)`
+  const res = await fetch(`https://graph.facebook.com/v21.0/${wabaId}?fields=currency,${encodeURIComponent(pricingField)}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
     signal: AbortSignal.timeout(20000),
     cache: 'no-store',
   })
   if (!res.ok) throw new Error(`Meta pricing analytics failed: ${res.status} ${(await res.text()).slice(0, 200)}`)
   const json = (await res.json()) as {
+    currency?: string
     pricing_analytics?: { data?: { data_points?: { start: number; cost?: number; currency?: string }[] }[] }
   }
   const out: DailyCosts = {}
-  let currency: string | null = null
+  let dataPointCurrency: string | null = null
   for (const group of json.pricing_analytics?.data ?? []) {
     for (const p of group.data_points ?? []) {
       const day = new Date(p.start * 1000).toISOString().slice(0, 10)
       out[day] = (out[day] ?? 0) + Number(p.cost ?? 0)
-      if (p.currency) currency = p.currency
+      if (p.currency) dataPointCurrency = p.currency
     }
   }
-  return { daily: out, currency }
+  // The WABA's own billing currency wins over whatever pricing_analytics claims.
+  return { daily: out, currency: json.currency || dataPointCurrency }
 }
 
 /** One month's daily costs for a hotel, live from Anthropic and Meta, saved as snapshots. */
