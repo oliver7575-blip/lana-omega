@@ -3,6 +3,9 @@ import { sendTenantEmail } from './email'
 import { buildKnowledgeBaseSection } from './knowledge-base'
 import { buildBookingLinkInstruction } from './booking-link'
 import { CONCIERGE_MODEL } from './anthropic'
+import { notifyStaff } from './escalation'
+import { parseEscalationContacts, findEscalationContact } from './escalation-contacts'
+import type { EncryptedPayload } from './crypto'
 
 /**
  * Lana answering guest emails. She replies only when she can answer from the
@@ -87,14 +90,18 @@ export async function replyGuard(
       return { allow: false, canSend: false, detail: `Lana already replied to this sender ${MAX_REPLIES_PER_SENDER_PER_DAY} times today — please handle this one yourself.` }
     }
   }
-  const to = replyAddress(mail)
-  const local = to.split('@')[0] ?? ''
-  const canSend = Boolean(to) && !/^(no-?reply|do-?not-?reply|donotreply|mailer-daemon|postmaster|bounce)/.test(local)
-  return { allow: true, canSend }
+  return { allow: true, canSend: canReplyToAddress(replyAddress(mail)) }
 }
 
 function replyAddress(mail: ReplyMail): string {
   return (mail.replyTo || mail.fromEmail || '').trim().toLowerCase()
+}
+
+/** Whether there's actually somewhere to send a reply — no address, or a no-reply/mailer address, means there isn't. */
+export function canReplyToAddress(address: string): boolean {
+  const to = (address || '').trim().toLowerCase()
+  const local = to.split('@')[0] ?? ''
+  return Boolean(to) && !/^(no-?reply|do-?not-?reply|donotreply|mailer-daemon|postmaster|bounce)/.test(local)
 }
 
 // ---------------------------------------------------------------------------
@@ -218,19 +225,68 @@ export async function deliverReply(
   return res.success
 }
 
+/** Alerts the reservations contact on WhatsApp — a guest emailed about an existing booking (date/room change, cancellation, special request…) and it needs a person. */
+async function alertReservationsStaff(db: Db, tenantId: string, tenant: ReplyTenant, mail: ReplyMail, guestName: string, reason: string): Promise<boolean> {
+  const contact = findEscalationContact(parseEscalationContacts(tenant.escalation_contacts), 'reservations')
+  const { data: wa } = await db
+    .from('tenant_integrations')
+    .select('status, credentials, config')
+    .eq('tenant_id', tenantId)
+    .eq('integration_type', 'whatsapp')
+    .maybeSingle()
+  const phoneNumberId = (wa?.config as { phone_number_id?: string } | null)?.phone_number_id
+
+  const summary = `Correo sobre una reserva — ${reason} · ${guestName || mail.fromEmail} (${mail.fromEmail}) · Asunto: ${mail.subject}`
+
+  let delivered = false
+  if (contact && wa?.status === 'connected' && wa.credentials && phoneNumberId) {
+    const result = await notifyStaff(
+      phoneNumberId,
+      wa.credentials as EncryptedPayload,
+      contact.phone,
+      mail.fromEmail,
+      { category: 'reservations', summary, urgency: 'normal' },
+      tenant.message_templates,
+      guestName || mail.fromName
+    )
+    delivered = result.success
+    if (!result.success) console.error('[email-reply] reservations alert failed', result.error)
+  }
+  await db.from('escalations').insert({
+    tenant_id: tenantId,
+    conversation_id: null,
+    guest_id: null,
+    category: 'reservations',
+    urgency: 'normal',
+    summary,
+    room: null,
+    delivered,
+  })
+  return delivered
+}
+
 /**
  * An email with no arrival time in it: answer it if the knowledge base covers
  * it, otherwise leave it for staff. Answered emails are marked handled.
+ * Emails about an existing booking (category "reservation" — date/room
+ * changes, cancellations, special requests) that need a person also alert
+ * the reservations contact on WhatsApp.
+ * When there's simply no way to reply by email (no address, or a no-reply
+ * address with no other channel), the email is marked handled regardless —
+ * there's nothing more to do here.
  */
 export async function answerGeneralEmail(
   db: Db,
   tenantId: string,
   tenant: ReplyTenant,
   mail: ReplyMail,
-  body: string
+  body: string,
+  category?: string
 ): Promise<void> {
   if (!repliesEnabled(tenant)) return
   const setReply = (patch: Record<string, unknown>) => db.from('inbound_emails').update(patch).eq('id', mail.id)
+  const markHandled = () => db.from('inbound_emails').update({ status: 'done' }).eq('id', mail.id)
+  const alertable = category === 'reservation'
 
   const guard = await replyGuard(db, tenantId, mail)
   if (!guard.allow) {
@@ -240,12 +296,18 @@ export async function answerGeneralEmail(
   const d = await composeEmailReply(tenant, mail, body)
   if (!d) {
     await setReply({ reply_status: 'failed', reply_detail: "Lana couldn't write a reply — please answer this one yourself." })
+    if (!guard.canSend) await markHandled()
     return
   }
   if (d.decision === 'staff' || !d.reply) {
-    await setReply({ reply_status: 'not_sent', reply_detail: `Lana didn't reply — ${d.reason || 'needs a person'}.` })
+    const reason = d.reason || 'needs a person'
+    let detail = `Lana didn't reply — ${reason}.`
+    if (alertable) detail += (await alertReservationsStaff(db, tenantId, tenant, mail, mail.fromName, reason)) ? ' Reservations alerted on WhatsApp.' : " Couldn't alert reservations on WhatsApp — please check."
+    await setReply({ reply_status: 'not_sent', reply_detail: detail })
+    if (!guard.canSend) await markHandled()
     return
   }
   const sent = await deliverReply(db, tenantId, mail, d.reply, guard.canSend, d.needsStaff ? `part of it needs a person: ${d.reason}` : undefined)
-  if (sent && !d.needsStaff) await db.from('inbound_emails').update({ status: 'done' }).eq('id', mail.id)
+  if (d.needsStaff && alertable) await alertReservationsStaff(db, tenantId, tenant, mail, mail.fromName, d.reason || 'needs a person')
+  if ((sent && !d.needsStaff) || !guard.canSend) await markHandled()
 }
