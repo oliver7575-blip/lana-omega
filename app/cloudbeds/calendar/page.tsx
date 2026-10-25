@@ -27,6 +27,10 @@ const VISIBLE_DAYS = 21 // how many days fit on screen
 const MIN_DAY_W = 30
 const CHUNK = 28 // days loaded each time you scroll near an edge
 const EDGE_PX = 400
+const MONTH_ROW_H = 16
+const PCT_ROW_H = 16
+const DAY_ROW_H = 30
+const TYPE_ROW_H = 30
 
 function addDays(d: string, n: number) {
   const x = new Date(`${d}T12:00:00Z`)
@@ -248,6 +252,55 @@ export default function CalendarPage() {
   const totalDays = data?.days.length ?? 0
   const gridW = LEFT_W + totalDays * dayW
 
+  // Which room type a room belongs to (for the per-day availability / occupancy math below).
+  const roomTypeOf = useMemo(() => {
+    const m: Record<string, string> = {}
+    for (const t of data?.roomTypes ?? []) for (const r of t.rooms) m[r.id] = t.id
+    return m
+  }, [data])
+
+  // Available rooms per type per day (shown under the rate), and hotel-wide occupancy % per day
+  // (shown in the band above the dates) — the same figures Cloudbeds' own calendar shows.
+  const dayStats = useMemo(() => {
+    if (!data) return null
+    const perType: Record<string, Record<string, number>> = {}
+    const occupiedByDay: Record<string, number> = {}
+    for (const t of data.roomTypes) perType[t.id] = {}
+    for (const d of data.days) {
+      let occupiedTotal = 0
+      for (const t of data.roomTypes) {
+        let occ = 0
+        for (const b of data.bookings) if (b.start <= d && d < b.end && roomTypeOf[b.roomID] === t.id) occ++
+        for (const bl of data.blocks) if (bl.start <= d && d < bl.end && roomTypeOf[bl.roomID] === t.id) occ++
+        for (const u of data.unassigned) if (u.start <= d && d < u.end && u.roomTypeID === t.id) occ++
+        perType[t.id][d] = Math.max(0, t.rooms.length - occ)
+        occupiedTotal += Math.min(occ, t.rooms.length)
+      }
+      occupiedByDay[d] = occupiedTotal
+    }
+    return { perType, occupiedByDay }
+  }, [data, roomTypeOf])
+
+  // Month-label segments for the band above the date row ("OCT 2026" spanning its days, "NOV 2026" the next).
+  const monthBands = useMemo(() => {
+    if (!data) return [] as { label: string; left: number; width: number }[]
+    const bands: { label: string; left: number; width: number }[] = []
+    let i = 0
+    while (i < data.days.length) {
+      const dt = new Date(`${data.days[i]}T12:00:00Z`)
+      const ym = `${dt.getUTCFullYear()}-${dt.getUTCMonth()}`
+      let j = i
+      while (j < data.days.length) {
+        const dj = new Date(`${data.days[j]}T12:00:00Z`)
+        if (`${dj.getUTCFullYear()}-${dj.getUTCMonth()}` !== ym) break
+        j++
+      }
+      bands.push({ label: dt.toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' }).toUpperCase(), left: i * dayW, width: (j - i) * dayW })
+      i = j
+    }
+    return bands
+  }, [data, dayW])
+
   return (
     <div className="p-2 md:p-3">
       <div className="min-h-[calc(100vh-1.5rem)] rounded-2xl bg-[#f7f9fb] p-3.5 text-[#14213d]">
@@ -290,18 +343,38 @@ export default function CalendarPage() {
               </div>
             )}
             <div style={{ width: gridW }}>
-              <div className="sticky top-0 z-20 flex border-b-2 border-gray-200 bg-gray-50 text-[10px] font-semibold">
-                <div className="sticky left-0 z-10 border-r-2 border-gray-200 bg-gray-50 px-2.5 py-1" style={{ width: LEFT_W, minWidth: LEFT_W }}>Room type / room</div>
+              <div className="sticky top-0 z-20 flex border-b border-gray-200 bg-gray-50 text-[9px] font-semibold text-gray-500">
+                <div className="sticky left-0 z-10 border-r-2 border-gray-200 bg-gray-50" style={{ width: LEFT_W, minWidth: LEFT_W, height: MONTH_ROW_H }} />
+                <div className="relative" style={{ width: totalDays * dayW, height: MONTH_ROW_H }}>
+                  {monthBands.map((m) => (
+                    <div key={m.left} className="absolute top-0 flex h-full items-center border-l-2 border-gray-300 pl-1.5 tracking-wide" style={{ left: m.left, width: m.width }}>{m.label}</div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="sticky z-20 flex border-b border-gray-200 bg-gray-50 text-[9.5px] font-semibold text-gray-500" style={{ top: MONTH_ROW_H }}>
+                <div className="sticky left-0 z-10 border-r-2 border-gray-200 bg-gray-50" style={{ width: LEFT_W, minWidth: LEFT_W, height: PCT_ROW_H }} />
+                {data.days.map((d) => {
+                  const pct = roomCount ? ((dayStats?.occupiedByDay[d] ?? 0) / roomCount) * 100 : 0
+                  const isToday = d === data.today
+                  return (
+                    <div key={d} className={`flex items-center justify-center border-r border-gray-200 ${isToday ? 'border-x border-x-[#8ec3ee] bg-[#c6e1f7] text-[#1f5fd6]' : ''}`} style={{ width: dayW, minWidth: dayW, height: PCT_ROW_H }}>
+                      {pct.toFixed(2)}%
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div className="sticky z-20 flex border-b-2 border-gray-200 bg-gray-50 text-[10px] font-semibold" style={{ top: MONTH_ROW_H + PCT_ROW_H }}>
+                <div className="sticky left-0 z-10 flex items-center border-r-2 border-gray-200 bg-gray-50 px-2.5" style={{ width: LEFT_W, minWidth: LEFT_W, height: DAY_ROW_H }}>Room type / room</div>
                 {data.days.map((d) => {
                   const dt = new Date(`${d}T12:00:00Z`)
                   const isToday = d === data.today
-                  const firstOfMonth = dt.getUTCDate() === 1
                   return (
                     <div key={d}
-                      className={`border-r py-1 text-center leading-tight ${firstOfMonth ? 'border-l-2 border-l-gray-400' : ''} border-gray-200 ${isToday ? 'border-x border-x-[#8ec3ee] bg-[#c6e1f7] text-[#1f5fd6]' : ''}`}
-                      style={{ width: dayW, minWidth: dayW }}>
-                      {firstOfMonth ? dt.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' }) + ' ' : ''}
-                      {dt.getUTCDate()}{' '}
+                      className={`flex flex-col items-center justify-center border-r text-center leading-tight border-gray-200 ${dt.getUTCDate() === 1 ? 'border-l-2 border-l-gray-300' : ''} ${isToday ? 'border-x border-x-[#8ec3ee] bg-[#c6e1f7] text-[#1f5fd6]' : ''}`}
+                      style={{ width: dayW, minWidth: dayW, height: DAY_ROW_H }}>
+                      <span>{dt.getUTCDate()}</span>
                       <span className="font-normal text-gray-500">{dt.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }).slice(0, 2)}</span>
                     </div>
                   )
@@ -316,16 +389,29 @@ export default function CalendarPage() {
                     <div className="flex bg-gray-50 text-[9px] text-gray-500">
                       <button
                         onClick={() => { const n = new Set(collapsed); if (n.has(t.id)) n.delete(t.id); else n.add(t.id); setCollapsed(n) }}
-                        className="sticky left-0 z-10 truncate border-r-2 border-gray-200 bg-gray-50 px-2 py-0 text-left text-[10.5px] font-semibold leading-[17px] text-[#14213d]"
-                        style={{ width: LEFT_W, minWidth: LEFT_W }}
+                        className="sticky left-0 z-10 flex items-center truncate border-r-2 border-gray-200 bg-gray-50 px-2 text-left text-[10.5px] font-semibold text-[#14213d]"
+                        style={{ width: LEFT_W, minWidth: LEFT_W, height: TYPE_ROW_H }}
                       >
-                        <span className="mr-1 inline-block text-[10px] text-gray-500">{isCollapsed ? '›' : '⌄'}</span>{t.name}
+                        <span className="mr-1 inline-block shrink-0 text-[10px] text-gray-500">{isCollapsed ? '›' : '⌄'}</span><span className="truncate">{t.name}</span>
                       </button>
-                      {data.days.map((d) => (
-                        <div key={d} className={`flex items-center justify-center border-r border-gray-200 ${d === data.today ? 'border-x border-x-[#8ec3ee] bg-[#d6eafa] font-semibold text-[#1f5fd6]' : ''}`} style={{ width: dayW, minWidth: dayW }}>
-                          {t.rates[d] ? Math.round(t.rates[d]) : ''}
-                        </div>
-                      ))}
+                      {data.days.map((d) => {
+                        const avail = dayStats?.perType[t.id]?.[d]
+                        const rate = t.rates[d]
+                        return (
+                          <div key={d}
+                            className={`flex flex-col items-center justify-center border-r border-gray-200 leading-tight ${new Date(`${d}T12:00:00Z`).getUTCDate() === 1 ? 'border-l-2 border-l-gray-300' : ''} ${d === data.today ? 'border-x border-x-[#8ec3ee] bg-[#d6eafa] font-semibold text-[#1f5fd6]' : ''}`}
+                            style={{ width: dayW, minWidth: dayW, height: TYPE_ROW_H }}>
+                            {rate ? (
+                              <>
+                                <span>{avail ?? ''}</span>
+                                <span className="font-normal">${Math.round(rate).toLocaleString('en-US')}.00</span>
+                              </>
+                            ) : (
+                              <span>{avail || ''}</span>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
 
                     {!isCollapsed && [...t.rooms, ...(unassigned.length ? [{ id: `unassigned-${t.id}`, name: 'Unassigned' }] : [])].map((room) => {
@@ -340,7 +426,9 @@ export default function CalendarPage() {
                           </div>
                           <div className="relative flex" style={{ height: ROW_H }}>
                             {data.days.map((d) => (
-                              <div key={d} className={`border-r border-gray-100 ${d === data.today ? 'border-x border-x-[#8ec3ee] bg-[#e4f1fc]' : ''}`} style={{ width: dayW, minWidth: dayW }} />
+                              <div key={d}
+                                className={`border-r border-gray-100 ${new Date(`${d}T12:00:00Z`).getUTCDate() === 1 ? 'border-l-2 border-l-gray-300' : ''} ${d === data.today ? 'border-x border-x-[#8ec3ee] bg-[#e4f1fc]' : ''}`}
+                                style={{ width: dayW, minWidth: dayW }} />
                             ))}
                             {blocks.map((b, i) => (
                               <Bar key={`b${i}`} start={b.start} end={addDays(b.end, 1)} viewStart={data.start} totalDays={totalDays} label={b.reason} color="#d9433f" title={`Blocked: ${b.reason}`} dayW={dayW} />
