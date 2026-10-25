@@ -174,7 +174,7 @@ export async function generateReply(
     tools.push({
       name: 'lookup_reservation',
       description:
-        "Look up a guest's reservation in the property management system: dates, room, balance, payment status. Pass the confirmation number if the guest gave one (exactly as given — never question its format). If the guest asks about \"my reservation\" without a number, call this WITHOUT confirmationNumber: on WhatsApp the system finds their reservation from their phone number. Only ask for the confirmation number if that returns found: false.",
+        "Look up a guest's reservation in the property management system: dates, room, balance, payment status. Pass the confirmation number if the guest gave one (exactly as given — never question its format). If the guest asks about \"my reservation\" without a number, call this WITHOUT confirmationNumber: on WhatsApp the system finds their reservation from their phone number. Only ask for the confirmation number if that returns found: false.\n\nA single confirmation number can legitimately cover MORE THAN ONE ROOM (common for group/family bookings made through Booking.com, Airbnb, etc.). Always check the `rooms` array in the result, not just `roomName` — if it has more than one entry, list every room to the guest. If a guest insists one confirmation number covers multiple rooms, trust the `rooms` array over any assumption that one number = one room; never tell them it must be a separate confirmation number without checking `rooms` first.",
       input_schema: {
         type: 'object',
         properties: {

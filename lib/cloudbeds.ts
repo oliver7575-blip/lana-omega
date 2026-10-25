@@ -34,8 +34,11 @@ export interface ReservationLookupResult {
   startDate?: string
   endDate?: string
   status?: string
+  /** The first room on the reservation — kept for backward compatibility; a multi-room booking has more in `rooms`. */
   roomName?: string
   roomTypeName?: string
+  /** Every room assigned to this reservation. A single OTA confirmation number often covers more than one room. */
+  rooms?: { roomName?: string; roomTypeName?: string }[]
   adults?: string
   children?: string
   balance?: number
@@ -84,7 +87,8 @@ function daysFromToday(offset: number): string {
 
 function toLookupResult(match: Record<string, unknown>): ReservationLookupResult {
   const guestDetail = extractGuestDetail(match)
-  const room = guestDetail?.rooms?.[0]
+  const rooms = guestDetail?.rooms ?? []
+  const room = rooms[0]
   return {
     found: true,
     reservationID: match.reservationID as string,
@@ -96,6 +100,7 @@ function toLookupResult(match: Record<string, unknown>): ReservationLookupResult
     status: match.status as string | undefined,
     roomName: room?.roomName,
     roomTypeName: room?.roomTypeName,
+    rooms: rooms.length ? rooms : undefined,
     adults: match.adults as string | undefined,
     children: match.children as string | undefined,
     balance: match.balance as number | undefined,
@@ -206,6 +211,7 @@ export interface UpcomingArrival {
   startDate?: string
   roomName?: string
   roomTypeName?: string
+  rooms?: { roomName?: string; roomTypeName?: string }[]
   phone?: string
 }
 
@@ -241,7 +247,8 @@ export async function getArrivalsInWindow(
 
     const arrivals: UpcomingArrival[] = reservations.map((r) => {
       const guestDetail = extractGuestDetail(r)
-      const room = guestDetail?.rooms?.[0]
+      const rooms = guestDetail?.rooms ?? []
+      const room = rooms[0]
       return {
         reservationID: r.reservationID as string,
         guestName: r.guestName as string | undefined,
@@ -251,6 +258,7 @@ export async function getArrivalsInWindow(
         endDate: r.endDate as string | undefined,
         roomName: room?.roomName,
         roomTypeName: room?.roomTypeName,
+        rooms: rooms.length ? rooms : undefined,
         phone: extractPhone(guestDetail),
       }
     })
@@ -269,6 +277,7 @@ export interface RecentDeparture {
   startDate?: string
   endDate?: string
   roomTypeName?: string
+  rooms?: { roomName?: string; roomTypeName?: string }[]
   phone?: string
 }
 
@@ -292,7 +301,8 @@ export async function getDeparturesInWindow(
 
     const departures: RecentDeparture[] = matching.map((r) => {
       const guestDetail = extractGuestDetail(r)
-      const room = guestDetail?.rooms?.[0]
+      const rooms = guestDetail?.rooms ?? []
+      const room = rooms[0]
       return {
         reservationID: r.reservationID as string,
         guestName: r.guestName as string | undefined,
@@ -301,6 +311,7 @@ export async function getDeparturesInWindow(
         startDate: r.startDate as string | undefined,
         endDate: r.endDate as string | undefined,
         roomTypeName: room?.roomTypeName,
+        rooms: rooms.length ? rooms : undefined,
         phone: extractPhone(guestDetail),
       }
     })
@@ -317,6 +328,7 @@ export interface NewReservation {
   startDate?: string
   endDate?: string
   roomTypeName?: string
+  rooms?: { roomName?: string; roomTypeName?: string }[]
   phone?: string
 }
 
@@ -353,13 +365,15 @@ export async function getRecentlyCreatedReservations(
 
     const reservations: NewReservation[] = recent.map((r) => {
       const guestDetail = extractGuestDetail(r)
-      const room = guestDetail?.rooms?.[0]
+      const rooms = guestDetail?.rooms ?? []
+      const room = rooms[0]
       return {
         reservationID: r.reservationID as string,
         guestName: r.guestName as string | undefined,
         startDate: r.startDate as string | undefined,
         endDate: r.endDate as string | undefined,
         roomTypeName: room?.roomTypeName,
+        rooms: rooms.length ? rooms : undefined,
         phone: extractPhone(guestDetail),
       }
     })
@@ -461,7 +475,8 @@ export async function findReservationByPhone(
 
     const match = matches[0]
     const guestDetail = extractGuestDetail(match)
-    const room = guestDetail?.rooms?.[0]
+    const rooms = guestDetail?.rooms ?? []
+    const room = rooms[0]
     return {
       found: true,
       reservationID: match.reservationID as string,
@@ -473,6 +488,7 @@ export async function findReservationByPhone(
       status: match.status as string | undefined,
       roomName: room?.roomName,
       roomTypeName: room?.roomTypeName,
+      rooms: rooms.length ? rooms : undefined,
       adults: match.adults as string | undefined,
       children: match.children as string | undefined,
       balance: match.balance as number | undefined,
