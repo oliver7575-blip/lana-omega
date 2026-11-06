@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { runTenantTick } from '@/lib/maintenance-engine'
+import { runLanaWatchdog } from '@/lib/lana-reliability'
 
 export const maxDuration = 60
 
@@ -19,5 +20,12 @@ export async function GET(request: Request) {
       results.push({ tenantId: t.id, error: err instanceof Error ? err.message : 'failed' })
     }
   }
-  return NextResponse.json({ ranAt: new Date().toISOString(), results })
+  // Same 5-minute heartbeat also watches the guest inbox (re-answers missed guests, alerts staff).
+  let watchdog: unknown = null
+  try {
+    watchdog = await runLanaWatchdog(new URL(request.url).origin)
+  } catch (err) {
+    watchdog = { error: err instanceof Error ? err.message : 'failed' }
+  }
+  return NextResponse.json({ ranAt: new Date().toISOString(), results, watchdog })
 }

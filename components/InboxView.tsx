@@ -88,6 +88,9 @@ export default async function InboxView({
           status: r.status,
           unread: r.unread,
           ago: timeAgo(r.lastMessageAt),
+          waitingHours: r.waitingHours,
+          lanaRetrying: r.lanaRetrying,
+          automated: r.automated,
         }))}
       />
     </main>

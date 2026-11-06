@@ -16,6 +16,7 @@ import { buildRoomPhotosTool } from '@/lib/room-photos'
 import { buildBookingLinkInstruction } from '@/lib/booking-link'
 import { buildKnowledgeBaseSection } from '@/lib/knowledge-base'
 import { processMaintenanceButtonReply } from '@/lib/maintenance-reply'
+import { alertAiOutage, detectLang, FALLBACK_TEXT, looksLikeBotLoop, markSilent } from '@/lib/lana-reliability'
 import { findGuestByPhone } from '@/lib/guest-records'
 
 // Meta must get a fast 200. All real work runs in after(), which keeps the
@@ -464,6 +465,7 @@ async function processInbound(msg: ExtractedMessage) {
     return
   }
   if (!guestMessage) return
+  await supabase.from('conversations').update({ silent_reason: null }).eq('id', conversationId)
 
   // ---- Debounce: only the newest message in a burst triggers a reply --------
 
@@ -522,24 +524,52 @@ async function replyToConversation(args: {
     .select('status')
     .eq('id', conversationId)
     .single()
-  if (convoNow?.status === 'human_takeover' || convoNow?.status === 'closed') return { answered: false, reason: 'Conversation is not with Lana' }
+  if (convoNow?.status === 'human_takeover' || convoNow?.status === 'closed') {
+    await markSilent(supabase, conversationId, convoNow.status === 'closed' ? 'conversation_closed' : 'staff_has_conversation')
+    return { answered: false, reason: 'Conversation is not with Lana' }
+  }
 
   // Only answer when the newest message is from the guest. If a staff member
   // (or Lana) already wrote after it, there is nothing new to answer.
-  const { data: newest } = await supabase
+  const { data: convoFlags } = await supabase
+    .from('conversations')
+    .select('lana_failed_at, automated_sender')
+    .eq('id', conversationId)
+    .single()
+  const failedAtMs = convoFlags?.lana_failed_at ? new Date(convoFlags.lana_failed_at as string).getTime() : 0
+  const { data: latest } = await supabase
     .from('messages')
-    .select('sender_type')
+    .select('sender_type, created_at')
     .eq('conversation_id', conversationId)
     .in('sender_type', ['guest', 'lana', 'staff'])
     .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  if (newest?.sender_type !== 'guest') return { answered: false, reason: 'No new guest message to answer' }
+    .limit(6)
+  // The apology Lana sent when her AI was down does not count as an answer.
+  const newest = (latest ?? []).find(
+    (m) => !(failedAtMs && m.sender_type === 'lana' && new Date(m.created_at as string).getTime() >= failedAtMs - 5000)
+  )
+  if (newest?.sender_type !== 'guest') {
+    await markSilent(supabase, conversationId, newest?.sender_type === 'staff' ? 'staff_already_replied' : 'already_answered')
+    return { answered: false, reason: 'No new guest message to answer' }
+  }
+
+  // Another automated system on the other end: stop instead of looping with it.
+  if (convoFlags?.automated_sender) {
+    await markSilent(supabase, conversationId, 'automated_sender')
+    return { answered: false, reason: 'Marked as an automated sender' }
+  }
+  if (await looksLikeBotLoop(supabase, conversationId)) {
+    await supabase.from('conversations').update({ automated_sender: true, silent_reason: 'automated_sender' }).eq('id', conversationId)
+    return { answered: false, reason: 'Looks like an automated sender' }
+  }
 
   // WhatsApp switched off under Integrations → Guest channels: the message
   // stays in the inbox for staff, but Lana doesn't reply.
   const { data: channelRow } = await supabase.from('tenants').select('channel_settings').eq('id', tenantId).single()
-  if ((channelRow?.channel_settings as { whatsapp?: boolean } | null)?.whatsapp === false) return { answered: false, reason: 'WhatsApp replies are switched off' }
+  if ((channelRow?.channel_settings as { whatsapp?: boolean } | null)?.whatsapp === false) {
+    await markSilent(supabase, conversationId, 'whatsapp_replies_off')
+    return { answered: false, reason: 'WhatsApp replies are switched off' }
+  }
 
   // ---- Tools & context ------------------------------------------------------
 
@@ -855,16 +885,31 @@ async function replyToConversation(args: {
     }
   } catch (err) {
     console.error('[whatsapp-inbound] AI generation failed', err)
-    const fallbackText =
-      "Sorry, I'm having trouble responding right now — a member of our team will follow up with you shortly."
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    const { data: prior } = await supabase.from('conversations').select('lana_failed_at').eq('id', conversationId).single()
+    const firstFailure = !prior?.lana_failed_at
+    await supabase
+      .from('conversations')
+      .update({ lana_failed_at: (prior?.lana_failed_at as string | null) ?? new Date().toISOString(), silent_reason: 'ai_error' })
+      .eq('id', conversationId)
 
-    await supabase.from('messages').insert({
-      tenant_id: tenantId,
-      conversation_id: conversationId,
-      sender_type: 'lana',
-      content: fallbackText,
-    })
-    await sendWhatsAppMessage(phoneNumberId, credentials, from, fallbackText)
+    // Apologise once per outage (retries stay quiet), in the guest's language.
+    if (firstFailure) {
+      const guestText = claudeMessages.filter((m) => m.role === 'user').slice(-3).map((m) => String(m.content)).join(' ')
+      const fallbackText = FALLBACK_TEXT[detectLang(guestText)]
+      await supabase.from('messages').insert({
+        tenant_id: tenantId,
+        conversation_id: conversationId,
+        sender_type: 'lana',
+        content: fallbackText,
+      })
+      await sendWhatsAppMessage(phoneNumberId, credentials, from, fallbackText)
+    }
+    try {
+      await alertAiOutage(supabase, tenantId, { phoneNumberId, credentials }, errorMessage, guestName ?? null)
+    } catch (alertErr) {
+      console.error('[whatsapp-inbound] outage alert failed', alertErr)
+    }
     return { answered: false, reason: 'Lana could not generate a reply' }
   }
 
@@ -923,6 +968,10 @@ async function replyToConversation(args: {
     const res = await sendWhatsAppImage(phoneNumberId, credentials, from, url)
     if (!res.success) console.error('[whatsapp-inbound] photo send failed', res.error)
   }
+  await supabase
+    .from('conversations')
+    .update({ lana_failed_at: null, silent_reason: noReply ? 'no_reply_needed' : null })
+    .eq('id', conversationId)
   return { answered: true }
 }
 
