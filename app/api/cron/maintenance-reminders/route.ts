@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { runTenantTick } from '@/lib/maintenance-engine'
 import { runLanaWatchdog } from '@/lib/lana-reliability'
+import { runWeeklyTaskSuggestions } from '@/lib/maintenance-suggestions'
 
 export const maxDuration = 60
 
@@ -27,5 +28,12 @@ export async function GET(request: Request) {
   } catch (err) {
     watchdog = { error: err instanceof Error ? err.message : 'failed' }
   }
-  return NextResponse.json({ ranAt: new Date().toISOString(), results, watchdog })
+  // Monday mornings the same heartbeat sends the owner the weekly task suggestions (a no-op the rest of the week).
+  let suggestions: unknown = null
+  try {
+    suggestions = await runWeeklyTaskSuggestions()
+  } catch (err) {
+    suggestions = { error: err instanceof Error ? err.message : 'failed' }
+  }
+  return NextResponse.json({ ranAt: new Date().toISOString(), results, watchdog, suggestions })
 }

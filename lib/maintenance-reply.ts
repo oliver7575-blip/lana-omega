@@ -1,5 +1,6 @@
 import { createServiceClient } from './supabase/service'
 import { samePhone } from './phone'
+import { handleFreeTextReply } from './maintenance-freetext'
 import { handleStaffReply, loadEngineContext, parseStaffReply, type StaffRow } from './maintenance-engine'
 
 export interface ButtonReplyResult {
@@ -17,7 +18,7 @@ export async function processMaintenanceButtonReply(
   fromPhone: string,
   text: string
 ): Promise<ButtonReplyResult> {
-  if (!parseStaffReply(text)) return { handled: false, detail: 'Not a task reply' }
+  const isKeyword = Boolean(parseStaffReply(text))
 
   const db = createServiceClient()
   const { data: staff } = await db
@@ -28,6 +29,7 @@ export async function processMaintenanceButtonReply(
   if (!worker) return { handled: false, detail: 'Not a maintenance staff number' }
 
   const ctx = await loadEngineContext(tenantId, db)
-  const handled = await handleStaffReply(ctx, worker, text)
-  return { handled }
+  if (isKeyword) return { handled: await handleStaffReply(ctx, worker, text) }
+  // Anything else is read as a free answer about their tasks; unrelated messages fall through.
+  return { handled: await handleFreeTextReply(ctx, worker, text) }
 }

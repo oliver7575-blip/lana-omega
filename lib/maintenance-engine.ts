@@ -513,7 +513,7 @@ function formatDue(dueAt: string | null, tz: string): string {
   return `${String(p.day).padStart(2, '0')}/${String(p.month).padStart(2, '0')}, ${time}`
 }
 
-async function sendStaffText(ctx: EngineContext, staff: StaffRow, taskId: string | null, text: string) {
+export async function sendStaffText(ctx: EngineContext, staff: StaffRow, taskId: string | null, text: string) {
   if (!ctx.whatsapp) return
   const res = await sendWhatsAppMessage(ctx.whatsapp.phoneNumberId, ctx.whatsapp.credentials, staff.phone, text)
   await ctx.db.from('maintenance_messages').insert({
