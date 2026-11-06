@@ -14,6 +14,9 @@ export interface InboxListRow {
   status: string
   unread: boolean
   ago: string
+  waitingHours?: number | null
+  lanaRetrying?: boolean
+  automated?: boolean
 }
 
 /** The conversation list with Escalations-style read/unread controls. */
@@ -96,6 +99,20 @@ export default function InboxList({ rows }: { rows: InboxListRow[] }) {
                 </div>
               </Link>
               <div className="flex shrink-0 flex-col items-end gap-1.5">
+                {r.lanaRetrying && (
+                  <span className="rounded-full bg-[#3a2a0c] px-2.5 py-1 text-xs font-medium text-[#ffcf80]">Lana retrying</span>
+                )}
+                {r.automated && (
+                  <span className="rounded-full bg-[#2a2147] px-2.5 py-1 text-xs font-medium text-[#c9b8ff]" title="Lana stopped replying: this looks like an automated sender. Use “Hand to Lana and answer” to unmute.">Automated sender</span>
+                )}
+                {r.waitingHours != null && r.waitingHours >= 2 && (
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-xs font-medium ${r.waitingHours >= 24 ? 'bg-[#4a1a1a] text-[#ffb3ab]' : 'bg-[#3a2a0c] text-[#ffcf80]'}`}
+                    title="The guest's last message has had no reply"
+                  >
+                    waiting {r.waitingHours >= 24 ? `${Math.floor(r.waitingHours / 24)}d` : `${Math.floor(r.waitingHours)}h`}
+                  </span>
+                )}
                 {r.status === 'human_takeover' ? (
                   <span className="rounded-full bg-purple-500/15 px-2.5 py-1 text-xs font-medium text-purple-300">human takeover</span>
                 ) : unread ? (

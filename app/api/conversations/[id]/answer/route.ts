@@ -23,7 +23,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   // hotel simply isn't found.
   const { data: updated, error } = await supabase
     .from('conversations')
-    .update({ status: 'active' })
+    .update({ status: 'active', automated_sender: false, silent_reason: null })
     .eq('id', id)
     .select('id, channel')
     .single()

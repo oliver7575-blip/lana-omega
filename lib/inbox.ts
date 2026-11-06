@@ -47,6 +47,10 @@ export interface InboxRow {
   preview: string
   reservationStatus: string | null
   unread: boolean
+  /** Hours the guest's last message has gone unanswered (null when answered or Lana's turn). */
+  waitingHours: number | null
+  lanaRetrying: boolean
+  automated: boolean
 }
 
 export async function loadInbox(
@@ -83,7 +87,7 @@ export async function loadInbox(
 
   let q = supabase
     .from('conversations')
-    .select('id, channel, status, guest_id, last_message_at', { count: 'exact' })
+    .select('id, channel, status, guest_id, last_message_at, lana_failed_at, automated_sender', { count: 'exact' })
     .neq('status', 'closed')
     .order('last_message_at', { ascending: false, nullsFirst: false })
     .limit(100)
@@ -131,6 +135,12 @@ export async function loadInbox(
       preview: m ? who + (m.content ?? '').replace(/\s+/g, ' ') : '',
       reservationStatus: c.guest_id ? (resByGuest.get(c.guest_id as string) ?? null) : null,
       unread: unreadSet.has(c.id as string),
+      waitingHours:
+        m?.sender_type === 'guest' && c.status !== 'active' && c.last_message_at
+          ? (Date.now() - new Date(c.last_message_at as string).getTime()) / 3600_000
+          : null,
+      lanaRetrying: Boolean(c.lana_failed_at) && c.status === 'active' && m?.sender_type !== 'staff',
+      automated: Boolean(c.automated_sender),
     }
   })
   return { rows, total: count ?? rows.length }
