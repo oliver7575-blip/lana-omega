@@ -1,5 +1,6 @@
 import { CONCIERGE_MODEL } from './anthropic'
 import { loadActiveNotes, type LiveNote } from './live-notes'
+import { KNOWLEDGE_BASE_MAX_CHARS } from './knowledge-base'
 import {
   ACTIVE_STATUSES,
   acknowledgeTask,
@@ -19,6 +20,8 @@ interface Interpretation {
   /** report: the fact in one short English sentence, written for guests' assistant. */
   fact: string | null
   daysValid: number
+  /** report: a lasting fact about the property (not a temporary problem). */
+  permanent: boolean
   /** fixed: numbers of the reported notes this clears. */
   resolves: number[]
   taskCode: string | null
@@ -33,12 +36,12 @@ interface Interpretation {
 const SYSTEM = `You read a WhatsApp message from a hotel maintenance team member who is answering about their open tasks. Staff may answer freely, in any words and any language. Decide what they mean.
 
 Return ONLY a JSON object:
-{"intent":"done|accept|still|help|note|report|fixed|unrelated","task_code":string|null,"done_by":string|null,"note":string,"reply":string,"subject":string|null,"fact":string|null,"days_valid":number,"resolves":number[]}
+{"intent":"done|accept|still|help|note|report|fixed|unrelated","task_code":string|null,"done_by":string|null,"note":string,"reply":string,"subject":string|null,"fact":string|null,"days_valid":number,"permanent":boolean,"resolves":number[]}
 
 - done: the task is finished. If someone OTHER than the sender did it (for example "Eliseo ya lo terminó", "lo hizo Abimael"), set done_by to that first name. If the sender did it, done_by is null.
 - accept: they will do it. still: they are still working on it. help: they cannot do it and need someone else.
 - note: they give information about the task but it is not finished (a delay, a missing part, a finding). Not for chit-chat.
-- report: they tell Lana something about the state of the hotel that guests or colleagues should know, with no task involved (for example "El cuarto 1 no cuenta con agua caliente", "the pool is closed", "no water in the garden"). Set subject (e.g. "Room 1") and fact (one short, neutral English sentence, no names). days_valid: how many days it is likely to stay true (1 to 14, default 3).
+- report: they tell Lana something about the state of the hotel that guests or colleagues should know, with no task involved (for example "El cuarto 1 no cuenta con agua caliente", "the pool is closed", "no water in the garden"). Set subject (e.g. "Room 1") and fact (one short, neutral English sentence, no names). days_valid: how many days it is likely to stay true (1 to 14, default 3). permanent: true ONLY when they state a lasting fact about how the property is built or run (for example "el cuarto 1 no tiene agua caliente, así está construido", "there is no AC in room 4"), not a breakdown that will be repaired. For a permanent fact, write fact as a neutral sentence for the knowledge base.
 - fixed: they say a previously reported problem is solved (for example "ya hay agua caliente en el cuarto 1"). resolves: the numbers from the list of current reports that this clears.
 - unrelated: nothing to do with their tasks or the state of the hotel (guest-style chat, questions about booking...).
 - task_code: the 6-character code if they mention one, else pick the task from the list that the message is clearly about, else null.
@@ -74,6 +77,7 @@ async function interpret(staff: StaffRow, text: string, tasks: TaskRow[], notes:
       subject: typeof j.subject === 'string' && j.subject.trim() ? j.subject.trim().slice(0, 80) : null,
       fact: typeof j.fact === 'string' && j.fact.trim() ? j.fact.trim().slice(0, 300) : null,
       daysValid: Math.min(14, Math.max(1, Number(j.days_valid) || 3)),
+      permanent: j.permanent === true,
       resolves: Array.isArray(j.resolves) ? j.resolves.map(Number).filter((n: number) => Number.isInteger(n)) : [],
       reply: String(j.reply ?? '').slice(0, 400),
     }
@@ -115,7 +119,9 @@ export async function handleFreeTextReply(ctx: EngineContext, staff: StaffRow, t
     await ctx.db.from('maintenance_messages').insert({
       tenant_id: ctx.tenantId, staff_id: staff.id, task_id: null, direction: 'inbound', content: text, delivery_status: 'received',
     })
-    if (result.intent === 'report' && result.fact) {
+    if (result.intent === 'report' && result.fact && result.permanent) {
+      await addPermanentFact(ctx, result.subject, result.fact, staff.name)
+    } else if (result.intent === 'report' && result.fact) {
       // A newer report on the same subject replaces the older one.
       if (result.subject) {
         await ctx.db
@@ -180,4 +186,25 @@ export async function handleFreeTextReply(ctx: EngineContext, staff: StaffRow, t
   }
   await sendStaffText(ctx, staff, task.id, result.reply || `Anotado #${task.task_code}, gracias ${first}`)
   return true
+}
+
+const FACTS_HEADING = '# Team-confirmed facts'
+
+/** A lasting fact told by staff goes into the knowledge base itself, so it never expires. */
+async function addPermanentFact(ctx: EngineContext, subject: string | null, fact: string, reportedBy: string) {
+  const { data } = await ctx.db.from('tenants').select('knowledge_base').eq('id', ctx.tenantId).single()
+  const kb = ((data?.knowledge_base as string | null) ?? '').trimEnd()
+  const line = `- ${subject ? `**${subject}**: ` : ''}${fact}`
+  if (kb.includes(line)) return
+  const next = kb.includes(FACTS_HEADING)
+    ? kb.replace(FACTS_HEADING, `${FACTS_HEADING}\n${line}`)
+    : `${kb}${kb ? '\n\n' : ''}${FACTS_HEADING}\n${line}`
+  if (next.length > KNOWLEDGE_BASE_MAX_CHARS) {
+    console.error('[maintenance-freetext] knowledge base is full, fact not saved')
+    return
+  }
+  await ctx.db.from('tenants').update({ knowledge_base: next }).eq('id', ctx.tenantId)
+  await ctx.db.from('lana_live_notes').insert({
+    tenant_id: ctx.tenantId, subject, note: fact, reported_by: reportedBy, resolved_at: new Date().toISOString(), resolved_by: 'saved to the knowledge base',
+  })
 }
