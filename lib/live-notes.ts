@@ -1,4 +1,6 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { createServiceClient } from './supabase/service'
+import { KNOWLEDGE_BASE_MAX_CHARS } from './knowledge-base'
 
 export interface LiveNote {
   id: string
@@ -34,4 +36,25 @@ export async function buildLiveNotesSection(tenantId: string): Promise<string> {
     console.error('[live-notes] failed to load', err)
     return ''
   }
+}
+
+const FACTS_HEADING = '# Team-confirmed facts'
+
+/** A lasting fact told by staff goes into the knowledge base itself, so it never expires. */
+export async function addPermanentFact(db: SupabaseClient, tenantId: string, subject: string | null, fact: string, reportedBy: string) {
+  const { data } = await db.from('tenants').select('knowledge_base').eq('id', tenantId).single()
+  const kb = ((data?.knowledge_base as string | null) ?? '').trimEnd()
+  const line = `- ${subject ? `**${subject}**: ` : ''}${fact}`
+  if (kb.includes(line)) return
+  const next = kb.includes(FACTS_HEADING)
+    ? kb.replace(FACTS_HEADING, `${FACTS_HEADING}\n${line}`)
+    : `${kb}${kb ? '\n\n' : ''}${FACTS_HEADING}\n${line}`
+  if (next.length > KNOWLEDGE_BASE_MAX_CHARS) {
+    console.error('[maintenance-freetext] knowledge base is full, fact not saved')
+    return
+  }
+  await db.from('tenants').update({ knowledge_base: next }).eq('id', tenantId)
+  await db.from('lana_live_notes').insert({
+    tenant_id: tenantId, subject, note: fact, reported_by: reportedBy, resolved_at: new Date().toISOString(), resolved_by: 'saved to the knowledge base',
+  })
 }
