@@ -146,7 +146,7 @@ async function replyToGuest(
     await setReply({ reply_status: 'not_sent', reply_detail: guard.detail })
     return false
   }
-  const d = await composeEmailReply(tenant, mail, arrival.guest_message || '', { time, kind, situation })
+  const d = await composeEmailReply(tenant, mail, arrival.guest_message || '', { time, kind, situation }, tenantId)
   if (!d) {
     await setReply({ reply_status: 'failed', reply_detail: "Lana couldn't write a reply — please answer the guest yourself." })
     return false

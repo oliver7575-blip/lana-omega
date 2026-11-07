@@ -1,6 +1,7 @@
 import type { createServiceClient } from './supabase/service'
 import { sendTenantEmail } from './email'
 import { buildKnowledgeBaseSection } from './knowledge-base'
+import { buildLiveNotesSection } from './live-notes'
 import { buildBookingLinkInstruction } from './booking-link'
 import { CONCIERGE_MODEL } from './anthropic'
 import { notifyStaff } from './escalation'
@@ -141,11 +142,13 @@ export async function composeEmailReply(
   tenant: ReplyTenant,
   mail: ReplyMail,
   guestMessage: string,
-  arrival?: { time: string; kind: 'stated' | 'request'; situation: ArrivalSituation }
+  arrival?: { time: string; kind: 'stated' | 'request'; situation: ArrivalSituation },
+  tenantId?: string
 ): Promise<ReplyDecision | null> {
   const system =
     (tenant.ai_persona_prompt ?? 'You are a warm, helpful hotel concierge.') +
     buildKnowledgeBaseSection(tenant.knowledge_base) +
+    (tenantId ? await buildLiveNotesSection(tenantId) : '') +
     buildBookingLinkInstruction(tenant.booking_config) +
     BASE_TASK +
     (arrival ? ARRIVAL_TASK(arrival.time, arrival.kind, arrival.situation) : '')
@@ -293,7 +296,7 @@ export async function answerGeneralEmail(
     await setReply({ reply_status: 'not_sent', reply_detail: guard.detail })
     return
   }
-  const d = await composeEmailReply(tenant, mail, body)
+  const d = await composeEmailReply(tenant, mail, body, undefined, tenantId)
   if (!d) {
     await setReply({ reply_status: 'failed', reply_detail: "Lana couldn't write a reply — please answer this one yourself." })
     if (!guard.canSend) await markHandled()

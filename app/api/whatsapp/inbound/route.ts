@@ -15,6 +15,7 @@ import { parseEscalationContacts, findEscalationContact } from '@/lib/escalation
 import { buildRoomPhotosTool } from '@/lib/room-photos'
 import { buildBookingLinkInstruction } from '@/lib/booking-link'
 import { buildKnowledgeBaseSection } from '@/lib/knowledge-base'
+import { buildLiveNotesSection } from '@/lib/live-notes'
 import { processMaintenanceButtonReply } from '@/lib/maintenance-reply'
 import { alertAiOutage, detectLang, FALLBACK_TEXT, looksLikeBotLoop, markSilent } from '@/lib/lana-reliability'
 import { findGuestByPhone } from '@/lib/guest-records'
@@ -846,6 +847,7 @@ async function replyToConversation(args: {
     (tenant?.ai_persona_prompt ??
       'You are a helpful, warm hotel concierge assistant. Answer guest questions clearly and concisely.') +
     buildKnowledgeBaseSection(tenant?.knowledge_base as string | null) +
+    (await buildLiveNotesSection(tenantId)) +
     buildBookingLinkInstruction(tenant?.booking_config as Record<string, unknown>) +
     channelInstruction
 

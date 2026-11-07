@@ -10,6 +10,7 @@ import { parseEscalationContacts, findEscalationContact } from '@/lib/escalation
 import { buildRoomPhotosTool } from '@/lib/room-photos'
 import { buildBookingLinkInstruction } from '@/lib/booking-link'
 import { buildKnowledgeBaseSection } from '@/lib/knowledge-base'
+import { buildLiveNotesSection } from '@/lib/live-notes'
 
 const RATE_LIMIT_WINDOW_MINUTES = 10
 const RATE_LIMIT_MAX_MESSAGES = 15
@@ -429,6 +430,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     (tenant.ai_persona_prompt ??
       'You are a helpful, warm hotel concierge assistant. Answer guest questions clearly and concisely.') +
     buildKnowledgeBaseSection(tenant.knowledge_base as string | null) +
+    (await buildLiveNotesSection(tenant.id as string)) +
     buildBookingLinkInstruction(tenant.booking_config as Record<string, unknown>)
 
   const roomPhotosTool = pms ? buildRoomPhotosTool(pms) : undefined
