@@ -11,6 +11,7 @@ import { notifyStaff } from '@/lib/escalation'
 import { parseEscalationContacts, findEscalationContact } from '@/lib/escalation-contacts'
 import { buildRoomPhotosTool } from '@/lib/room-photos'
 import { buildKnowledgeBaseSection } from '@/lib/knowledge-base'
+import { buildLiveNotesSection } from '@/lib/live-notes'
 import { buildBookingLinkInstruction } from '@/lib/booking-link'
 import { describeImage } from '@/lib/whatsapp-media'
 import {
@@ -266,6 +267,7 @@ async function handleMessage(tenantId: string, conn: InstagramConnection, accoun
     nameContext +
     ((tenant?.ai_persona_prompt as string) ?? 'You are a helpful, warm hotel concierge assistant.') +
     buildKnowledgeBaseSection(tenant?.knowledge_base as string | null) +
+    (await buildLiveNotesSection(tenantId)) +
     buildBookingLinkInstruction(tenant?.booking_config as Record<string, unknown>) +
     channelInstruction
 

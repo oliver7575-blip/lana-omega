@@ -4,6 +4,9 @@ import { loadEngineContext } from './maintenance-engine'
 import { notifyStaff } from './escalation'
 import { findEscalationContact, parseEscalationContacts, type EscalationContact } from './escalation-contacts'
 import { zonedParts } from './tz'
+import { samePhone } from './phone'
+import { processEscalationReply } from './escalation-replies'
+import { processMaintenanceButtonReply } from './maintenance-reply'
 
 // ---------------------------------------------------------------------------
 // Settings (defaults chosen with the hotel)
@@ -187,6 +190,8 @@ async function watchTenant(db: SupabaseClient, tenantId: string, origin: string)
   const ctx = await loadEngineContext(tenantId, db)
   const now = Date.now()
 
+  await reprocessStaffMessages(db, tenantId, ctx, (await tenantContacts(db, tenantId)).contacts)
+
   const { data: convs } = await db
     .from('conversations')
     .select('id, status, lana_failed_at, waiting_alerted_at, automated_sender, silent_reason, guests(name)')
@@ -291,3 +296,54 @@ async function watchTenant(db: SupabaseClient, tenantId: string, origin: string)
   return result
 }
 
+
+/**
+ * Messages from the team's own numbers (escalation contacts, maintenance staff) that
+ * landed in the guest inbox are read now: their comments are information, not guest chat.
+ */
+async function reprocessStaffMessages(
+  db: SupabaseClient,
+  tenantId: string,
+  ctx: Awaited<ReturnType<typeof loadEngineContext>>,
+  contacts: EscalationContact[]
+) {
+  if (!ctx.whatsapp) return
+  const { data: staff } = await db.from('maintenance_staff').select('phone').eq('tenant_id', tenantId)
+  const phones = [...contacts.map((c) => c.phone), ...(staff ?? []).map((s) => s.phone as string)].filter(Boolean)
+  if (!phones.length) return
+  const { data: convs } = await db
+    .from('conversations')
+    .select('id, silent_reason, guests(phone)')
+    .eq('tenant_id', tenantId)
+    .eq('channel', 'whatsapp')
+    .neq('status', 'closed')
+    .gte('last_message_at', new Date(Date.now() - 6 * 3600_000).toISOString())
+    .limit(60)
+  let handledCount = 0
+  for (const c of convs ?? []) {
+    if (handledCount >= 3 || c.silent_reason === 'staff_message_handled') continue
+    const g = (c as unknown as { guests?: { phone?: string } | { phone?: string }[] }).guests
+    const phone = (Array.isArray(g) ? g[0]?.phone : g?.phone) ?? ''
+    if (!phone || !phones.some((p) => samePhone(p, phone))) continue
+    const { data: last } = await db
+      .from('messages')
+      .select('sender_type, content, media_type')
+      .eq('conversation_id', c.id as string)
+      .in('sender_type', ['guest', 'lana', 'staff'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+    const m = last?.[0]
+    if (!m || m.sender_type !== 'guest' || !m.content || m.media_type) continue
+    const text = String(m.content)
+    const line = { phoneNumberId: ctx.whatsapp.phoneNumberId, credentials: ctx.whatsapp.credentials }
+    let handled = (await processMaintenanceButtonReply(tenantId, phone, text, 'keyword')).handled
+    if (!handled) handled = (await processEscalationReply(tenantId, phone, text, line, db)).handled
+    if (!handled) handled = (await processMaintenanceButtonReply(tenantId, phone, text, 'free')).handled
+    // It was staff talking to Lana, not a guest: file the chat away so it is not shown as waiting.
+    await db
+      .from('conversations')
+      .update(handled ? { status: 'closed', silent_reason: 'staff_message_handled' } : { silent_reason: 'staff_message_handled' })
+      .eq('id', c.id as string)
+    if (handled) handledCount++
+  }
+}
