@@ -16,9 +16,11 @@ export interface ButtonReplyResult {
 export async function processMaintenanceButtonReply(
   tenantId: string,
   fromPhone: string,
-  text: string
+  text: string,
+  phase: 'keyword' | 'free' | 'both' = 'both'
 ): Promise<ButtonReplyResult> {
   const isKeyword = Boolean(parseStaffReply(text))
+  if ((phase === 'keyword' && !isKeyword) || (phase === 'free' && isKeyword)) return { handled: false, detail: 'Other phase' }
 
   const db = createServiceClient()
   const { data: staff } = await db

@@ -1,4 +1,5 @@
 import { CONCIERGE_MODEL } from './anthropic'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { loadActiveNotes, type LiveNote } from './live-notes'
 import { KNOWLEDGE_BASE_MAX_CHARS } from './knowledge-base'
 import {
@@ -41,7 +42,7 @@ Return ONLY a JSON object:
 - done: the task is finished. If someone OTHER than the sender did it (for example "Eliseo ya lo terminó", "lo hizo Abimael"), set done_by to that first name. If the sender did it, done_by is null.
 - accept: they will do it. still: they are still working on it. help: they cannot do it and need someone else.
 - note: they give information about the task but it is not finished (a delay, a missing part, a finding). Not for chit-chat.
-- report: they tell Lana something about the state of the hotel that guests or colleagues should know, with no task involved (for example "El cuarto 1 no cuenta con agua caliente", "the pool is closed", "no water in the garden"). Set subject (e.g. "Room 1") and fact (one short, neutral English sentence, no names). days_valid: how many days it is likely to stay true (1 to 14, default 3). permanent: true ONLY when they state a lasting fact about how the property is built or run (for example "el cuarto 1 no tiene agua caliente, así está construido", "there is no AC in room 4"), not a breakdown that will be repaired. For a permanent fact, write fact as a neutral sentence for the knowledge base.
+- report: they tell Lana something about the state of the hotel that guests or colleagues should know, with no task involved (for example "El cuarto 1 no cuenta con agua caliente", "the pool is closed", "no water in the garden"). Set subject (e.g. "Room 1") and fact (one short, neutral English sentence, no names). days_valid: how many days it is likely to stay true (1 to 14, default 3). permanent: true ONLY when they state a lasting fact about how the property is built or run (for example "el cuarto 1 no tiene agua caliente, así está construido", "there is no AC in room 4"), not a breakdown that will be repaired. For a permanent fact, write fact as a neutral sentence for the knowledge base. Any intent may also carry a lasting fact (for example a done message that says "el calentador del cuarto 3 es solar, no hay agua caliente de noche"): then set permanent true and fill subject and fact too.
 - fixed: they say a previously reported problem is solved (for example "ya hay agua caliente en el cuarto 1"). resolves: the numbers from the list of current reports that this clears.
 - unrelated: nothing to do with their tasks or the state of the hotel (guest-style chat, questions about booking...).
 - task_code: the 6-character code if they mention one, else pick the task from the list that the message is clearly about, else null.
@@ -120,7 +121,7 @@ export async function handleFreeTextReply(ctx: EngineContext, staff: StaffRow, t
       tenant_id: ctx.tenantId, staff_id: staff.id, task_id: null, direction: 'inbound', content: text, delivery_status: 'received',
     })
     if (result.intent === 'report' && result.fact && result.permanent) {
-      await addPermanentFact(ctx, result.subject, result.fact, staff.name)
+      await addPermanentFact(ctx.db, ctx.tenantId, result.subject, result.fact, staff.name)
     } else if (result.intent === 'report' && result.fact) {
       // A newer report on the same subject replaces the older one.
       if (result.subject) {
@@ -184,6 +185,7 @@ export async function handleFreeTextReply(ctx: EngineContext, staff: StaffRow, t
   } else {
     await logEvent(ctx, task.id, 'staff_note', detail, meta)
   }
+  if (result.permanent && result.fact) await addPermanentFact(ctx.db, ctx.tenantId, result.subject, result.fact, staff.name)
   await sendStaffText(ctx, staff, task.id, result.reply || `Anotado #${task.task_code}, gracias ${first}`)
   return true
 }
@@ -191,8 +193,8 @@ export async function handleFreeTextReply(ctx: EngineContext, staff: StaffRow, t
 const FACTS_HEADING = '# Team-confirmed facts'
 
 /** A lasting fact told by staff goes into the knowledge base itself, so it never expires. */
-async function addPermanentFact(ctx: EngineContext, subject: string | null, fact: string, reportedBy: string) {
-  const { data } = await ctx.db.from('tenants').select('knowledge_base').eq('id', ctx.tenantId).single()
+export async function addPermanentFact(db: SupabaseClient, tenantId: string, subject: string | null, fact: string, reportedBy: string) {
+  const { data } = await db.from('tenants').select('knowledge_base').eq('id', tenantId).single()
   const kb = ((data?.knowledge_base as string | null) ?? '').trimEnd()
   const line = `- ${subject ? `**${subject}**: ` : ''}${fact}`
   if (kb.includes(line)) return
@@ -203,8 +205,8 @@ async function addPermanentFact(ctx: EngineContext, subject: string | null, fact
     console.error('[maintenance-freetext] knowledge base is full, fact not saved')
     return
   }
-  await ctx.db.from('tenants').update({ knowledge_base: next }).eq('id', ctx.tenantId)
-  await ctx.db.from('lana_live_notes').insert({
-    tenant_id: ctx.tenantId, subject, note: fact, reported_by: reportedBy, resolved_at: new Date().toISOString(), resolved_by: 'saved to the knowledge base',
+  await db.from('tenants').update({ knowledge_base: next }).eq('id', tenantId)
+  await db.from('lana_live_notes').insert({
+    tenant_id: tenantId, subject, note: fact, reported_by: reportedBy, resolved_at: new Date().toISOString(), resolved_by: 'saved to the knowledge base',
   })
 }
