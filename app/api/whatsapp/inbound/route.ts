@@ -17,7 +17,7 @@ import { buildBookingLinkInstruction } from '@/lib/booking-link'
 import { buildKnowledgeBaseSection } from '@/lib/knowledge-base'
 import { buildLiveNotesSection } from '@/lib/live-notes'
 import { processMaintenanceButtonReply } from '@/lib/maintenance-reply'
-import { processEscalationReply } from '@/lib/escalation-replies'
+import { processEscalationReply, processPendingAnswer } from '@/lib/escalation-replies'
 import { alertAiOutage, detectLang, FALLBACK_TEXT, looksLikeBotLoop, markSilent } from '@/lib/lana-reliability'
 import { findGuestByPhone } from '@/lib/guest-records'
 
@@ -359,6 +359,7 @@ async function processInbound(msg: ExtractedMessage) {
     // 1) strict task answers (DONE, ACCEPT, #CODE...), 2) free-text answers to an escalation,
     // 3) free-text answers about tasks or the state of the hotel.
     if ((await processMaintenanceButtonReply(tenantId, from, msg.text, 'keyword')).handled) return
+    if ((await processPendingAnswer(tenantId, from, msg.text, { phoneNumberId, credentials })).handled) return
     if ((await processEscalationReply(tenantId, from, msg.text, { phoneNumberId, credentials })).handled) return
     if ((await processMaintenanceButtonReply(tenantId, from, msg.text, 'free')).handled) return
   }
