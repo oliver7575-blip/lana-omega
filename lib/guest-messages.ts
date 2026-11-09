@@ -60,21 +60,21 @@ export async function loadMessagingContext(tenantId: string): Promise<MessagingC
   }
 }
 
-async function alreadySent(tenantId: string, reservationID: string, type: string) {
-  const { data } = await createServiceClient()
+/** Reserves a send before it happens so two simultaneous triggers can't both send. False = someone else already has it. */
+async function claimSend(tenantId: string, reservationID: string, type: string): Promise<boolean> {
+  const { error } = await createServiceClient()
     .from('sent_reminders')
-    .select('id')
+    .insert({ tenant_id: tenantId, reservation_id: reservationID, message_type: type })
+  return !error
+}
+
+async function releaseSend(tenantId: string, reservationID: string, type: string) {
+  await createServiceClient()
+    .from('sent_reminders')
+    .delete()
     .eq('tenant_id', tenantId)
     .eq('reservation_id', reservationID)
     .eq('message_type', type)
-    .maybeSingle()
-  return Boolean(data)
-}
-
-async function markSent(tenantId: string, reservationID: string, type: string) {
-  await createServiceClient()
-    .from('sent_reminders')
-    .insert({ tenant_id: tenantId, reservation_id: reservationID, message_type: type })
 }
 
 export interface ChannelResult {
@@ -102,7 +102,7 @@ export async function sendGuestMessage(
   if (!ctx.whatsapp) whatsapp = { sent: false, skipped: 'WhatsApp not connected' }
   else if (!mapping) whatsapp = { sent: false, skipped: 'No WhatsApp template chosen for this message' }
   else if (!r.guestPhone || normalizePhone(r.guestPhone).length < 8) whatsapp = { sent: false, skipped: 'No phone number on the reservation' }
-  else if (await alreadySent(ctx.tenantId, r.reservationID, waType))
+  else if (!(await claimSend(ctx.tenantId, r.reservationID, waType)))
     whatsapp = { sent: false, skipped: 'Already sent' }
   else {
     const res = await sendMappedTemplate(
@@ -112,8 +112,8 @@ export async function sendGuestMessage(
       mapping,
       values
     )
+    if (!res.success) await releaseSend(ctx.tenantId, r.reservationID, waType)
     if (res.success) {
-      await markSent(ctx.tenantId, r.reservationID, waType)
       const text = ctx.whatsapp.wabaId
         ? await renderMappedTemplateText(ctx.whatsapp.wabaId, ctx.whatsapp.credentials, mapping, values)
         : null
@@ -135,7 +135,7 @@ export async function sendGuestMessage(
   if (!tpl?.enabled) email = { sent: false, skipped: 'Email turned off for this message' }
   else if (!tpl.subject?.trim() || !tpl.body_html?.trim()) email = { sent: false, skipped: 'Email template is empty' }
   else if (!r.guestEmail) email = { sent: false, skipped: 'No email on the reservation' }
-  else if (await alreadySent(ctx.tenantId, r.reservationID, emailType))
+  else if (!(await claimSend(ctx.tenantId, r.reservationID, emailType)))
     email = { sent: false, skipped: 'Already sent' }
   else {
     const res = await sendTenantEmail(
@@ -144,8 +144,8 @@ export async function sendGuestMessage(
       renderEmailTemplate(tpl.subject, values, false),
       renderEmailTemplate(tpl.body_html, values, true)
     )
+    if (!res.success) await releaseSend(ctx.tenantId, r.reservationID, emailType)
     if (res.success) {
-      await markSent(ctx.tenantId, r.reservationID, emailType)
       await recordInConversation(ctx, r, `[Email sent to ${r.guestEmail}: ${renderEmailTemplate(tpl.subject, values, false)}]`)
     }
     email = { sent: res.success, error: res.error }
