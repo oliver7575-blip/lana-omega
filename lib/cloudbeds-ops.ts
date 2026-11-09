@@ -729,6 +729,18 @@ export async function availability(cb: CB, start: string, end: string, adults: n
   return out.sort((a, b) => (a.total ?? 0) - (b.total ?? 0))
 }
 
+/**
+ * Cloudbeds (API v1.3) only accepts "s-{id}" for primary sources and "ss-{id}-0|1" for
+ * third-party ones. Older shapes ("12", "s-12-1") are converted; anything else is dropped
+ * so the booking falls back to the property's default source instead of failing.
+ */
+export function normalizeSourceId(raw: unknown): string | null {
+  const v = String(raw ?? '').trim()
+  if (/^s-\d+$/.test(v) || /^ss-\d+-[01]$/.test(v)) return v
+  const primary = v.match(/^s-(\d+)-\d$/) ?? v.match(/^(\d+)$/)
+  return primary ? `s-${primary[1]}` : null
+}
+
 /** Booking sources and payment methods set up in Cloudbeds. */
 export async function bookingOptions(cb: CB) {
   const [sources, payments] = await Promise.all([
@@ -737,9 +749,11 @@ export async function bookingOptions(cb: CB) {
   ])
   const pd = (payments.data ?? {}) as Json
   return {
-    sources: ((sources.data as Json[]) ?? [])
-      .filter((s) => !s.isThirdParty)
-      .map((s) => ({ id: String(s.sourceID), name: String(s.sourceName ?? '') })),
+    sources: (Array.isArray(sources.data) ? (sources.data as Json[]) : [])
+      .filter((s) => !s.isThirdParty && s.status !== false)
+      .map((s) => ({ id: normalizeSourceId(s.sourceID ?? s.id), name: String(s.sourceName ?? s.name ?? '').trim() }))
+      .filter((s): s is { id: string; name: string } => Boolean(s.id))
+      .map((s) => ({ ...s, name: s.name || s.id })),
     paymentMethods: ((pd.methods as Json[]) ?? []).map((m) => ({ code: String(m.method ?? m.code ?? ''), name: String(m.name ?? m.method ?? '') })),
   }
 }
@@ -783,7 +797,8 @@ export async function createReservation(cb: CB, r: NewReservation): Promise<stri
   }
   if (r.phone) f.guestPhone = r.phone
   if (r.arrivalTime) f.estimatedArrivalTime = r.arrivalTime
-  if (r.sourceID) f.sourceID = r.sourceID
+  const sourceID = normalizeSourceId(r.sourceID)
+  if (sourceID) f.sourceID = sourceID
   if (r.roomRateID) f['rooms[0][roomRateID]'] = r.roomRateID
   if (r.roomID) {
     f['rooms[0][roomID]'] = r.roomID
