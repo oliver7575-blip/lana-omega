@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
+import { processNewReservation } from '@/lib/new-reservation-notify'
 import { cloudbedsForCaller } from '@/lib/cloudbeds-caller'
 import { createReservation, listReservationsSummary, type NewReservation } from '@/lib/cloudbeds-ops'
 
@@ -52,6 +53,9 @@ export async function POST(request: Request) {
       paymentMethod: b.paymentMethod!,
       sendEmail: Boolean(b.sendEmail),
     })
+    // Cloudbeds doesn't reliably notify us about bookings made through its API, so
+    // send the welcome message ourselves (duplicates are skipped if the webhook also fires).
+    after(() => processNewReservation(c.tenantId, reservationID).catch((e) => console.error('[new-reservation] notify failed', e)))
     return NextResponse.json({ reservationID })
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Cloudbeds error' }, { status: 502 })
