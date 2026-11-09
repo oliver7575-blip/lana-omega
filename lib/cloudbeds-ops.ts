@@ -741,17 +741,35 @@ export function normalizeSourceId(raw: unknown): string | null {
   return primary ? `s-${primary[1]}` : null
 }
 
+/** Finds every source entry in a getSources response, whether it is a flat list or grouped (e.g. per property). */
+function collectSources(node: unknown, depth = 0): Json[] {
+  if (!node || depth > 4) return []
+  if (Array.isArray(node)) return node.flatMap((n) => collectSources(n, depth + 1))
+  if (typeof node === 'object') {
+    const o = node as Json
+    if ('sourceID' in o || 'sourceId' in o) return [o]
+    return Object.values(o).flatMap((v) => collectSources(v, depth + 1))
+  }
+  return []
+}
+
 /** Booking sources and payment methods set up in Cloudbeds. */
 export async function bookingOptions(cb: CB) {
+  let sourcesError: string | null = null
   const [sources, payments] = await Promise.all([
-    cbGet(cb, 'getSources', { propertyIDs: cb.propertyId }).catch(() => ({ data: [] })),
+    cbGet(cb, 'getSources', { propertyIDs: cb.propertyId }).catch((err) => {
+      sourcesError = err instanceof Error ? err.message : 'failed'
+      console.error('[cloudbeds] getSources failed', err)
+      return { data: [] } as Json
+    }),
     cbGet(cb, 'getPaymentMethods', { propertyID: cb.propertyId }).catch(() => ({ data: {} })),
   ])
   const pd = (payments.data ?? {}) as Json
   return {
-    sources: (Array.isArray(sources.data) ? (sources.data as Json[]) : [])
-      .filter((s) => !s.isThirdParty && s.status !== false)
-      .map((s) => ({ id: normalizeSourceId(s.sourceID ?? s.id), name: String(s.sourceName ?? s.name ?? '').trim() }))
+    sourcesError,
+    sources: collectSources(sources.data)
+      .filter((s) => !s.isThirdParty && s.status !== false && s.status !== 'false')
+      .map((s) => ({ id: normalizeSourceId(s.sourceID ?? s.sourceId), name: String(s.sourceName ?? s.name ?? '').trim() }))
       .filter((s): s is { id: string; name: string } => Boolean(s.id))
       .map((s) => ({ ...s, name: s.name || s.id })),
     paymentMethods: ((pd.methods as Json[]) ?? []).map((m) => ({ code: String(m.method ?? m.code ?? ''), name: String(m.name ?? m.method ?? '') })),

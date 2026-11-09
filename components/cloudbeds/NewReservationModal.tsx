@@ -15,6 +15,7 @@ interface RoomType {
 }
 interface Options {
   sources: { id: string; name: string }[]
+  sourcesError?: string | null
   paymentMethods: { code: string; name: string }[]
 }
 
@@ -200,6 +201,9 @@ export default function NewReservationModal({ today, onClose, onCreated }: {
                 {options?.sources.length === 0 && <option value="">Default</option>}
                 {options?.sources.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
+              {options && options.sources.length === 0 && options.sourcesError && (
+                <span className="mt-1 block text-[11px] text-amber-300">Couldn&apos;t load sources ({options.sourcesError}). Using the default.</span>
+              )}
             </label>
             <label><span className={label}>Payment method *</span>
               <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className={input} disabled={!options}>
