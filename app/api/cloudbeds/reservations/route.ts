@@ -57,7 +57,14 @@ export async function POST(request: Request) {
     })
     // Cloudbeds doesn't reliably notify us about bookings made through its API, so
     // send the welcome message ourselves (duplicates are skipped if the webhook also fires).
-    after(() => processNewReservation(c.tenantId, reservationID).catch((e) => console.error('[new-reservation] notify failed', e)))
+    after(async () => {
+      try {
+        const res = await processNewReservation(c.tenantId, reservationID)
+        console.log('[new-reservation] panel booking', reservationID, JSON.stringify({ step: res.step, ok: res.ok, detail: 'detail' in res ? res.detail : undefined }))
+      } catch (e) {
+        console.error('[new-reservation] notify failed', reservationID, e)
+      }
+    })
     return NextResponse.json({ reservationID, priceWarning })
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Cloudbeds error' }, { status: 502 })
