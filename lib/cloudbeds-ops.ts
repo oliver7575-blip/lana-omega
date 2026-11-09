@@ -793,10 +793,14 @@ export interface NewReservation {
   sourceID?: string
   paymentMethod: string
   sendEmail: boolean
+  /** Price the staff member wants for the whole stay, when it differs from the set price. */
+  customTotal?: number
+  /** The set price for the whole stay shown when the room was chosen. */
+  listTotal?: number
 }
 
 /** Creates the reservation in Cloudbeds and returns its reservation ID. */
-export async function createReservation(cb: CB, r: NewReservation): Promise<string> {
+export async function createReservation(cb: CB, r: NewReservation): Promise<{ id: string; priceWarning?: string }> {
   const f: Record<string, string> = {
     startDate: r.startDate,
     endDate: r.endDate,
@@ -826,5 +830,23 @@ export async function createReservation(cb: CB, r: NewReservation): Promise<stri
   const json = await cbPost(cb, 'postReservation', f)
   const id = (json.reservationID ?? (json.data as Json | undefined)?.reservationID) as string | undefined
   if (!id) throw new Error('Cloudbeds did not return a reservation number')
-  return String(id)
+  const out: { id: string; priceWarning?: string } = { id: String(id) }
+
+  // Cloudbeds books at the set rate; a different price is applied as a rate adjustment (new total minus set total).
+  if (r.customTotal != null && r.listTotal != null) {
+    const delta = Math.round((r.customTotal - r.listTotal) * 100) / 100
+    if (Math.abs(delta) >= 0.01) {
+      try {
+        await cbPost(cb, 'postAdjustment', {
+          reservationID: out.id,
+          type: 'rate',
+          amount: String(delta),
+          notes: `Price set when booking: MXN ${r.customTotal} (set price MXN ${r.listTotal})`,
+        })
+      } catch (err) {
+        out.priceWarning = `The reservation was created at the set price, but the custom price could not be applied (${err instanceof Error ? err.message : 'Cloudbeds error'}). Please adjust it in Cloudbeds.`
+      }
+    }
+  }
+  return out
 }

@@ -35,7 +35,7 @@ export async function POST(request: Request) {
   if (problems.length) return NextResponse.json({ error: `Please add ${problems.join(', ')}.` }, { status: 400 })
 
   try {
-    const reservationID = await createReservation(c.cb, {
+    const { id: reservationID, priceWarning } = await createReservation(c.cb, {
       startDate: b.startDate!,
       endDate: b.endDate!,
       adults: Math.max(1, Number(b.adults) || 1),
@@ -52,11 +52,13 @@ export async function POST(request: Request) {
       sourceID: b.sourceID || undefined,
       paymentMethod: b.paymentMethod!,
       sendEmail: Boolean(b.sendEmail),
+      customTotal: Number.isFinite(Number(b.customTotal)) && b.customTotal != null && Number(b.customTotal) >= 0 ? Number(b.customTotal) : undefined,
+      listTotal: Number.isFinite(Number(b.listTotal)) && b.listTotal != null ? Number(b.listTotal) : undefined,
     })
     // Cloudbeds doesn't reliably notify us about bookings made through its API, so
     // send the welcome message ourselves (duplicates are skipped if the webhook also fires).
     after(() => processNewReservation(c.tenantId, reservationID).catch((e) => console.error('[new-reservation] notify failed', e)))
-    return NextResponse.json({ reservationID })
+    return NextResponse.json({ reservationID, priceWarning })
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Cloudbeds error' }, { status: 502 })
   }

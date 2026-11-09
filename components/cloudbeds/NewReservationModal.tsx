@@ -54,6 +54,7 @@ export default function NewReservationModal({ today, onClose, onCreated }: {
   const [sourceID, setSourceID] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('')
   const [sendEmail, setSendEmail] = useState(true)
+  const [nightly, setNightly] = useState('')
 
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -80,6 +81,7 @@ export default function NewReservationModal({ today, onClose, onCreated }: {
     setRooms(null)
     setRoomTypeID('')
     setRoomID('')
+    setNightly('')
   }, [start, end, adults, children])
 
   async function check() {
@@ -96,17 +98,25 @@ export default function NewReservationModal({ today, onClose, onCreated }: {
   }
 
   const chosen = rooms?.find((r) => r.roomTypeID === roomTypeID)
+  const nightCount = nights(start, end)
+  const setPerNight = chosen && chosen.total !== null && nightCount > 0 ? chosen.total / nightCount : null
+  const nightlyNum = nightly.trim() === '' ? null : Number(nightly)
+  const nightlyValid = nightlyNum === null || (Number.isFinite(nightlyNum) && nightlyNum >= 0)
+  const customTotal = nightlyNum !== null && nightlyValid && setPerNight !== null ? Math.round(nightlyNum * nightCount * 100) / 100 : undefined
+  const effectiveTotal = customTotal ?? chosen?.total ?? null
 
   async function create() {
     setError(null)
     setSaving(true)
     try {
-      const j = await cbApi<{ reservationID: string }>('/api/cloudbeds/reservations', 'POST', {
+      const j = await cbApi<{ reservationID: string; priceWarning?: string }>('/api/cloudbeds/reservations', 'POST', {
         startDate: start, endDate: end, adults, children,
         roomTypeID, roomID: roomID || undefined, roomRateID: chosen?.roomRateID ?? undefined,
         firstName, lastName, email, phone, country, arrivalTime: arrivalTime || undefined,
         sourceID: sourceID || undefined, paymentMethod, sendEmail,
+        customTotal, listTotal: customTotal !== undefined ? chosen?.total ?? undefined : undefined,
       })
+      if (j.priceWarning) window.alert(j.priceWarning)
       onCreated(j.reservationID)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not create the reservation')
@@ -118,7 +128,7 @@ export default function NewReservationModal({ today, onClose, onCreated }: {
   const label = 'mb-0.5 block text-[11px] font-semibold uppercase tracking-wide text-gray-600'
   const section = 'mb-1.5 mt-4 text-[13px] font-semibold text-[#14213d]'
   const n = nights(start, end)
-  const canCreate = Boolean(chosen && firstName.trim() && lastName.trim() && email.trim() && country && paymentMethod && !saving)
+  const canCreate = Boolean(chosen && firstName.trim() && lastName.trim() && email.trim() && country && paymentMethod && nightlyValid && !saving)
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-10" onClick={onClose}>
@@ -213,6 +223,13 @@ export default function NewReservationModal({ today, onClose, onCreated }: {
               </select>
             </label>
           </div>
+          {chosen && (
+            <label className="mt-3 block"><span className={label}>Price per night (MXN)</span>
+              <input type="number" min="0" step="1" inputMode="decimal" value={nightly} onChange={(e) => setNightly(e.target.value)}
+                placeholder={setPerNight !== null ? `Set price: ${Math.round(setPerNight).toLocaleString('en-US')}` : 'Set price'} className={input} />
+              <span className="mt-0.5 block text-[11px] text-gray-500">Leave empty to use the set price.</span>
+            </label>
+          )}
           <label className="mt-2 flex items-center gap-2 text-[12.5px]">
             <input type="checkbox" checked={sendEmail} onChange={(e) => setSendEmail(e.target.checked)} />
             Send Cloudbeds confirmation email to the guest
@@ -223,7 +240,7 @@ export default function NewReservationModal({ today, onClose, onCreated }: {
 
         <div className="flex items-center justify-between gap-3 border-t border-gray-200 px-5 py-3">
           <span className="text-[12.5px] text-gray-600">
-            {chosen ? <>Total <b className="text-[#14213d]">{chosen.total !== null ? `MXN ${Math.round(chosen.total).toLocaleString('en-US')}` : '—'}</b> · {n} night{n === 1 ? '' : 's'}</> : 'Check availability and choose a room'}
+            {chosen ? <>Total <b className="text-[#14213d]">{effectiveTotal !== null ? `MXN ${Math.round(effectiveTotal).toLocaleString('en-US')}` : '—'}</b> · {n} night{n === 1 ? '' : 's'}</> : 'Check availability and choose a room'}
           </span>
           <div className="flex gap-2">
             <button onClick={onClose} className="rounded-md border border-gray-300 px-3 py-1.5 text-[12.5px] font-semibold hover:bg-gray-50">Cancel</button>
