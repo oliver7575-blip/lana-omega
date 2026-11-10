@@ -832,7 +832,7 @@ export async function createReservation(cb: CB, r: NewReservation): Promise<{ id
   if (!id) throw new Error('Cloudbeds did not return a reservation number')
   const out: { id: string; priceWarning?: string } = { id: String(id) }
 
-  // Cloudbeds books at the set rate; a different price is applied as a rate adjustment (new total minus set total).
+  // Cloudbeds books at the set rate; a different price is applied as a rate adjustment (Cloudbeds subtracts the amount, so we send set total minus new total).
   if (r.customTotal != null && r.listTotal != null) {
     const delta = Math.round((r.customTotal - r.listTotal) * 100) / 100
     if (Math.abs(delta) >= 0.01) {
@@ -840,7 +840,8 @@ export async function createReservation(cb: CB, r: NewReservation): Promise<{ id
         await cbPost(cb, 'postAdjustment', {
           reservationID: out.id,
           type: 'rate',
-          amount: String(delta),
+          // Cloudbeds treats a positive adjustment amount as a reduction of the rate, so the sign is flipped.
+          amount: String(-delta),
           notes: `Price set when booking: MXN ${r.customTotal} (set price MXN ${r.listTotal})`,
         })
         // Read the reservation back so a wrong total is noticed instead of silently left in Cloudbeds.
