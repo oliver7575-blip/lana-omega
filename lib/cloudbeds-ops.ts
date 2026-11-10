@@ -832,7 +832,7 @@ export async function createReservation(cb: CB, r: NewReservation): Promise<{ id
   if (!id) throw new Error('Cloudbeds did not return a reservation number')
   const out: { id: string; priceWarning?: string } = { id: String(id) }
 
-  // Cloudbeds books at the set rate; a different price is applied as a rate adjustment (new total minus set total).
+  // Cloudbeds books at the set rate; a different price is applied as a rate adjustment (Cloudbeds subtracts the amount, so we send set total minus new total).
   if (r.customTotal != null && r.listTotal != null) {
     const delta = Math.round((r.customTotal - r.listTotal) * 100) / 100
     if (Math.abs(delta) >= 0.01) {
@@ -840,9 +840,20 @@ export async function createReservation(cb: CB, r: NewReservation): Promise<{ id
         await cbPost(cb, 'postAdjustment', {
           reservationID: out.id,
           type: 'rate',
-          amount: String(delta),
+          // Cloudbeds treats a positive adjustment amount as a reduction of the rate, so the sign is flipped.
+          amount: String(-delta),
           notes: `Price set when booking: MXN ${r.customTotal} (set price MXN ${r.listTotal})`,
         })
+        // Read the reservation back so a wrong total is noticed instead of silently left in Cloudbeds.
+        try {
+          const actual = (await getReservationDetail(cb, out.id)).total
+          console.log('[cloudbeds] custom price', JSON.stringify({ reservationID: out.id, listTotal: r.listTotal, customTotal: r.customTotal, delta, actualTotal: actual }))
+          if (actual != null && Math.abs(actual - r.customTotal) > 1) {
+            out.priceWarning = `Cloudbeds shows a total of ${Math.round(actual).toLocaleString('en-US')} for this reservation, but you asked for ${Math.round(r.customTotal).toLocaleString('en-US')}. Please check it in Cloudbeds.`
+          }
+        } catch {
+          // Reading back is best-effort.
+        }
       } catch (err) {
         out.priceWarning = `The reservation was created at the set price, but the custom price could not be applied (${err instanceof Error ? err.message : 'Cloudbeds error'}). Please adjust it in Cloudbeds.`
       }
