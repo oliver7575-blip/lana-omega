@@ -843,6 +843,16 @@ export async function createReservation(cb: CB, r: NewReservation): Promise<{ id
           amount: String(delta),
           notes: `Price set when booking: MXN ${r.customTotal} (set price MXN ${r.listTotal})`,
         })
+        // Read the reservation back so a wrong total is noticed instead of silently left in Cloudbeds.
+        try {
+          const actual = (await getReservationDetail(cb, out.id)).total
+          console.log('[cloudbeds] custom price', JSON.stringify({ reservationID: out.id, listTotal: r.listTotal, customTotal: r.customTotal, delta, actualTotal: actual }))
+          if (actual != null && Math.abs(actual - r.customTotal) > 1) {
+            out.priceWarning = `Cloudbeds shows a total of ${Math.round(actual).toLocaleString('en-US')} for this reservation, but you asked for ${Math.round(r.customTotal).toLocaleString('en-US')}. Please check it in Cloudbeds.`
+          }
+        } catch {
+          // Reading back is best-effort.
+        }
       } catch (err) {
         out.priceWarning = `The reservation was created at the set price, but the custom price could not be applied (${err instanceof Error ? err.message : 'Cloudbeds error'}). Please adjust it in Cloudbeds.`
       }
