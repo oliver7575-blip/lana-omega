@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import ReservationModal from '@/components/cloudbeds/ReservationModal'
+import NewReservationModal from '@/components/cloudbeds/NewReservationModal'
 import SearchBar from '@/components/cloudbeds/SearchBar'
 import { cbApi, statusColor } from '@/components/cloudbeds/shared'
 
@@ -95,6 +96,9 @@ export default function CalendarPage() {
   const [menu, setMenu] = useState<{ x: number; y: number; reservationID: string; guestName: string; status: string; roomID: string | null } | null>(null)
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null)
   const [busy, setBusy] = useState(false)
+  // Click-to-book: first click picks the check-in day, second click the check-out day.
+  const [pick, setPick] = useState<{ roomID: string; roomTypeID: string; start: string; hover: string | null } | null>(null)
+  const [creating, setCreating] = useState<{ start: string; end: string; roomTypeID?: string; roomID?: string } | 'blank' | null>(null)
   const scroller = useRef<HTMLDivElement>(null)
   const pendingShift = useRef(0) // columns added on the left, to keep the view still
   const scrollToDay = useRef<string | null>(null)
@@ -210,6 +214,27 @@ export default function CalendarPage() {
     }
   }, [menu])
 
+  useEffect(() => {
+    if (!pick) return
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setPick(null)
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [pick])
+
+  function clickDay(room: { id: string }, roomTypeID: string, day: string) {
+    if (!data || day < data.today) return
+    if (!pick || pick.roomID !== room.id) {
+      setPick({ roomID: room.id, roomTypeID, start: day, hover: null })
+      return
+    }
+    let s = pick.start
+    let e = day
+    if (e < s) [s, e] = [e, s]
+    if (e === s) e = addDays(s, 1)
+    setPick(null)
+    setCreating({ start: s, end: e, roomTypeID, roomID: room.id })
+  }
+
   async function runAction(action: string, m: NonNullable<typeof menu>) {
     setMenu(null)
     if (action === 'cancel') {
@@ -308,7 +333,7 @@ export default function CalendarPage() {
           <div>
             <Link href="/cloudbeds" className="text-xs font-semibold text-[#3b6fe0] hover:underline">← Activity</Link>
             <h1 className="text-lg font-semibold leading-tight">Reservation calendar</h1>
-            <p className="text-[11px] text-gray-600">{roomCount} rooms · live assignments from Cloudbeds · scroll sideways to move through time · right-click a reservation for actions</p>
+            <p className="text-[11px] text-gray-600">{roomCount} rooms · live assignments from Cloudbeds · scroll sideways to move through time · right-click a reservation for actions · click two days in a room row to book</p>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="mr-1 flex items-center gap-1.5 text-xs text-gray-600"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Updates automatically</span>
@@ -322,8 +347,10 @@ export default function CalendarPage() {
           <SearchBar onOpen={setOpen} />
           <div className="flex items-center gap-2 text-xs">
             {data && (
-              <a href={data.links.newReservation} target="_blank" rel="noreferrer" title="New reservation"
-                className="flex h-7 w-7 items-center justify-center rounded-full bg-[#3b6fe0] text-base text-white hover:bg-[#2f5fcc]">+</a>
+              <button onClick={() => setCreating('blank')}
+                className="rounded-full bg-[#5cc3a5] px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-white hover:bg-[#4bb294]">
+                Create new reservation
+              </button>
             )}
             <span className="text-gray-700">Go to date</span>
             <input type="date" value={goTo} onChange={(e) => setGoTo(e.target.value)}
@@ -332,6 +359,12 @@ export default function CalendarPage() {
           </div>
         </div>
 
+        {pick && (
+          <p className="mb-2 rounded-md bg-[#e6f6f0] px-3 py-1.5 text-xs text-[#1d6b52]">
+            Check-in {pick.start}. Now click the check-out day in the same room row (Esc to cancel).
+            <button onClick={() => setPick(null)} className="ml-2 font-semibold underline">Cancel</button>
+          </p>
+        )}
         {error && <p className="mb-2 rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>}
         {!data && !error && <p className="py-10 text-center text-sm text-gray-500">Loading the calendar…</p>}
 
@@ -425,11 +458,19 @@ export default function CalendarPage() {
                             {room.name}
                           </div>
                           <div className="relative flex" style={{ height: ROW_H }}>
-                            {data.days.map((d) => (
-                              <div key={d}
-                                className={`border-r border-gray-100 ${new Date(`${d}T12:00:00Z`).getUTCDate() === 1 ? 'border-l-2 border-l-gray-300' : ''} ${d === data.today ? 'border-x border-x-[#8ec3ee] bg-[#e4f1fc]' : ''}`}
-                                style={{ width: dayW, minWidth: dayW }} />
-                            ))}
+                            {data.days.map((d) => {
+                              const canPick = !isUnassigned && d >= data.today
+                              const inRange = pick && pick.roomID === room.id && pick.hover !== null
+                                ? d >= (pick.hover < pick.start ? pick.hover : pick.start) && d <= (pick.hover < pick.start ? pick.start : pick.hover)
+                                : pick?.roomID === room.id && d === pick.start
+                              return (
+                                <div key={d}
+                                  onClick={canPick ? () => clickDay(room, t.id, d) : undefined}
+                                  onMouseEnter={pick && pick.roomID === room.id ? () => setPick((p) => (p ? { ...p, hover: d } : p)) : undefined}
+                                  className={`border-r border-gray-100 ${canPick ? 'cursor-pointer hover:bg-[#e6f6f0]' : ''} ${new Date(`${d}T12:00:00Z`).getUTCDate() === 1 ? 'border-l-2 border-l-gray-300' : ''} ${inRange ? 'bg-[#bfe7d8]' : d === data.today ? 'border-x border-x-[#8ec3ee] bg-[#e4f1fc]' : ''}`}
+                                  style={{ width: dayW, minWidth: dayW }} />
+                              )
+                            })}
                             {blocks.map((b, i) => (
                               <Bar key={`b${i}`} start={b.start} end={addDays(b.end, 1)} viewStart={data.start} totalDays={totalDays} label={b.reason} color="#d9433f" title={`Blocked: ${b.reason}`} dayW={dayW} />
                             ))}
@@ -498,6 +539,19 @@ export default function CalendarPage() {
           <span>{toast.text}</span>
           <button onClick={() => setToast(null)} className="opacity-70 hover:opacity-100">×</button>
         </div>
+      )}
+
+      {creating && data && (
+        <NewReservationModal
+          today={data.today}
+          initial={creating === 'blank' ? undefined : creating}
+          onClose={() => setCreating(null)}
+          onCreated={(id) => {
+            setCreating(null)
+            setToast({ ok: true, text: `Reservation #${id} created.` })
+            refreshVisible()
+          }}
+        />
       )}
 
       {open && data && <ReservationModal id={open} today={data.today} onClose={() => setOpen(null)} onChanged={refreshVisible} />}

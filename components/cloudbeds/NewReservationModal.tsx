@@ -29,13 +29,15 @@ function addDays(d: string, n: number) {
 }
 const nights = (a: string, b: string) => Math.max(0, Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86400000))
 
-export default function NewReservationModal({ today, onClose, onCreated }: {
+export default function NewReservationModal({ today, onClose, onCreated, initial }: {
   today: string
   onClose: () => void
   onCreated: (reservationID: string) => void
+  /** Dates (and optionally the room) picked on the calendar: availability is checked straight away. */
+  initial?: { start: string; end: string; roomTypeID?: string; roomID?: string }
 }) {
-  const [start, setStart] = useState(today)
-  const [end, setEnd] = useState(addDays(today, 1))
+  const [start, setStart] = useState(initial?.start ?? today)
+  const [end, setEnd] = useState(initial?.end ?? addDays(today, 1))
   const [adults, setAdults] = useState(2)
   const [children, setChildren] = useState(0)
   const [rooms, setRooms] = useState<RoomType[] | null>(null)
@@ -83,6 +85,26 @@ export default function NewReservationModal({ today, onClose, onCreated }: {
     setRoomID('')
     setNightly('')
   }, [start, end, adults, children])
+
+  // Opened from the calendar with dates picked: check availability and pre-select the clicked room.
+  useEffect(() => {
+    if (!initial) return
+    let alive = true
+    setChecking(true)
+    cbApi<{ roomTypes: RoomType[] }>(`/api/cloudbeds/availability?start=${initial.start}&end=${initial.end}&adults=2&children=0`)
+      .then((j) => {
+        if (!alive) return
+        setRooms(j.roomTypes)
+        const t = j.roomTypes.find((x) => x.roomTypeID === initial.roomTypeID) ?? (j.roomTypes.length === 1 ? j.roomTypes[0] : undefined)
+        if (t) {
+          setRoomTypeID(t.roomTypeID)
+          if (initial.roomID && t.rooms.some((r) => r.roomID === initial.roomID)) setRoomID(initial.roomID)
+        }
+      })
+      .catch((e) => alive && setError(e instanceof Error ? e.message : 'Could not check availability'))
+      .finally(() => alive && setChecking(false))
+    return () => { alive = false }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function check() {
     setError(null)
