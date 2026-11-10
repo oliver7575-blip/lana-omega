@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
+import { processNewReservation } from '@/lib/new-reservation-notify'
 import { cloudbedsForCaller } from '@/lib/cloudbeds-caller'
 import { createReservation, listReservationsSummary, type NewReservation } from '@/lib/cloudbeds-ops'
 
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
   if (problems.length) return NextResponse.json({ error: `Please add ${problems.join(', ')}.` }, { status: 400 })
 
   try {
-    const reservationID = await createReservation(c.cb, {
+    const { id: reservationID, priceWarning } = await createReservation(c.cb, {
       startDate: b.startDate!,
       endDate: b.endDate!,
       adults: Math.max(1, Number(b.adults) || 1),
@@ -51,8 +52,20 @@ export async function POST(request: Request) {
       sourceID: b.sourceID || undefined,
       paymentMethod: b.paymentMethod!,
       sendEmail: Boolean(b.sendEmail),
+      customTotal: Number.isFinite(Number(b.customTotal)) && b.customTotal != null && Number(b.customTotal) >= 0 ? Number(b.customTotal) : undefined,
+      listTotal: Number.isFinite(Number(b.listTotal)) && b.listTotal != null ? Number(b.listTotal) : undefined,
     })
-    return NextResponse.json({ reservationID })
+    // Cloudbeds doesn't reliably notify us about bookings made through its API, so
+    // send the welcome message ourselves (duplicates are skipped if the webhook also fires).
+    after(async () => {
+      try {
+        const res = await processNewReservation(c.tenantId, reservationID)
+        console.log('[new-reservation] panel booking', reservationID, JSON.stringify({ step: res.step, ok: res.ok, detail: 'detail' in res ? res.detail : undefined }))
+      } catch (e) {
+        console.error('[new-reservation] notify failed', reservationID, e)
+      }
+    })
+    return NextResponse.json({ reservationID, priceWarning })
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Cloudbeds error' }, { status: 502 })
   }

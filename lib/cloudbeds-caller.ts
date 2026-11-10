@@ -4,7 +4,7 @@ import { decryptCredentials } from './crypto'
 import type { CB } from './cloudbeds-ops'
 
 /** Cloudbeds access for the signed-in staff member's hotel. */
-export async function cloudbedsForCaller(): Promise<{ cb: CB; tz: string } | { error: NextResponse }> {
+export async function cloudbedsForCaller(): Promise<{ cb: CB; tz: string; tenantId: string } | { error: NextResponse }> {
   const supabase = await createClient()
   const {
     data: { user },
@@ -22,5 +22,5 @@ export async function cloudbedsForCaller(): Promise<{ cb: CB; tz: string } | { e
     return { error: NextResponse.json({ error: 'Cloudbeds is not connected — connect it under Integrations.' }, { status: 400 }) }
   }
   const { api_key } = decryptCredentials<{ api_key: string }>(integration.credentials)
-  return { cb: { apiKey: api_key, propertyId }, tz: (tenant?.timezone as string) || 'America/Mexico_City' }
+  return { tenantId: staff.tenant_id as string, cb: { apiKey: api_key, propertyId }, tz: (tenant?.timezone as string) || 'America/Mexico_City' }
 }

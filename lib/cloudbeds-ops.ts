@@ -729,17 +729,49 @@ export async function availability(cb: CB, start: string, end: string, adults: n
   return out.sort((a, b) => (a.total ?? 0) - (b.total ?? 0))
 }
 
+/**
+ * Cloudbeds (API v1.3) only accepts "s-{id}" for primary sources and "ss-{id}-0|1" for
+ * third-party ones. Older shapes ("12", "s-12-1") are converted; anything else is dropped
+ * so the booking falls back to the property's default source instead of failing.
+ */
+export function normalizeSourceId(raw: unknown): string | null {
+  const v = String(raw ?? '').trim()
+  if (/^s-\d+$/.test(v) || /^ss-\d+-[01]$/.test(v)) return v
+  const primary = v.match(/^s-(\d+)-\d$/) ?? v.match(/^(\d+)$/)
+  return primary ? `s-${primary[1]}` : null
+}
+
+/** Finds every source entry in a getSources response, whether it is a flat list or grouped (e.g. per property). */
+function collectSources(node: unknown, depth = 0): Json[] {
+  if (!node || depth > 4) return []
+  if (Array.isArray(node)) return node.flatMap((n) => collectSources(n, depth + 1))
+  if (typeof node === 'object') {
+    const o = node as Json
+    if ('sourceID' in o || 'sourceId' in o) return [o]
+    return Object.values(o).flatMap((v) => collectSources(v, depth + 1))
+  }
+  return []
+}
+
 /** Booking sources and payment methods set up in Cloudbeds. */
 export async function bookingOptions(cb: CB) {
+  let sourcesError: string | null = null
   const [sources, payments] = await Promise.all([
-    cbGet(cb, 'getSources', { propertyIDs: cb.propertyId }).catch(() => ({ data: [] })),
+    cbGet(cb, 'getSources', { propertyIDs: cb.propertyId }).catch((err) => {
+      sourcesError = err instanceof Error ? err.message : 'failed'
+      console.error('[cloudbeds] getSources failed', err)
+      return { data: [] } as Json
+    }),
     cbGet(cb, 'getPaymentMethods', { propertyID: cb.propertyId }).catch(() => ({ data: {} })),
   ])
   const pd = (payments.data ?? {}) as Json
   return {
-    sources: ((sources.data as Json[]) ?? [])
-      .filter((s) => !s.isThirdParty)
-      .map((s) => ({ id: String(s.sourceID), name: String(s.sourceName ?? '') })),
+    sourcesError,
+    sources: collectSources(sources.data)
+      .filter((s) => !s.isThirdParty && s.status !== false && s.status !== 'false')
+      .map((s) => ({ id: normalizeSourceId(s.sourceID ?? s.sourceId), name: String(s.sourceName ?? s.name ?? '').trim() }))
+      .filter((s): s is { id: string; name: string } => Boolean(s.id))
+      .map((s) => ({ ...s, name: s.name || s.id })),
     paymentMethods: ((pd.methods as Json[]) ?? []).map((m) => ({ code: String(m.method ?? m.code ?? ''), name: String(m.name ?? m.method ?? '') })),
   }
 }
@@ -761,10 +793,14 @@ export interface NewReservation {
   sourceID?: string
   paymentMethod: string
   sendEmail: boolean
+  /** Price the staff member wants for the whole stay, when it differs from the set price. */
+  customTotal?: number
+  /** The set price for the whole stay shown when the room was chosen. */
+  listTotal?: number
 }
 
 /** Creates the reservation in Cloudbeds and returns its reservation ID. */
-export async function createReservation(cb: CB, r: NewReservation): Promise<string> {
+export async function createReservation(cb: CB, r: NewReservation): Promise<{ id: string; priceWarning?: string }> {
   const f: Record<string, string> = {
     startDate: r.startDate,
     endDate: r.endDate,
@@ -783,7 +819,8 @@ export async function createReservation(cb: CB, r: NewReservation): Promise<stri
   }
   if (r.phone) f.guestPhone = r.phone
   if (r.arrivalTime) f.estimatedArrivalTime = r.arrivalTime
-  if (r.sourceID) f.sourceID = r.sourceID
+  const sourceID = normalizeSourceId(r.sourceID)
+  if (sourceID) f.sourceID = sourceID
   if (r.roomRateID) f['rooms[0][roomRateID]'] = r.roomRateID
   if (r.roomID) {
     f['rooms[0][roomID]'] = r.roomID
@@ -793,5 +830,23 @@ export async function createReservation(cb: CB, r: NewReservation): Promise<stri
   const json = await cbPost(cb, 'postReservation', f)
   const id = (json.reservationID ?? (json.data as Json | undefined)?.reservationID) as string | undefined
   if (!id) throw new Error('Cloudbeds did not return a reservation number')
-  return String(id)
+  const out: { id: string; priceWarning?: string } = { id: String(id) }
+
+  // Cloudbeds books at the set rate; a different price is applied as a rate adjustment (new total minus set total).
+  if (r.customTotal != null && r.listTotal != null) {
+    const delta = Math.round((r.customTotal - r.listTotal) * 100) / 100
+    if (Math.abs(delta) >= 0.01) {
+      try {
+        await cbPost(cb, 'postAdjustment', {
+          reservationID: out.id,
+          type: 'rate',
+          amount: String(delta),
+          notes: `Price set when booking: MXN ${r.customTotal} (set price MXN ${r.listTotal})`,
+        })
+      } catch (err) {
+        out.priceWarning = `The reservation was created at the set price, but the custom price could not be applied (${err instanceof Error ? err.message : 'Cloudbeds error'}). Please adjust it in Cloudbeds.`
+      }
+    }
+  }
+  return out
 }
