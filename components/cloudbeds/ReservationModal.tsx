@@ -114,6 +114,15 @@ interface PaymentLinkResult {
 
 interface Note { author: string; date: string; text: string }
 
+/** Booking source pill: Booking.com blue, Airbnb pink, walk-in light green, anything else light grey. */
+function sourceStyle(source: string): React.CSSProperties {
+  const s = source.toLowerCase()
+  if (s.includes('booking.com')) return { background: '#e3edff', borderColor: '#b9cffa', color: '#1d4ed8' }
+  if (s.includes('airbnb')) return { background: '#ffe4ea', borderColor: '#fbb6c4', color: '#d6335a' }
+  if (s.includes('walk')) return { background: '#e4f6ee', borderColor: '#bfe6d6', color: '#0e6b4a' }
+  return { background: '#f1f3f6', borderColor: '#dde1e8', color: '#4a5262' }
+}
+
 export default function ReservationModal({ id, today, onClose, onChanged, onCheckedOut, onBalance }: {
   id: string
   today: string
@@ -435,7 +444,9 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
               </div>
               <div>
                 <p className={label}>Source</p>
-                <p>{r.source ?? '—'}</p>
+                {r.source ? (
+                  <span className="mt-0.5 inline-block rounded-full border px-2.5 py-px" style={sourceStyle(r.source)}>{r.source}</span>
+                ) : <p>—</p>}
                 {r.confirmationCode && <p className="break-all text-gray-500">{r.confirmationCode}</p>}
               </div>
               <div><p className={label}>Booked on</p><p>{r.dateCreated ? r.dateCreated.slice(0, 10) : '—'}</p></div>
