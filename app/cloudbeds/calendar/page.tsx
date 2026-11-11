@@ -112,6 +112,7 @@ export default function CalendarPage() {
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [openBlock, setOpenBlock] = useState<Block | null>(null)
+  const [hoverDay, setHoverDay] = useState<string | null>(null) // column under the pointer
   // Click-to-book: first click picks the check-in day, second click the check-out day.
   const [pick, setPick] = useState<{ roomID: string; roomTypeID: string; start: string; hover: string | null } | null>(null)
   const [creating, setCreating] = useState<{ start: string; end: string; roomTypeID?: string; roomID?: string } | 'blank' | 'block' | null>(null)
@@ -391,7 +392,7 @@ export default function CalendarPage() {
         {!data && !error && <p className="py-10 text-center text-sm text-gray-500">Loading the calendar…</p>}
 
         {data && (
-          <div ref={scroller} onScroll={onScroll} className="relative overflow-x-auto rounded-2xl border border-gray-200 bg-white shadow-[0_1px_2px_rgba(20,33,61,.04)]">
+          <div ref={scroller} onScroll={onScroll} onMouseLeave={() => setHoverDay(null)} className="relative overflow-x-auto rounded-2xl border border-gray-200 bg-white shadow-[0_1px_2px_rgba(20,33,61,.04)]">
             {loading && (
               <div className={`pointer-events-none sticky top-0 z-30 ${loading === 'past' ? 'left-0' : 'left-0'} h-0`}>
                 <span className="absolute left-2 top-1 rounded bg-white/90 px-2 py-0.5 text-[10px] text-gray-500 shadow">Loading {loading === 'past' ? 'earlier' : 'later'} days…</span>
@@ -427,7 +428,7 @@ export default function CalendarPage() {
                   const isToday = d === data.today
                   return (
                     <div key={d}
-                      className={`flex flex-col items-center justify-center border-r text-center leading-tight border-gray-200 ${dt.getUTCDate() === 1 ? 'border-l-2 border-l-gray-300' : ''} ${isToday ? 'bg-[#eefaf5] text-[#1f7d60]' : ''}`}
+                      className={`flex flex-col items-center justify-center border-r text-center leading-tight border-gray-200 ${d === hoverDay ? 'bg-[#dbe8f7]' : ''} ${dt.getUTCDate() === 1 ? 'border-l-2 border-l-gray-300' : ''} ${isToday ? 'bg-[#eefaf5] text-[#1f7d60]' : ''}`}
                       style={{ width: dayW, minWidth: dayW, height: DAY_ROW_H }}>
                       <span className="text-[10px] font-medium text-gray-500">{dt.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })}</span>
                       <span className={`mt-0.5 flex h-6 min-w-6 items-center justify-center rounded-full text-[12.5px] font-semibold ${isToday ? 'bg-[#1f9d78] text-white' : ''}`}>{dt.getUTCDate()}</span>
@@ -474,7 +475,7 @@ export default function CalendarPage() {
                       const stays = isUnassigned ? unassigned.map((u) => ({ ...u, roomID: room.id })) : data.bookings.filter((b) => b.roomID === room.id)
                       const blocks = data.blocks.filter((b) => b.roomID === room.id)
                       return (
-                        <div key={room.id} className="group flex border-t border-gray-200 hover:bg-[#f4f8fb]">
+                        <div key={room.id} className="group flex border-t border-[#d5dae4] hover:bg-[#f4f8fb]">
                           <div className={`sticky left-0 z-10 border-r-2 border-gray-200 bg-white px-2.5 text-[11px] font-semibold group-hover:bg-[#f4f8fb] ${isUnassigned ? 'italic text-amber-700' : ''}`}
                             style={{ width: LEFT_W, minWidth: LEFT_W, height: ROW_H, lineHeight: `${ROW_H}px` }}>
                             {room.name}
@@ -485,14 +486,23 @@ export default function CalendarPage() {
                               const inRange = pick && pick.roomID === room.id && pick.hover !== null
                                 ? d >= (pick.hover < pick.start ? pick.hover : pick.start) && d <= (pick.hover < pick.start ? pick.start : pick.hover)
                                 : pick?.roomID === room.id && d === pick.start
+                              const dow = new Date(`${d}T12:00:00Z`).getUTCDay()
+                              const bg = inRange ? 'bg-[#bfe7d8]' : d === hoverDay ? 'bg-[#e8f1fb]' : d === data.today ? 'bg-[#f1fbf7]' : dow === 0 || dow === 6 ? 'bg-[#f6f7fa]' : ''
                               return (
                                 <div key={d}
                                   onClick={canPick ? () => clickDay(room, t.id, d) : undefined}
-                                  onMouseEnter={pick && pick.roomID === room.id ? () => setPick((p) => (p ? { ...p, hover: d } : p)) : undefined}
-                                  className={`border-r ${new Date(`${d}T12:00:00Z`).getUTCDay() === 1 ? 'border-r-gray-200' : 'border-r-gray-200/70'} ${[0, 6].includes(new Date(`${d}T12:00:00Z`).getUTCDay()) && d !== data.today && !inRange ? 'bg-[#f8f9fb]' : ''} ${canPick ? 'cursor-pointer hover:bg-[#e6f6f0]' : ''} ${new Date(`${d}T12:00:00Z`).getUTCDate() === 1 ? 'border-l-2 border-l-gray-300' : ''} ${inRange ? 'bg-[#bfe7d8]' : d === data.today ? 'bg-[#f1fbf7]' : ''}`}
+                                  onMouseEnter={() => {
+                                    setHoverDay(d)
+                                    if (pick && pick.roomID === room.id) setPick((p) => (p ? { ...p, hover: d } : p))
+                                  }}
+                                  className={`${canPick ? 'cursor-pointer hover:bg-[#d9f0e6]' : ''} ${bg}`}
                                   style={{ width: dayW, minWidth: dayW }} />
                               )
                             })}
+                            <div className="pointer-events-none absolute inset-0" style={{
+                              backgroundImage: 'linear-gradient(to left, #cfd5e0 1px, transparent 1px)',
+                              backgroundSize: `${dayW}px 100%`,
+                            }} />
                             {blocks.map((b, i) => {
                               const service = b.type === 'out_of_service' || /service|servicio|mainten|repair|mantenim|reparaci/i.test(b.reason)
                               return (
