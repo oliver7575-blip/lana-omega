@@ -5,6 +5,13 @@ import ReservationModal from './ReservationModal'
 import RoomCell from './RoomCell'
 import { cbApi, longDate, mxn, nights, statusLabel, type ReservationSummary } from './shared'
 
+// One colour per booking day (same day = same colour, neighbouring days differ) so the cutoff between days stands out.
+const DAY_COLORS = ['text-red-500', 'text-sky-500', 'text-emerald-500', 'text-amber-500', 'text-violet-400', 'text-pink-500', 'text-teal-400']
+function dayColor(day: string): string {
+  const n = Math.floor(Date.parse(`${day}T12:00:00Z`) / 86_400_000)
+  return Number.isFinite(n) ? DAY_COLORS[((n % DAY_COLORS.length) + DAY_COLORS.length) % DAY_COLORS.length] : 'text-red-500'
+}
+
 export default function ReservationsList() {
   const [rows, setRows] = useState<ReservationSummary[]>([])
   const [page, setPage] = useState(1)
@@ -76,7 +83,7 @@ export default function ReservationsList() {
                 <tr key={r.reservationID} onClick={() => setOpen(r.reservationID)}
                   className="cursor-pointer border-b border-line text-sm text-navy last:border-b-0 hover:bg-white/[0.03]">
                   <td className="px-4 py-3 font-medium text-clay sm:px-5">{r.guestName || '—'}</td>
-                  <td className="whitespace-nowrap px-4 py-3 font-medium text-red-600 sm:px-5">{r.bookedOn ? longDate(r.bookedOn) : '—'}</td>
+                  <td className={`whitespace-nowrap px-4 py-3 font-medium ${r.bookedOn ? dayColor(r.bookedOn) : ''} sm:px-5`}>{r.bookedOn ? longDate(r.bookedOn) : '—'}</td>
                   <td className="whitespace-nowrap px-4 py-3 sm:px-5">{longDate(r.startDate)}</td>
                   <td className="whitespace-nowrap px-4 py-3 sm:px-5">{longDate(r.endDate)}</td>
                   <td className="px-4 py-3 sm:px-5">{nights(r.startDate, r.endDate) ?? '—'}</td>
