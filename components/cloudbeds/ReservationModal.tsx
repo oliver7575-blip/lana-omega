@@ -105,6 +105,14 @@ const HELLO_REASONS: Record<'es' | 'en', { label: string; text: string }[]> = {
 
 const SIGNATURE_SUGGESTION = 'Oliver\nSoirée · Zipolite, Oaxaca\nsoiree.mx'
 
+interface PaymentLinkResult {
+  url: string
+  amount: number
+  reused: boolean
+  email: { status: 'sent' | 'skipped' | 'failed'; detail: string }
+  whatsapp: { status: 'sent' | 'skipped' | 'failed'; detail: string }
+}
+
 interface Note { author: string; date: string; text: string }
 
 export default function ReservationModal({ id, today, onClose, onChanged }: {
@@ -117,6 +125,10 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
   const [link, setLink] = useState('')
   const [notes, setNotes] = useState<Note[]>([])
   // Quick message bubble opened from the phone number (WhatsApp) or the email address.
+  const [payBusy, setPayBusy] = useState(false)
+  const [pay, setPay] = useState<PaymentLinkResult | null>(null)
+  const [payError, setPayError] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
   const [quick, setQuick] = useState<'whatsapp' | 'email' | null>(null)
   const [quickText, setQuickText] = useState('')
   const [quickSubject, setQuickSubject] = useState('')
@@ -178,6 +190,32 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
       .then((j) => setGuestProfile(j.profile))
       .catch((e) => setGuestError(e instanceof Error ? e.message : 'Could not load guest details'))
       .finally(() => setGuestLoading(false))
+  }
+
+  async function createPaymentLinkNow() {
+    setPayBusy(true)
+    setPayError(null)
+    setPay(null)
+    setCopied(false)
+    try {
+      setPay(await cbApi<PaymentLinkResult>(`/api/cloudbeds/reservation/${id}/payment-link`, 'POST', {}))
+    } catch (e) {
+      setPayError(e instanceof Error ? e.message : 'Could not create the payment link')
+    }
+    setPayBusy(false)
+  }
+
+  async function copyPaymentLink() {
+    if (!pay) return
+    try {
+      await navigator.clipboard.writeText(pay.url)
+    } catch {
+      const el = document.getElementById('pay-link-input') as HTMLInputElement | null
+      el?.select()
+      document.execCommand('copy')
+    }
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   function openQuick(kind: 'whatsapp' | 'email') {
@@ -361,17 +399,44 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
                     Check in
                   </button>
                 )}
-                {link && (
-                  <a href={link} target="_blank" rel="noreferrer"
-                    className="rounded-full border border-gray-300 px-4 py-1.5 text-sm font-semibold text-[#14213d] hover:bg-gray-50">
-                    Reservation details
-                  </a>
-                )}
+                <button disabled={payBusy} onClick={createPaymentLinkNow}
+                  className="rounded-full border border-gray-300 px-4 py-1.5 text-sm font-semibold text-[#14213d] hover:bg-gray-50 disabled:opacity-60">
+                  {payBusy ? 'Creating…' : 'Create Payment Link'}
+                </button>
                 <button disabled={messagesBusy} onClick={goToMessages}
                   className="rounded-full border border-gray-300 px-4 py-1.5 text-sm font-semibold text-[#14213d] hover:bg-gray-50 disabled:opacity-60">
                   {messagesBusy ? 'Opening…' : 'Messages'}
                 </button>
               </div>
+
+              {(pay || payError) && (
+                <div className="mt-4 rounded-xl border border-[#c9d6f5] bg-[#f3f6fe] p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-sm font-semibold">{pay ? `Payment link · MXN ${pay.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Payment link'}</p>
+                    <button onClick={() => { setPay(null); setPayError(null) }} className="text-lg leading-none text-gray-500 hover:text-gray-800" aria-label="Close">×</button>
+                  </div>
+                  {payError && <p className="text-sm text-red-600">{payError}</p>}
+                  {pay && (
+                    <>
+                      <div className="flex gap-2">
+                        <input id="pay-link-input" readOnly value={pay.url} onFocus={(e) => e.currentTarget.select()}
+                          className="min-w-0 flex-1 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-xs outline-none" />
+                        <button onClick={copyPaymentLink} className="rounded-md bg-[#1b2340] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#2a3560]">
+                          {copied ? 'Copied ✓' : 'Copy link'}
+                        </button>
+                      </div>
+                      <ul className="mt-2 space-y-0.5 text-xs">
+                        {([['Email', pay.email], ['WhatsApp', pay.whatsapp]] as const).map(([k, s]) => (
+                          <li key={k} className={s.status === 'sent' ? 'text-emerald-700' : s.status === 'failed' ? 'text-red-600' : 'text-gray-500'}>
+                            <b>{k}:</b> {s.status === 'sent' ? '✓ ' : s.status === 'failed' ? '✗ ' : '– '}{s.detail}
+                          </li>
+                        ))}
+                      </ul>
+                      {pay.reused && <p className="mt-1 text-[11px] text-gray-500">A link for this balance already existed, so it was sent again.</p>}
+                    </>
+                  )}
+                </div>
+              )}
 
               {quick && (
                 <div className="mt-4 rounded-xl border border-[#b7e0d8] bg-[#f0faf7] p-3">
