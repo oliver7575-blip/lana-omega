@@ -474,8 +474,6 @@ export default function CalendarPage() {
           {([['Confirmed', BAR.confirmed.bg, BAR.confirmed.border], ['Not confirmed', BAR.not_confirmed.bg, BAR.not_confirmed.border], ['Checked in', BAR.checked_in.bg, BAR.checked_in.border], ['Checked out', BAR.checked_out.bg, BAR.checked_out.border], ['Blocked', HATCH_BLOCK, '#c5cad4'], ['Out of service', HATCH_SERVICE, '#efc47a']] as const).map(([l, bg, bd]) => (
             <span key={l} className="flex items-center gap-1.5"><i className="h-3 w-3 rounded border" style={{ background: bg, borderColor: bd }} />{l}</span>
           ))}
-          <span className="flex-1" />
-          <span>Click a start and an end day on a room to book or block · right-click a reservation for actions · click a date to mark its whole column</span>
         </div>
 
         {pick && (
