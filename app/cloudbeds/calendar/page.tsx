@@ -8,8 +8,8 @@ import BlockModal from '@/components/cloudbeds/BlockModal'
 import SearchBar from '@/components/cloudbeds/SearchBar'
 import { cbApi } from '@/components/cloudbeds/shared'
 
-interface Booking { reservationID: string; guestName: string; status: string; roomID: string; start: string; end: string; due?: boolean }
-interface Unassigned { reservationID: string; guestName: string; roomTypeID: string; start: string; end: string; status: string; due?: boolean }
+interface Booking { reservationID: string; guestName: string; status: string; roomID: string; start: string; end: string; due?: boolean; src?: string }
+interface Unassigned { reservationID: string; guestName: string; roomTypeID: string; start: string; end: string; status: string; due?: boolean; src?: string }
 interface Block { roomBlockID: string; type: string; roomID: string; start: string; end: string; reason: string }
 interface RoomType { id: string; name: string; rates: Record<string, number>; rateID?: string; rooms: { id: string; name: string }[] }
 interface Chunk {
@@ -78,9 +78,20 @@ function mergeChunk(prev: Chunk | null, next: Chunk, from: string, to: string): 
   }
 }
 
-function Bar({ start, end, viewStart, totalDays, label, bg, border, text, onClick, onContextMenu, title, dayW, due }: {
+/** Small source badge shown after the guest name: Booking.com, Airbnb, walk-in, website/direct. */
+function sourceBadge(src?: string): { t: string; bg: string; name: string } | null {
+  const s = (src ?? '').toLowerCase()
+  if (!s) return null
+  if (s.includes('booking.com')) return { t: 'B.', bg: '#0b4aa8', name: 'Booking.com' }
+  if (s.includes('airbnb')) return { t: 'A', bg: '#ff5a7a', name: 'Airbnb' }
+  if (s.includes('walk')) return { t: 'W', bg: '#2f9e6b', name: 'Walk-in' }
+  if (s.includes('website') || s.includes('direct') || s.includes('engine') || s.includes('soiree') || s.includes('soirée')) return { t: '@', bg: '#7a54d6', name: 'Website' }
+  return null
+}
+
+function Bar({ start, end, viewStart, totalDays, label, bg, border, text, onClick, onContextMenu, title, dayW, due, src }: {
   start: string; end: string; viewStart: string; totalDays: number; label: string; bg: string; border: string; text: string; onClick?: () => void
-  onContextMenu?: (e: React.MouseEvent) => void; title?: string; dayW: number; due?: boolean
+  onContextMenu?: (e: React.MouseEvent) => void; title?: string; dayW: number; due?: boolean; src?: string
 }) {
   const from = diff(viewStart, start) + 0.5
   const to = diff(viewStart, end) + 0.5
@@ -97,6 +108,10 @@ function Bar({ start, end, viewStart, totalDays, label, bg, border, text, onClic
     >
       {due && <i aria-label="Balance due" className="absolute left-[3px] top-[3px] h-[6px] w-[6px] rounded-full bg-[#e5484d]" />}
       <span className="truncate">{label}</span>
+      {(() => {
+        const b = sourceBadge(src)
+        return b ? <i title={b.name} className="ml-1.5 inline-flex h-[15px] min-w-[15px] shrink-0 items-center justify-center rounded-[4px] px-0.5 text-[9px] font-bold not-italic leading-none text-white" style={{ background: b.bg }}>{b.t}</i> : null
+      })()}
     </button>
   )
 }
@@ -648,7 +663,7 @@ export default function CalendarPage() {
                             })}
                             {stays.map((s) => (
                               <Bar key={`${s.reservationID}-${s.start}`} start={s.start} end={s.end} viewStart={data.start} totalDays={totalDays}
-                                label={s.guestName} due={dueOf(s.reservationID, s.due)} bg={barColors(s.status).bg} border={barColors(s.status).border} text={barColors(s.status).text} onClick={() => setOpen(s.reservationID)} dayW={dayW}
+                                label={s.guestName} due={dueOf(s.reservationID, s.due)} src={s.src} bg={barColors(s.status).bg} border={barColors(s.status).border} text={barColors(s.status).text} onClick={() => setOpen(s.reservationID)} dayW={dayW}
                                 onContextMenu={(e) => {
                                   e.preventDefault()
                                   e.stopPropagation()

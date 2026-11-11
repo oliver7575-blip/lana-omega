@@ -495,8 +495,10 @@ export interface CalendarData {
     end: string
     /** The reservation still has money owing. */
     due?: boolean
+    /** Booking source name as Cloudbeds reports it. */
+    src?: string
   }[]
-  unassigned: { reservationID: string; guestName: string; roomTypeID: string; start: string; end: string; status: string; due?: boolean }[]
+  unassigned: { reservationID: string; guestName: string; roomTypeID: string; start: string; end: string; status: string; due?: boolean; src?: string }[]
   blocks: { roomBlockID: string; type: string; roomID: string; start: string; end: string; reason: string }[]
   overbookings: { roomID: string; reservationIDs: string[] }[]
 }
@@ -555,13 +557,14 @@ export async function calendar(cb: CB, start: string, dayCount: number): Promise
   for (const r of reservations) {
     if (!ACTIVE(r.status)) continue
     const due = Number(r.balance ?? 0) > 0.005
+    const src = String(r.sourceName ?? r.source ?? '')
     for (const room of (r.rooms as Json[]) ?? []) {
       const s = String(room.roomCheckIn ?? r.startDate)
       const e = String(room.roomCheckOut ?? r.endDate)
       if (room.roomID) {
-        bookings.push({ reservationID: String(r.reservationID), guestName: String(room.guestName ?? r.guestName ?? ''), status: stayStatus(room.roomStatus, r.status), roomID: String(room.roomID), start: s, end: e, due })
+        bookings.push({ reservationID: String(r.reservationID), guestName: String(room.guestName ?? r.guestName ?? ''), status: stayStatus(room.roomStatus, r.status), roomID: String(room.roomID), start: s, end: e, due, src })
       } else {
-        unassigned.push({ reservationID: String(r.reservationID), guestName: String(r.guestName ?? ''), roomTypeID: String(room.roomTypeID ?? ''), start: s, end: e, status: String(r.status), due })
+        unassigned.push({ reservationID: String(r.reservationID), guestName: String(r.guestName ?? ''), roomTypeID: String(room.roomTypeID ?? ''), start: s, end: e, status: String(r.status), due, src })
       }
     }
   }
