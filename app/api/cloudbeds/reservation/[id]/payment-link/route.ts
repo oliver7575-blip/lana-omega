@@ -99,11 +99,11 @@ export async function POST(_r: Request, { params }: { params: Promise<{ id: stri
       if (!wa) {
         out.whatsapp = { status: 'failed', detail: 'WhatsApp integration not fully configured' }
       } else {
-        // Same wording and look as Lana's own payment message.
+        // Lana's payment wording, plus who we are and which reservation: the guest didn't ask for this link in a chat.
         const short = `${amount.toLocaleString('en-US', { minimumFractionDigits: Number.isInteger(amount) ? 0 : 2, maximumFractionDigits: 2 })} MXN`
         const body = es
-          ? `Aquí está tu link de pago seguro por **${short}** 🌴 Es válido por ${hours} horas, y ingresarás los datos de tu tarjeta solo en esa página segura.`
-          : `Here's your secure payment link for **${short}** 🌴 It's valid for ${hours} hours, and you'll enter your card details only on that secure page.`
+          ? `Hola${first ? ` ${first}` : ''}, te escribimos de Soirée, en Zipolite 🌴 Aquí está tu link de pago seguro por **${short}** para tu reservación #${id}. Es válido por ${hours} horas, y ingresarás los datos de tu tarjeta solo en esa página segura.`
+          : `Hi${first ? ` ${first}` : ''}, this is Soirée in Zipolite 🌴 Here's your secure payment link for **${short}** for your reservation #${id}. It's valid for ${hours} hours, and you'll enter your card details only on that secure page.`
         const res = await sendWhatsAppInteractiveButton(wa.phoneNumberId, wa.credentials, phone, body, url, es ? 'Pagar ahora' : 'Pay now')
         out.whatsapp = res.success ? { status: 'sent', detail: `Sent to ${phone}` } : { status: 'failed', detail: res.error ?? 'WhatsApp did not deliver it' }
         if (res.success) await record(`${body}\n[Payment button]`)
