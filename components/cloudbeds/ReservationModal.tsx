@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { cbApi, statusColor, statusLabel } from './shared'
 
 type Json = Record<string, unknown>
@@ -151,8 +150,7 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
   const [guestProfile, setGuestProfile] = useState<Json | null>(null)
   const [guestError, setGuestError] = useState<string | null>(null)
   const [guestLoading, setGuestLoading] = useState(false)
-  const [messagesBusy, setMessagesBusy] = useState(false)
-  const router = useRouter()
+  const [confirmCancel, setConfirmCancel] = useState(false)
 
   function apply(d: Detail) {
     setR(d)
@@ -304,20 +302,14 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
     setQuickBusy(false)
   }
 
-  async function goToMessages() {
-    setMessagesBusy(true)
-    setError(null)
-    try {
-      const j = await cbApi<{ conversationId: string }>(`/api/cloudbeds/reservation/${id}/conversation`)
-      onClose()
-      router.push(`/conversations/${j.conversationId}`)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not open this guest’s messages')
-      setMessagesBusy(false)
-    }
+  async function cancelReservation() {
+    await act({ action: 'cancel' }, 'Reservation canceled.')
+    setConfirmCancel(false)
   }
 
   const color = statusColor(r?.status ?? '')
+  const canCancel = r && !['canceled', 'cancelled', 'checked_out', 'no_show'].includes(r.status)
+  const isThirdParty = Boolean(r && (r.confirmationCode || /booking\.com|airbnb|expedia|agoda|vrbo|homeaway|hostelworld|tripadvisor|trip\.com|despegar|hotels\.com|google|kayak|trivago/i.test(r.source ?? '')))
   const canCheckIn = r && ['confirmed', 'not_confirmed'].includes(r.status) && r.startDate <= today
   const label = 'text-sm font-semibold text-[#14213d]'
 
@@ -404,11 +396,36 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
                   className="rounded-full border border-gray-300 px-4 py-1.5 text-sm font-semibold text-[#14213d] hover:bg-gray-50 disabled:opacity-60">
                   {payBusy ? 'Creating…' : 'Create Payment Link'}
                 </button>
-                <button disabled={messagesBusy} onClick={goToMessages}
-                  className="rounded-full border border-gray-300 px-4 py-1.5 text-sm font-semibold text-[#14213d] hover:bg-gray-50 disabled:opacity-60">
-                  {messagesBusy ? 'Opening…' : 'Messages'}
-                </button>
+                {canCancel && (
+                  <button disabled={busy} onClick={() => setConfirmCancel(true)}
+                    className="rounded-full border border-red-300 px-4 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60">
+                    Cancel Reservation
+                  </button>
+                )}
               </div>
+
+              {confirmCancel && (
+                <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3">
+                  <p className="text-sm font-semibold text-red-800">Are you sure you want to cancel this reservation?</p>
+                  <p className="mt-1 text-sm text-red-900">
+                    {r.guestName} · {r.startDate} – {r.endDate} · #{id}
+                  </p>
+                  <p className={`mt-2 rounded-md px-3 py-2 text-sm ${isThirdParty ? 'bg-amber-100 font-semibold text-amber-900' : 'bg-white text-gray-700'}`}>
+                    {isThirdParty ? 'This is an OTA / third-party booking' + (r.source ? ` (${r.source})` : '') + '. ' : ''}
+                    Reservations made through an OTA or other third party (Airbnb, Booking.com, Expedia…) must also be cancelled directly with them. Cancelling here does not cancel it on their platform.
+                  </p>
+                  <div className="mt-3 flex gap-2">
+                    <button disabled={busy} onClick={cancelReservation}
+                      className="rounded-full bg-red-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60">
+                      {busy ? 'Cancelling…' : 'Yes, cancel reservation'}
+                    </button>
+                    <button disabled={busy} onClick={() => setConfirmCancel(false)}
+                      className="rounded-full border border-gray-300 bg-white px-4 py-1.5 text-sm font-semibold text-[#14213d] hover:bg-gray-50">
+                      Keep reservation
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {(pay || payError) && (
                 <div className="mt-4 rounded-xl border border-[#c9d6f5] bg-[#f3f6fe] p-3">
