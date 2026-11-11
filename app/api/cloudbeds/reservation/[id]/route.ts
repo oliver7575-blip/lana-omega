@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { cloudbedsForCaller } from '@/lib/cloudbeds-caller'
-import { assignRoom, checkIn, cloudbedsLinks, getReservationDetail, getReservationNotes, setArrivalTime, setStatus, setStayDates, unassignRoom } from '@/lib/cloudbeds-ops'
+import { assignRoom, checkIn, cloudbedsLinks, getGuestProfile, getReservationDetail, getReservationGuestContact, getReservationNotes, setArrivalTime, setStatus, setStayDates, unassignRoom } from '@/lib/cloudbeds-ops'
 
 export const maxDuration = 60
 
@@ -13,6 +13,33 @@ export async function GET(_r: Request, { params }: { params: Promise<{ id: strin
       getReservationDetail(c.cb, id),
       getReservationNotes(c.cb, id).catch(() => []),
     ])
+    // getReservation doesn't carry the guest's phone/email for this account; the list endpoint with guest details does.
+    if (!reservation.guestPhone || !reservation.guestEmail) {
+      try {
+        const contact = await getReservationGuestContact(c.cb, id)
+        reservation.guestPhone ??= contact.phone
+        reservation.guestEmail ??= contact.email
+      } catch {
+        // Best-effort: the window still works without it.
+      }
+    }
+    if (reservation.guestID && (!reservation.guestPhone || !reservation.guestEmail || !reservation.guestCountry)) {
+      try {
+        const p = await getGuestProfile(c.cb, reservation.guestID)
+        const pick = (...keys: string[]) => {
+          for (const k of keys) {
+            const v = p[k]
+            if (typeof v === 'string' && v.trim()) return v.trim()
+          }
+          return null
+        }
+        reservation.guestPhone ??= pick('guestCellPhone', 'guestPhone', 'cellPhone', 'phone', 'guestHomePhone', 'homePhone')
+        reservation.guestEmail ??= pick('guestEmail', 'email')
+        reservation.guestCountry ??= pick('guestCountry', 'country')
+      } catch {
+        // Best-effort.
+      }
+    }
     return NextResponse.json({ reservation, notes, link: cloudbedsLinks(c.cb.propertyId).reservation(id) })
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Cloudbeds error' }, { status: 502 })
