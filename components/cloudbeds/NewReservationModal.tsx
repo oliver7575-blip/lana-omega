@@ -208,12 +208,12 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
             <label className="col-span-1"><span className={label}>Check-out</span>
               <input type="date" value={end} min={addDays(start, 1)} onChange={(e) => setEnd(e.target.value)} className={input} />
             </label>
-            <label><span className={label}>Adults</span>
+            {!blocking && <label><span className={label}>Adults</span>
               <input type="number" min={1} max={12} value={adults} onChange={(e) => setAdults(Math.max(1, Number(e.target.value) || 1))} className={input} />
-            </label>
-            <label><span className={label}>Children</span>
+            </label>}
+            {!blocking && <label><span className={label}>Children</span>
               <input type="number" min={0} max={12} value={children} onChange={(e) => setChildren(Math.max(0, Number(e.target.value) || 0))} className={input} />
-            </label>
+            </label>}
           </div>
           <div className="mt-2 flex items-center justify-between">
             <span className="text-[12px] text-gray-600">{n} night{n === 1 ? '' : 's'}</span>
@@ -252,6 +252,11 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
 
           {blocking && (
             <div className="mt-3 space-y-2">
+              {initial?.roomID && roomID ? (
+                <p className="text-[12.5px] text-gray-600">
+                  Room <b className="text-[#14213d]">{blockGroups?.find((g) => g.rooms.some((r) => r.id === roomID))?.typeName}{blockGroups ? ' · ' : ''}{blockGroups?.flatMap((g) => g.rooms).find((r) => r.id === roomID)?.name}</b>
+                </p>
+              ) : (
               <label className="block"><span className={label}>Room to block *</span>
                 <select value={roomID} onChange={(e) => setRoomID(e.target.value)} className={input} disabled={!blockGroups}>
                   <option value="">{blockGroups ? 'Select a room' : 'Loading rooms…'}</option>
@@ -262,6 +267,7 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
                   ))}
                 </select>
               </label>
+              )}
               <div className="grid grid-cols-2 gap-2">
                 <label><span className={label}>Type</span>
                   <select value={blockType} onChange={(e) => setBlockType(e.target.value as 'blocked_dates' | 'out_of_service')} className={input}>
