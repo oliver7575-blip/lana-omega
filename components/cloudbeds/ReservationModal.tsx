@@ -72,6 +72,7 @@ interface Detail {
   dateCreated: string | null
   confirmationCode: string | null
   specialRequests: string | null
+  breakdown: { subTotal: number | null; additionalItems: number | null; taxesFees: number | null; paid: number | null }
 }
 
 interface Note { author: string; date: string; text: string }
@@ -186,8 +187,26 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
               <div><p className={label}>Check-in / Out</p><p>{r.startDate} – {r.endDate}</p></div>
               <div><p className={label}>Guests</p><p>{r.adults + r.children}</p></div>
               <div><p className={label}>Room</p><p>{r.rooms.map((x) => x.roomName ?? `${x.roomTypeName} (unassigned)`).join(', ') || '—'}</p></div>
-              <div><p className={label}>Grand Total</p><p>MXN {r.total?.toLocaleString('en-US') ?? '—'}</p></div>
-              <div><p className={label}>Paid</p><p>MXN {r.total !== null && r.balance !== null ? (r.total - r.balance).toLocaleString('en-US') : '—'}</p></div>
+              <div>
+                <p className={label}>Price</p>
+                {(() => {
+                  const m = (n: number | null) => `MXN ${n === null ? '—' : n.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
+                  const b = r.breakdown
+                  const paid = b.paid ?? (r.total !== null && r.balance !== null ? r.total - r.balance : null)
+                  const line = (k: string, v: string, strong = false) => (
+                    <p className={`flex justify-between gap-2 ${strong ? 'mt-1 border-t border-gray-200 pt-1 font-semibold' : ''}`}><span className={strong ? '' : 'text-gray-500'}>{k}</span><span>{v}</span></p>
+                  )
+                  return (
+                    <div className="mt-0.5">
+                      {b.subTotal !== null && line('Room', m(b.subTotal))}
+                      {b.additionalItems !== null && b.additionalItems !== 0 && line('Extras', m(b.additionalItems))}
+                      {b.taxesFees !== null && line('Taxes & fees', m(b.taxesFees))}
+                      {line('Grand total', m(r.total), true)}
+                      {line('Paid', m(paid))}
+                    </div>
+                  )
+                })()}
+              </div>
               <div>
                 <p className={label}>Balance Due</p>
                 <p className={r.balance && r.balance > 0 ? 'text-red-600' : ''}>MXN {r.balance?.toLocaleString('en-US') ?? '—'}</p>

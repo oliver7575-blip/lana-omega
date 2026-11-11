@@ -125,6 +125,8 @@ export interface ReservationDetail {
   confirmationCode: string | null
   /** Free-text the guest sent with the booking, if any. */
   specialRequests: string | null
+  /** Cloudbeds' own split of the total: room subtotal, extras, taxes & fees, paid. */
+  breakdown: { subTotal: number | null; additionalItems: number | null; taxesFees: number | null; paid: number | null }
 }
 
 export interface ReservationNote { author: string; date: string; text: string }
@@ -187,6 +189,11 @@ export async function getReservationDetail(cb: CB, reservationID: string): Promi
     dateCreated: text(d.dateCreated),
     confirmationCode: text(d.thirdPartyIdentifier),
     specialRequests: text(d.specialRequests) ?? text(d.guestSpecialRequests),
+    breakdown: (() => {
+      const b = (d.balanceDetailed ?? {}) as Json
+      const num = (v: unknown) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v))
+      return { subTotal: num(b.subTotal), additionalItems: num(b.additionalItems), taxesFees: num(b.taxesFees), paid: num(b.paid) }
+    })(),
     status: String(d.status ?? ''),
     source: (d.source as string) ?? null,
     startDate: String(d.startDate ?? ''),
