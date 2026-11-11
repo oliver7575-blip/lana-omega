@@ -385,20 +385,20 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
               </div>
             </div>
             <div className="px-6 py-5">
-              <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-4">
+              <div className="flex flex-nowrap gap-1.5 border-b border-gray-200 pb-4">
                 {canCheckIn && (
                   <button disabled={busy} onClick={() => act({ action: 'check_in' }, 'Checked in.')}
-                    className="rounded-full bg-[#3b6fe0] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#2f5fcc] disabled:opacity-60">
+                    className="rounded-full bg-[#3b6fe0] whitespace-nowrap px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#2f5fcc] disabled:opacity-60">
                     Check in
                   </button>
                 )}
                 <button disabled={payBusy} onClick={createPaymentLinkNow}
-                  className="rounded-full border border-gray-300 px-4 py-1.5 text-sm font-semibold text-[#14213d] hover:bg-gray-50 disabled:opacity-60">
+                  className="rounded-full border border-gray-300 whitespace-nowrap px-3 py-1.5 text-xs font-semibold text-[#14213d] hover:bg-gray-50 disabled:opacity-60">
                   {payBusy ? 'Creating…' : 'Create Payment Link'}
                 </button>
                 {canCancel && (
                   <button disabled={busy} onClick={() => setConfirmCancel(true)}
-                    className="rounded-full border border-red-300 px-4 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60">
+                    className="rounded-full border border-red-300 whitespace-nowrap px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60">
                     Cancel Reservation
                   </button>
                 )}
