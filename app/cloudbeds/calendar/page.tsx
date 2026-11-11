@@ -124,7 +124,7 @@ export default function CalendarPage() {
   const [goTo, setGoTo] = useState('')
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [open, setOpen] = useState<string | null>(null)
-  const [dayW, setDayW] = useState(44)
+  const [dayW, setDayW] = useState(0) // 0 until the screen width is measured
   const [span, setSpan] = useState<number>(DEFAULT_SPAN) // days shown at once: 7, 14, 21 or 30
   useEffect(() => {
     try { const v = Number(localStorage.getItem('calendarSpan')); if (SPANS.some((x) => x.days === v)) setSpan(v) } catch { /* ignore */ }
@@ -188,7 +188,7 @@ export default function CalendarPage() {
   useEffect(() => { reset() }, [reset])
 
   // Days size themselves so about three weeks fit on screen.
-  useEffect(() => {
+  useLayoutEffect(() => {
     const measure = () => {
       const w = scroller.current?.clientWidth ?? 0
       if (w) setDayW(Math.max(MIN_DAY_W, Math.floor((w - LEFT_W) / span)))
@@ -201,7 +201,7 @@ export default function CalendarPage() {
   // Keep the view steady when days are added on the left, and jump to requested days.
   useLayoutEffect(() => {
     const el = scroller.current
-    if (!el || !data) return
+    if (!el || !data || !dayW) return // wait for the first measurement so today lands in the right column
     if (pendingShift.current) {
       el.scrollLeft += pendingShift.current * dayW
       pendingShift.current = 0
@@ -284,7 +284,7 @@ export default function CalendarPage() {
   const refreshVisible = useCallback(async () => {
     const el = scroller.current
     const cur = dataRef.current
-    if (!el || !cur) return
+    if (!el || !cur || !dayW) return
     const firstIdx = Math.max(0, Math.floor(el.scrollLeft / dayW) - 7)
     const start = cur.days[Math.min(firstIdx, cur.days.length - 1)]
     const days = Math.min(span + 14, 62)
@@ -385,7 +385,7 @@ export default function CalendarPage() {
     if (days === span) return
     const el = scroller.current
     const cur = dataRef.current
-    if (el && cur) scrollToDay.current = cur.days[Math.min(cur.days.length - 1, Math.max(0, Math.floor(el.scrollLeft / dayW)))]
+    if (el && cur && dayW) scrollToDay.current = cur.days[Math.min(cur.days.length - 1, Math.max(0, Math.floor(el.scrollLeft / dayW)))]
     try { localStorage.setItem('calendarSpan', String(days)) } catch { /* ignore */ }
     setSpan(days)
   }
