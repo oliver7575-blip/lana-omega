@@ -19,6 +19,8 @@ export interface ReservationSummary {
   reservationID: string
   guestID: string | null
   guestName: string
+  /** Day the reservation was made (YYYY-MM-DD), '' when unknown. */
+  bookedOn: string
   startDate: string
   endDate: string
   status: string

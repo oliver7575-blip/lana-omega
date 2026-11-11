@@ -58,6 +58,7 @@ export default function ReservationsList() {
             <thead>
               <tr className="border-b border-line text-left text-[11px] font-semibold uppercase tracking-wide text-navy/50">
                 <th className="px-4 py-2.5 sm:px-5">Guest</th>
+                <th className="px-4 py-2.5 sm:px-5">Booked on</th>
                 <th className="px-4 py-2.5 sm:px-5">Check-in</th>
                 <th className="px-4 py-2.5 sm:px-5">Check-out</th>
                 <th className="px-4 py-2.5 sm:px-5">Nights</th>
@@ -69,12 +70,13 @@ export default function ReservationsList() {
             </thead>
             <tbody>
               {shownRows.length === 0 && !loading && (
-                <tr><td colSpan={8} className="px-6 py-10 text-center text-sm text-navy/50">No reservations found.</td></tr>
+                <tr><td colSpan={9} className="px-6 py-10 text-center text-sm text-navy/50">No reservations found.</td></tr>
               )}
               {shownRows.map((r) => (
                 <tr key={r.reservationID} onClick={() => setOpen(r.reservationID)}
                   className="cursor-pointer border-b border-line text-sm text-navy last:border-b-0 hover:bg-white/[0.03]">
                   <td className="px-4 py-3 font-medium text-clay sm:px-5">{r.guestName || '—'}</td>
+                  <td className="whitespace-nowrap px-4 py-3 font-medium text-red-600 sm:px-5">{r.bookedOn ? longDate(r.bookedOn) : '—'}</td>
                   <td className="whitespace-nowrap px-4 py-3 sm:px-5">{longDate(r.startDate)}</td>
                   <td className="whitespace-nowrap px-4 py-3 sm:px-5">{longDate(r.endDate)}</td>
                   <td className="px-4 py-3 sm:px-5">{nights(r.startDate, r.endDate) ?? '—'}</td>
@@ -95,7 +97,7 @@ export default function ReservationsList() {
                 </tr>
               ))}
               {loading && (
-                <tr><td colSpan={8} className="px-6 py-10 text-center text-sm text-navy/50">Loading…</td></tr>
+                <tr><td colSpan={9} className="px-6 py-10 text-center text-sm text-navy/50">Loading…</td></tr>
               )}
             </tbody>
           </table>

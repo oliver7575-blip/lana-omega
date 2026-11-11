@@ -599,6 +599,8 @@ export interface ReservationSummary {
   reservationID: string
   guestID: string | null
   guestName: string
+  /** Day the reservation was made (YYYY-MM-DD), '' when unknown. */
+  bookedOn: string
   startDate: string
   endDate: string
   status: string
@@ -648,7 +650,7 @@ export async function listReservationsSummary(
       return null
     }
   })
-  const rows: ReservationSummary[] = slice.map(({ dateCreated: _dateCreated, ...r }, i) => ({ ...r, total: totals[i] }))
+  const rows: ReservationSummary[] = slice.map(({ dateCreated, ...r }, i) => ({ ...r, bookedOn: dateCreated.slice(0, 10), total: totals[i] }))
   return { rows, hasMore: start + pageSize < sorted.length }
 }
 
