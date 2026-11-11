@@ -96,6 +96,12 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
   const [r, setR] = useState<Detail | null>(null)
   const [link, setLink] = useState('')
   const [notes, setNotes] = useState<Note[]>([])
+  // Quick message bubble opened from the phone number (WhatsApp) or the email address.
+  const [quick, setQuick] = useState<'whatsapp' | 'email' | null>(null)
+  const [quickText, setQuickText] = useState('')
+  const [quickSubject, setQuickSubject] = useState('')
+  const [quickBusy, setQuickBusy] = useState(false)
+  const [quickMsg, setQuickMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -146,6 +152,44 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
       .finally(() => setGuestLoading(false))
   }
 
+  function openQuick(kind: 'whatsapp' | 'email') {
+    setQuick((q) => (q === kind ? null : kind))
+    setQuickMsg(null)
+  }
+
+  async function sendQuick() {
+    if (!quick || !quickText.trim() || (quick === 'email' && !quickSubject.trim())) return
+    setQuickBusy(true)
+    setQuickMsg(null)
+    try {
+      if (quick === 'whatsapp') {
+        // Same path as the Messages page: find (or open) the guest's conversation, then send a staff reply into it.
+        const conv = await cbApi<{ conversationId: string }>(`/api/cloudbeds/reservation/${id}/conversation`)
+        const res = await fetch(`/api/conversations/${conv.conversationId}/reply`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: quickText }),
+        })
+        const j = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(j.error ?? 'Could not send')
+        if (j.deliveryResult && j.deliveryResult.success === false) {
+          setQuickMsg({ ok: false, text: `Saved, but WhatsApp didn't deliver it: ${j.deliveryResult.error}` })
+          setQuickBusy(false)
+          return
+        }
+        setQuickMsg({ ok: true, text: 'Sent on WhatsApp.' })
+      } else {
+        const j = await cbApi<{ to: string }>(`/api/cloudbeds/reservation/${id}/email`, 'POST', { subject: quickSubject, body: quickText })
+        setQuickMsg({ ok: true, text: `Email sent to ${j.to}.` })
+      }
+      setQuickText('')
+      if (quick === 'email') setQuickSubject('')
+    } catch (e) {
+      setQuickMsg({ ok: false, text: e instanceof Error ? e.message : 'Could not send' })
+    }
+    setQuickBusy(false)
+  }
+
   async function goToMessages() {
     setMessagesBusy(true)
     setError(null)
@@ -183,8 +227,19 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
               <div>
                 <p className={label}>Guest</p>
                 <p>{r.guestName || '—'}</p>
-                {r.guestPhone && <p><a href={`tel:${r.guestPhone.replace(/[^\d+]/g, '')}`} className="text-[#3b6fe0] hover:underline">{r.guestPhone}</a></p>}
-                {r.guestEmail && <p className="break-all"><a href={`mailto:${r.guestEmail}`} className="text-[#3b6fe0] hover:underline">{r.guestEmail}</a></p>}
+                {r.guestPhone && (
+                  <p>
+                    <button onClick={() => openQuick('whatsapp')} title="Send a WhatsApp message"
+                      className={`hover:underline ${quick === 'whatsapp' ? 'font-semibold text-[#128c7e]' : 'text-[#3b6fe0]'}`}>{r.guestPhone}</button>
+                    <a href={`tel:${r.guestPhone.replace(/[^\d+]/g, '')}`} title="Call" className="ml-2 text-xs text-gray-500 hover:underline">call</a>
+                  </p>
+                )}
+                {r.guestEmail && (
+                  <p className="break-all">
+                    <button onClick={() => openQuick('email')} title="Send an email"
+                      className={`break-all text-left hover:underline ${quick === 'email' ? 'font-semibold text-[#128c7e]' : 'text-[#3b6fe0]'}`}>{r.guestEmail}</button>
+                  </p>
+                )}
                 {r.guestCountry && <p>{countryName(r.guestCountry)}</p>}
                 {!r.guestPhone && !r.guestEmail && <p className="text-gray-500">No contact details</p>}
               </div>
@@ -241,6 +296,32 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
                   {messagesBusy ? 'Opening…' : 'Messages'}
                 </button>
               </div>
+
+              {quick && (
+                <div className="mt-4 rounded-xl border border-[#b7e0d8] bg-[#f0faf7] p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-sm font-semibold">
+                      {quick === 'whatsapp' ? `WhatsApp to ${r.guestName.split(' ')[0] || 'guest'} · ${r.guestPhone}` : `Email to ${r.guestName.split(' ')[0] || 'guest'} · ${r.guestEmail}`}
+                    </p>
+                    <button onClick={() => setQuick(null)} className="text-lg leading-none text-gray-500 hover:text-gray-800" aria-label="Close">×</button>
+                  </div>
+                  {quick === 'email' && (
+                    <input value={quickSubject} onChange={(e) => setQuickSubject(e.target.value)} placeholder="Subject"
+                      className="mb-2 w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm outline-none focus:border-[#128c7e]" />
+                  )}
+                  <textarea value={quickText} onChange={(e) => setQuickText(e.target.value)} rows={4} autoFocus
+                    onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) sendQuick() }}
+                    placeholder={quick === 'whatsapp' ? 'Write a message… (sent as staff, like on the Messages page)' : 'Write the email…'}
+                    className="w-full resize-none rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#128c7e]" />
+                  <div className="mt-2 flex items-center gap-3">
+                    <button disabled={quickBusy || !quickText.trim() || (quick === 'email' && !quickSubject.trim())} onClick={sendQuick}
+                      className="rounded-full bg-[#128c7e] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#0f776b] disabled:opacity-50">
+                      {quickBusy ? 'Sending…' : quick === 'whatsapp' ? 'Send WhatsApp' : 'Send email'}
+                    </button>
+                    {quickMsg && <p className={`text-sm ${quickMsg.ok ? 'text-emerald-700' : 'text-red-600'}`}>{quickMsg.text}</p>}
+                  </div>
+                </div>
+              )}
 
               {(r.specialRequests || notes.length > 0) && (
                 <div className="mt-4 space-y-2">
