@@ -706,7 +706,7 @@ export async function getGuestProfile(cb: CB, guestID: string): Promise<Record<s
 export async function getReservationGuestContact(
   cb: CB,
   reservationID: string
-): Promise<{ phone: string | null; email: string | null }> {
+): Promise<{ phone: string | null; email: string | null; country: string | null }> {
   const json = await cbGet(cb, 'getReservations', {
     propertyID: cb.propertyId,
     reservationID,
@@ -714,13 +714,14 @@ export async function getReservationGuestContact(
     pageSize: 1,
   })
   const match = ((json.data as Json[]) ?? [])[0]
-  if (!match) return { phone: null, email: null }
+  if (!match) return { phone: null, email: null, country: null }
   const guestID = match.guestID as string | undefined
   const guestList = (match.guestList as Record<string, Json>) ?? {}
   const g = guestID ? guestList[guestID] : undefined
   const phone = ((g?.guestPhone as string) || (g?.guestCellPhone as string) || '').trim() || null
   const email = ((g?.guestEmail as string) || '').trim() || null
-  return { phone, email }
+  const country = ((g?.guestCountry as string) || (match.guestCountry as string) || '').trim() || null
+  return { phone, email, country }
 }
 
 // ---------------------------------------------------------------------------

@@ -14,11 +14,12 @@ export async function GET(_r: Request, { params }: { params: Promise<{ id: strin
       getReservationNotes(c.cb, id).catch(() => []),
     ])
     // getReservation doesn't carry the guest's phone/email for this account; the list endpoint with guest details does.
-    if (!reservation.guestPhone || !reservation.guestEmail) {
+    if (!reservation.guestPhone || !reservation.guestEmail || !reservation.guestCountry) {
       try {
         const contact = await getReservationGuestContact(c.cb, id)
         reservation.guestPhone ??= contact.phone
         reservation.guestEmail ??= contact.email
+        reservation.guestCountry ??= contact.country
       } catch {
         // Best-effort: the window still works without it.
       }

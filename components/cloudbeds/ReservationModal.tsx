@@ -75,6 +75,16 @@ interface Detail {
   breakdown: { subTotal: number | null; additionalItems: number | null; taxesFees: number | null; paid: number | null }
 }
 
+/** "MX" → "Mexico"; anything that isn't a 2-letter code is shown as is. */
+function countryName(code: string): string {
+  if (!/^[A-Za-z]{2}$/.test(code)) return code
+  try {
+    return new Intl.DisplayNames(['en'], { type: 'region' }).of(code.toUpperCase()) ?? code
+  } catch {
+    return code
+  }
+}
+
 interface Note { author: string; date: string; text: string }
 
 export default function ReservationModal({ id, today, onClose, onChanged }: {
@@ -175,7 +185,7 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
                 <p>{r.guestName || '—'}</p>
                 {r.guestPhone && <p><a href={`tel:${r.guestPhone.replace(/[^\d+]/g, '')}`} className="text-[#3b6fe0] hover:underline">{r.guestPhone}</a></p>}
                 {r.guestEmail && <p className="break-all"><a href={`mailto:${r.guestEmail}`} className="text-[#3b6fe0] hover:underline">{r.guestEmail}</a></p>}
-                {r.guestCountry && <p className="text-gray-500">{r.guestCountry}</p>}
+                {r.guestCountry && <p>{countryName(r.guestCountry)}</p>}
                 {!r.guestPhone && !r.guestEmail && <p className="text-gray-500">No contact details</p>}
               </div>
               <div>
