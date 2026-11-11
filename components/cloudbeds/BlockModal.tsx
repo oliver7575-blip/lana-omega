@@ -20,7 +20,7 @@ function addDays(d: string, n: number) {
 const nice = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
 
 /** A block / out-of-service period: remove it, or swap it for a reservation on the same room and dates. */
-export default function BlockModal({ block, roomName, roomTypeName, otherRooms, onClose, onRemoved, onReplace }: {
+export default function BlockModal({ block, roomName, roomTypeName, otherRooms, onClose, onRemoved }: {
   block: BlockInfo
   roomName: string
   roomTypeName: string
@@ -28,9 +28,8 @@ export default function BlockModal({ block, roomName, roomTypeName, otherRooms, 
   otherRooms: string[]
   onClose: () => void
   onRemoved: () => void
-  onReplace: () => void
 }) {
-  const [confirm, setConfirm] = useState<'remove' | 'replace' | null>(null)
+  const [confirm, setConfirm] = useState<'remove' | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const service = block.type === 'out_of_service' || /service|servicio|mainten|repair|mantenim|reparaci/i.test(block.reason)
@@ -93,22 +92,8 @@ export default function BlockModal({ block, roomName, roomTypeName, otherRooms, 
               </div>
             </div>
           )}
-          {confirm === 'replace' && (
-            <div className="mt-4 rounded-2xl border border-[#b7e0d8] bg-[#f0faf7] p-3">
-              <p className="text-sm font-semibold">Replace this block with a reservation?</p>
-              <p className="mt-1 text-sm text-gray-700">
-                The block is removed first, then the new reservation window opens with {roomName} and {nice(block.start)} → {nice(free)} filled in. If you close that window without saving, the room stays unblocked.
-              </p>
-              <div className="mt-3 flex gap-2">
-                <button disabled={busy} onClick={() => remove(onReplace)} className="h-9 rounded-[10px] bg-[#1f9d78] px-4 text-sm font-semibold text-white hover:bg-[#188a69] disabled:opacity-60">{busy ? 'Removing…' : 'Remove block and continue'}</button>
-                <button disabled={busy} onClick={() => setConfirm(null)} className="h-9 rounded-[10px] border border-gray-300 bg-white px-4 text-sm font-semibold hover:bg-gray-50">Back</button>
-              </div>
-            </div>
-          )}
-
           {!confirm && (
             <div className="mt-4 flex flex-wrap gap-2">
-              <button disabled={!block.roomBlockID} onClick={() => setConfirm('replace')} className="h-9 rounded-[10px] bg-[#1f9d78] px-4 text-[13px] font-semibold text-white hover:bg-[#188a69] disabled:opacity-50">Replace with reservation</button>
               <button disabled={!block.roomBlockID} onClick={() => setConfirm('remove')} className="h-9 rounded-[10px] border border-red-300 px-4 text-[13px] font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50">Remove block</button>
             </div>
           )}

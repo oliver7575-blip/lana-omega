@@ -952,11 +952,23 @@ export async function allRoomsByType(cb: CB): Promise<{ typeName: string; rooms:
 
 /** Removes a room block (all rooms that share it) so the dates open up again. */
 export async function deleteRoomBlock(cb: CB, roomBlockID: string): Promise<void> {
-  const res = await fetch(`${BASE}/deleteRoomBlock?${new URLSearchParams({ propertyID: cb.propertyId, roomBlockID })}`, {
-    method: 'DELETE',
-    headers: { 'x-api-key': cb.apiKey },
-    signal: AbortSignal.timeout(20000),
-  })
-  const json = (await res.json().catch(() => ({}))) as Json
-  if (!res.ok || json.success === false) throw new Error((json.message as string) ?? `Cloudbeds deleteRoomBlock failed: ${res.status}`)
+  const params = { propertyID: cb.propertyId, roomBlockID }
+  const attempts: { label: string; run: () => Promise<Response> }[] = [
+    { label: 'DELETE query', run: () => fetch(`${BASE}/deleteRoomBlock?${new URLSearchParams(params)}`, { method: 'DELETE', headers: { 'x-api-key': cb.apiKey }, signal: AbortSignal.timeout(20000) }) },
+    { label: 'DELETE form', run: () => fetch(`${BASE}/deleteRoomBlock`, { method: 'DELETE', headers: { 'x-api-key': cb.apiKey, 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(params), signal: AbortSignal.timeout(20000) }) },
+    { label: 'POST form', run: () => fetch(`${BASE}/deleteRoomBlock`, { method: 'POST', headers: { 'x-api-key': cb.apiKey, 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(params), signal: AbortSignal.timeout(20000) }) },
+  ]
+  const errors: string[] = []
+  for (const a of attempts) {
+    const res = await a.run().catch((e) => null as Response | null)
+    if (!res) { errors.push(`${a.label}: no response`); continue }
+    const text = await res.text()
+    let json: Json = {}
+    try { json = JSON.parse(text) as Json } catch { /* not json */ }
+    if (res.ok && json.success !== false) return
+    const msg = (json.message as string) ?? text.slice(0, 160)
+    console.error('[deleteRoomBlock]', a.label, res.status, msg)
+    errors.push(`${a.label} ${res.status}: ${msg}`)
+  }
+  throw new Error(`Cloudbeds wouldn't remove the block (${errors.join(' | ')})`)
 }

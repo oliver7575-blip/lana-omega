@@ -605,11 +605,6 @@ export default function CalendarPage() {
             otherRooms={[...new Set(otherRooms)]}
             onClose={() => setOpenBlock(null)}
             onRemoved={() => { setOpenBlock(null); setToast({ ok: true, text: `Block removed from ${room?.name ?? 'the room'}.` }); refreshVisible() }}
-            onReplace={() => {
-              setOpenBlock(null)
-              refreshVisible()
-              setCreating({ start: openBlock.start < data.today ? data.today : openBlock.start, end: addDays(openBlock.end, 1), roomTypeID: type?.id, roomID: openBlock.roomID })
-            }}
           />
         )
       })()}
