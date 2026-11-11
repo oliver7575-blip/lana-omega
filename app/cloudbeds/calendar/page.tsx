@@ -365,7 +365,7 @@ export default function CalendarPage() {
               className="h-9 rounded-[10px] border border-gray-300 bg-white px-2.5 text-[13px] outline-none focus:border-[#3b6fe0]" />
             <button onClick={() => goTo && jumpTo(goTo)} className="h-9 rounded-[10px] border border-gray-300 bg-white px-3.5 text-[13px] font-semibold hover:bg-gray-50">Go</button>
           </div>
-          <div className="min-w-[220px] flex-1 rounded-[10px] border border-gray-300 bg-white px-2 py-0.5"><SearchBar onOpen={setOpen} /></div>
+          <div className="min-w-[220px] flex-1"><SearchBar onOpen={setOpen} /></div>
           {data && (
             <>
               <button onClick={() => setCreating('block')} className="h-9 rounded-[10px] border border-gray-300 bg-white px-4 text-[13px] font-semibold hover:bg-gray-50">Block dates</button>

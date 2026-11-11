@@ -29,22 +29,23 @@ const TABS = [
 
 function Card({ title, onRefresh, children }: { title: string; onRefresh: () => void; children: React.ReactNode }) {
   return (
-    <section className="min-w-0 rounded-lg border-t-[3px] border-[#3d62e8] bg-white px-2 py-2 shadow-[0_1px_3px_rgba(15,23,42,0.10)] sm:px-2.5 sm:py-2.5">
-      <div className="mb-1.5 flex items-center justify-between">
-        <h2 className="text-[12px] font-semibold text-[#14213d]">{title}</h2>
-        <button onClick={onRefresh} title="Refresh" className="text-[12px] text-[#14213d] hover:text-[#3d62e8]">↻</button>
+    <section className="min-w-0 rounded-2xl border border-gray-200 bg-white p-5 shadow-[0_1px_2px_rgba(20,33,61,.04)]">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-[15px] font-bold tracking-tight text-[#14213d]">{title}</h2>
+        <button onClick={onRefresh} title="Refresh" className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-300 text-[13px] text-gray-600 hover:bg-gray-50">↻</button>
       </div>
       {children}
     </section>
   )
 }
 
-function Tabs({ items, value, onChange }: { items: { key: string; label: string }[]; value: string; onChange: (k: string) => void }) {
+/** Soft segmented switch, the same one the calendar's windows use. */
+function Segmented({ items, value, onChange }: { items: { key: string; label: string }[]; value: string; onChange: (k: string) => void }) {
   return (
-    <div className="flex overflow-x-auto bg-[#f1f2f4]">
+    <div className="inline-flex max-w-full overflow-x-auto rounded-[10px] bg-[#e9ecf1] p-[3px]">
       {items.map((t) => (
         <button key={t.key} onClick={() => onChange(t.key)}
-          className={`shrink-0 px-2 py-0.5 text-[10px] text-[#14213d] sm:px-2.5 ${value === t.key ? 'bg-[#e4e6ea]' : 'hover:bg-[#e9ebee]'}`}>
+          className={`h-[30px] shrink-0 whitespace-nowrap rounded-lg px-3.5 text-[12.5px] font-semibold ${value === t.key ? 'bg-white text-[#14213d] shadow-[0_1px_2px_rgba(20,33,61,.12)]' : 'text-gray-600 hover:text-[#14213d]'}`}>
           {t.label}
         </button>
       ))}
@@ -52,10 +53,15 @@ function Tabs({ items, value, onChange }: { items: { key: string; label: string 
   )
 }
 
-const ICONS: Record<string, React.ReactNode> = {
-  bell: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#c5c9cf" strokeWidth="1.6"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15L6 16Z" /><path d="M10 20a2 2 0 0 0 4 0" /></svg>,
-  out: <svg width="22" height="22" viewBox="0 0 24 24" fill="#c5c9cf"><path d="M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h5v-2H6V6h4V4Z" /><path d="M14 7l5 5-5 5v-3H9v-4h5V7Z" /></svg>,
-  moon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#c5c9cf" strokeWidth="1.6"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" /></svg>,
+function StatusPill({ label, status }: { label: string; status: string }) {
+  const k = status.toLowerCase()
+  const c =
+    k === 'checked_in' || k === 'in_house' ? { bg: '#cdeee1', border: '#8fd3b8', text: '#0e4d38' }
+    : k === 'checked_out' ? { bg: '#e6e9ef', border: '#c5cad4', text: '#4a5262' }
+    : k === 'not_confirmed' ? { bg: '#fdeccb', border: '#f0c978', text: '#7a4a05' }
+    : k === 'canceled' || k === 'cancelled' ? { bg: '#fde0e0', border: '#f0a9a9', text: '#7a1b1b' }
+    : { bg: '#d6e4fb', border: '#9bbbf0', text: '#17356b' }
+  return <span className="inline-block rounded-full border px-2.5 py-0.5 text-[11px] font-semibold capitalize" style={{ background: c.bg, borderColor: c.border, color: c.text }}>{label}</span>
 }
 
 export default function DashviewPage() {
@@ -110,93 +116,83 @@ export default function DashviewPage() {
 
   const [guestFilter, setGuestFilter] = useState('')
   const shownRows = rows?.filter((r) => !guestFilter.trim() || r.guestName.toLowerCase().includes(guestFilter.trim().toLowerCase())) ?? null
-  const thc = 'border-r border-white px-1.5 py-0.5 text-left text-[9px] font-semibold uppercase tracking-wide text-[#14213d] last:border-r-0'
-  const tdc = 'px-1.5 py-0.5 text-[11px] text-[#14213d]'
+  const thc = 'px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500'
+  const tdc = 'px-3 py-2.5 text-[13px] text-[#14213d]'
+
+  const stats = [
+    { n: summary?.arrivals, label: 'Arrivals', color: '#1f9d78', tint: '#eefaf5' },
+    { n: summary?.departures, label: 'Departures', color: '#c9631f', tint: '#fff4e8' },
+    { n: summary?.stayovers, label: 'Stay overs', color: '#6a4fd8', tint: '#f1eefd' },
+    { n: summary?.roomsOccupied, label: 'Accommodations booked', color: '#2f66d0', tint: '#eef3fd', pct: summary?.percentageOccupied },
+  ]
 
   return (
-    <div className="p-1 md:p-1.5">
-      <div className="min-h-[calc(100vh-1.5rem)] min-w-0 overflow-hidden rounded-2xl bg-[#f2f3f5] px-2 py-2.5 text-[#14213d] sm:px-3 sm:py-3">
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <h1 className="text-[14px] font-semibold tracking-tight sm:text-[15px]">{todayLabel || 'Dashboard'}</h1>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Link href="/cloudbeds/calendar" title="Reservation calendar"
-              className="flex h-6 w-7 items-center justify-center rounded-md bg-[#e4e6ea] text-[#14213d] shadow-sm hover:bg-[#d9dce1]">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M3 9h18M8 2v4M16 2v4" /></svg>
-            </Link>
-            <button onClick={() => { loadSummary(); loadList(); setOverbookings(null) }} title="Refresh (also updates automatically)"
-              className="flex h-6 w-7 items-center justify-center rounded-md bg-[#e4e6ea] text-[12px] text-[#14213d] shadow-sm hover:bg-[#d9dce1]">↻</button>
-            {summary && (
-              <button onClick={() => setCreating(true)}
-                className="rounded-full bg-[#5cc3a5] px-3 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white hover:bg-[#4bb294]">
-                Create new reservation
-              </button>
-            )}
+    <div className="p-2 md:p-3">
+      <div className="min-h-[calc(100vh-1.5rem)] min-w-0 rounded-2xl bg-[#f6f7f9] p-5 text-[#14213d]">
+        <div className="mb-5 flex flex-wrap items-center gap-3">
+          <div className="mr-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Dashboard</p>
+            <h1 className="text-[22px] font-bold leading-tight tracking-tight">{todayLabel || 'Today'}</h1>
           </div>
+          <div className="flex-1" />
+          <Link href="/cloudbeds/calendar" className="flex h-9 items-center gap-2 rounded-[10px] border border-gray-300 bg-white px-3.5 text-[13px] font-semibold hover:bg-gray-50">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M3 9h18M8 2v4M16 2v4" /></svg>
+            Calendar
+          </Link>
+          <button onClick={() => { loadSummary(); loadList(); setOverbookings(null) }} title="Refresh (also updates automatically)"
+            className="h-9 w-9 rounded-[10px] border border-gray-300 bg-white text-[14px] hover:bg-gray-50">↻</button>
+          {summary && (
+            <button onClick={() => setCreating(true)} className="h-9 rounded-[10px] bg-[#1f9d78] px-[18px] text-[13px] font-semibold text-white hover:bg-[#188a69]">
+              + Create new reservation
+            </button>
+          )}
         </div>
 
-        {summaryError && <p className="mb-3 rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{summaryError}</p>}
+        {summaryError && <p className="mb-4 rounded-xl bg-red-50 px-4 py-2 text-sm text-red-700">{summaryError}</p>}
 
-        <div className="mb-2 grid gap-1.5 sm:grid-cols-2 xl:grid-cols-4 xl:gap-2">
-          {[
-            { n: summary?.arrivals, label: 'Arrivals', color: '#3aa99f', icon: ICONS.bell },
-            { n: summary?.departures, label: 'Departures', color: '#e0622d', icon: ICONS.out },
-            { n: summary?.stayovers, label: 'Stay overs', color: '#7a5af8', icon: ICONS.moon },
-            { n: summary?.roomsOccupied, label: 'Accommodations booked', color: '#3d62e8', pct: summary?.percentageOccupied },
-          ].map((c) => (
-            <div key={c.label} className="relative min-h-[44px] rounded-lg bg-white px-2.5 py-1.5 shadow-[0_1px_3px_rgba(15,23,42,0.10)]">
-              <p className="text-[14px] leading-none" style={{ color: c.color }}>{c.n ?? '—'}</p>
-              <p className="mt-1.5 text-[9px] font-semibold uppercase tracking-wide">{c.label}</p>
+        <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {stats.map((c) => (
+            <div key={c.label} className="flex items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-5 py-4 shadow-[0_1px_2px_rgba(20,33,61,.04)]">
+              <div>
+                <p className="text-[30px] font-bold leading-none tracking-tight" style={{ color: c.color }}>{c.n ?? '—'}</p>
+                <p className="mt-2 text-[12px] font-semibold text-gray-600">{c.label}</p>
+              </div>
               {c.pct !== undefined ? (
-                <span className="absolute right-2.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-[#eef0f2] text-[9px] text-[#44506a]">
-                  {c.pct.toFixed(2)}%
-                </span>
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-[12px] font-bold" style={{ background: c.tint, color: c.color }}>{Math.round(c.pct)}%</span>
               ) : (
-                <span className="absolute right-2.5 top-1.5 scale-[0.65]">{c.icon}</span>
+                <span className="h-12 w-12 shrink-0 rounded-full" style={{ background: c.tint }} />
               )}
             </div>
           ))}
         </div>
 
-        <div className="mb-2 grid gap-2 xl:grid-cols-2 xl:gap-2.5">
+        <div className="mb-5 grid gap-4 xl:grid-cols-2">
           <Card title="Reservations" onRefresh={loadList}>
-            <Tabs items={TABS} value={tab} onChange={setTab} />
-            <div className="mb-1 mt-1 flex flex-wrap items-end gap-x-2.5 gap-y-1">
-              <div className="flex">
-                {(['today', 'tomorrow'] as const).map((d) => (
-                  <button key={d} onClick={() => setDay(d)}
-                    className={`border-b-[2px] px-2 py-0.5 text-[11px] font-medium capitalize ${day === d ? 'border-[#3d62e8] text-[#3d62e8]' : 'border-transparent text-[#14213d]'}`}>
-                    {d}
-                  </button>
-                ))}
-              </div>
-              <label className="flex w-full max-w-[200px] items-center border-b border-gray-400 pb-0.5">
-                <input value={guestFilter} onChange={(e) => setGuestFilter(e.target.value)} placeholder="Guest Name"
-                  className="min-w-0 flex-1 bg-transparent px-1.5 text-[11px] text-[#14213d] outline-none placeholder:text-gray-400" />
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.4"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+            <Segmented items={TABS} value={tab} onChange={setTab} />
+            <div className="mb-3 mt-3 flex flex-wrap items-center gap-3">
+              <Segmented items={[{ key: 'today', label: 'Today' }, { key: 'tomorrow', label: 'Tomorrow' }]} value={day} onChange={(k) => setDay(k as 'today' | 'tomorrow')} />
+              <label className="flex h-9 w-full max-w-[220px] items-center gap-2 rounded-[10px] border border-gray-300 bg-white px-3">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.2" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+                <input value={guestFilter} onChange={(e) => setGuestFilter(e.target.value)} placeholder="Guest name"
+                  className="min-w-0 flex-1 bg-transparent text-[13px] text-[#14213d] outline-none placeholder:text-gray-400" />
               </label>
             </div>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto rounded-xl border border-gray-200">
               <table className="w-full">
-                <thead className="bg-[#f1f2f4]">
-                  <tr><th className={thc}>Guest</th><th className={thc}>Conf #</th><th className={thc}>Room</th><th className={thc}>Arrival time</th><th className={thc}>Status</th></tr>
+                <thead className="border-b border-gray-200 bg-[#fbfbfc]">
+                  <tr><th className={thc}>Guest</th><th className={thc}>Conf #</th><th className={thc}>Room</th><th className={thc}>Arrival</th><th className={thc}>Status</th></tr>
                 </thead>
-                <tbody>
-                  <tr aria-hidden="true"><td colSpan={5} className="h-1 p-0" /></tr>
-                  {shownRows === null && <tr><td colSpan={5} className="py-3 text-center text-[11px] text-gray-500">Loading…</td></tr>}
-                  {shownRows?.length === 0 && <tr><td colSpan={5} className="py-3 text-center text-[11px] text-[#14213d]">{listError ?? 'None available'}</td></tr>}
+                <tbody className="divide-y divide-gray-100">
+                  {shownRows === null && <tr><td colSpan={5} className="py-6 text-center text-[13px] text-gray-500">Loading…</td></tr>}
+                  {shownRows?.length === 0 && <tr><td colSpan={5} className="py-6 text-center text-[13px] text-gray-500">{listError ?? 'None available'}</td></tr>}
                   {shownRows?.map((r) => (
-                    <tr key={r.reservationID} onClick={() => setOpen(r.reservationID)} className="cursor-pointer hover:bg-[#f7f8fa]">
-                      <td className={`${tdc} min-w-[130px]`}>
-                        <span className="inline-flex items-center gap-1 text-[#3d62e8] hover:underline">
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#14213d" strokeWidth="2"><path d="M4 20h4L19 9l-4-4L4 16v4Z" /><path d="M14 6l4 4" /></svg>
-                          {r.guestName}
-                        </span>
-                      </td>
-                      <td className={tdc}>{r.reservationID}</td>
+                    <tr key={r.reservationID} onClick={() => setOpen(r.reservationID)} className="cursor-pointer hover:bg-[#f4f8fb]">
+                      <td className={`${tdc} min-w-[130px] font-semibold`}>{r.guestName}</td>
+                      <td className={`${tdc} text-gray-600`}>{r.reservationID}</td>
                       <td className={tdc}>{r.room}</td>
                       <td className={tdc}>{r.arrivalTime ?? '—'}</td>
-                      <td className={`${tdc} capitalize text-[#3d62e8]`}>
-                        {tab === 'arrivals' && ['confirmed', 'not_confirmed'].includes(r.status) ? 'Arrival' : statusLabel(r.status)}
+                      <td className={tdc}>
+                        <StatusPill status={r.status} label={tab === 'arrivals' && ['confirmed', 'not_confirmed'].includes(r.status) ? 'Arrival' : statusLabel(r.status)} />
                       </td>
                     </tr>
                   ))}
@@ -205,28 +201,34 @@ export default function DashviewPage() {
             </div>
           </Card>
 
-          <Card title="Today's Activity" onRefresh={() => { loadSummary(); setOverbookings(null) }}>
-            <Tabs
+          <Card title="Today's activity" onRefresh={() => { loadSummary(); setOverbookings(null) }}>
+            <Segmented
               items={[{ key: 'sales', label: 'Sales' }, { key: 'cancellations', label: 'Cancellations' }, { key: 'overbookings', label: 'Overbookings' }]}
               value={activity}
               onChange={(k) => setActivity(k as typeof activity)}
             />
             {activity !== 'overbookings' ? (
               <>
-                <div className="my-1.5 grid grid-cols-3 gap-1.5 px-1">
-                  <div><p className="text-[14px] leading-none text-[#3d62e8] sm:text-[15px]">{act?.count ?? '—'}</p><p className="mt-1 text-[9px] font-semibold uppercase">{activity === 'sales' ? 'Booked today' : 'Cancelled today'}</p></div>
-                  <div><p className="text-[14px] leading-none text-[#3d62e8] sm:text-[15px]">{act?.roomNights ?? '—'}</p><p className="mt-1 text-[9px] font-semibold uppercase">Room nights</p></div>
-                  <div><p className="text-[14px] leading-none text-[#3d62e8] sm:text-[15px]">{act ? mxn(act.revenue) : '—'}</p><p className="mt-1 text-[9px] font-semibold uppercase">Revenue</p></div>
+                <div className="my-4 grid grid-cols-3 gap-3">
+                  {[
+                    { v: act?.count ?? '—', l: activity === 'sales' ? 'Booked today' : 'Cancelled today' },
+                    { v: act?.roomNights ?? '—', l: 'Room nights' },
+                    { v: act ? mxn(act.revenue) : '—', l: 'Revenue' },
+                  ].map((x) => (
+                    <div key={x.l} className="rounded-xl bg-[#f6f7f9] px-4 py-3">
+                      <p className="text-[22px] font-bold leading-none tracking-tight text-[#2f66d0]">{x.v}</p>
+                      <p className="mt-1.5 text-[12px] font-semibold text-gray-600">{x.l}</p>
+                    </div>
+                  ))}
                 </div>
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto rounded-xl border border-gray-200">
                   <table className="w-full">
-                    <thead className="bg-[#f1f2f4]"><tr><th className={thc}>Guest</th><th className={thc}>Revenue</th><th className={thc}>Check-in</th><th className={thc}>Nights</th></tr></thead>
-                    <tbody>
-                      <tr aria-hidden="true"><td colSpan={4} className="h-1 p-0" /></tr>
-                      {act?.rows.length === 0 && <tr><td colSpan={4} className="py-2.5 text-center text-[11px] text-[#14213d]">None available</td></tr>}
+                    <thead className="border-b border-gray-200 bg-[#fbfbfc]"><tr><th className={thc}>Guest</th><th className={thc}>Revenue</th><th className={thc}>Check-in</th><th className={thc}>Nights</th></tr></thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {act?.rows.length === 0 && <tr><td colSpan={4} className="py-6 text-center text-[13px] text-gray-500">None available</td></tr>}
                       {act?.rows.map((r) => (
-                        <tr key={r.reservationID} onClick={() => setOpen(r.reservationID)} className="cursor-pointer hover:bg-[#f7f8fa]">
-                          <td className={`${tdc} min-w-[110px] text-[#3d62e8]`}>{r.guestName}</td>
+                        <tr key={r.reservationID} onClick={() => setOpen(r.reservationID)} className="cursor-pointer hover:bg-[#f4f8fb]">
+                          <td className={`${tdc} min-w-[110px] font-semibold`}>{r.guestName}</td>
                           <td className={tdc}>{mxn(r.revenue)}</td>
                           <td className={tdc}>{r.checkIn}</td>
                           <td className={tdc}>{r.nights}</td>
@@ -237,14 +239,14 @@ export default function DashviewPage() {
                 </div>
               </>
             ) : (
-              <div className="mt-1.5 text-[11px]">
-                {overbookings === null && <p className="py-3 text-center text-gray-500">Checking the next 30 days…</p>}
-                {overbookings?.length === 0 && <p className="py-3 text-center">None available</p>}
+              <div className="mt-4 text-[13px]">
+                {overbookings === null && <p className="py-6 text-center text-gray-500">Checking the next 30 days…</p>}
+                {overbookings?.length === 0 && <p className="py-6 text-center text-gray-500">None available</p>}
                 {overbookings?.map((o, i) => (
-                  <p key={i} className="border-b border-gray-100 py-0.5">
+                  <p key={i} className="border-b border-gray-100 py-2">
                     Two stays share room {o.roomID}:{' '}
                     {o.reservationIDs.map((id) => (
-                      <button key={id} onClick={() => setOpen(id)} className="mr-2 text-[#3d62e8] hover:underline">#{id}</button>
+                      <button key={id} onClick={() => setOpen(id)} className="mr-2 font-semibold text-[#2f66d0] hover:underline">#{id}</button>
                     ))}
                   </p>
                 ))}
