@@ -468,7 +468,7 @@ export interface CalendarData {
     end: string
   }[]
   unassigned: { reservationID: string; guestName: string; roomTypeID: string; start: string; end: string; status: string }[]
-  blocks: { roomID: string; start: string; end: string; reason: string }[]
+  blocks: { roomBlockID: string; type: string; roomID: string; start: string; end: string; reason: string }[]
   overbookings: { roomID: string; reservationIDs: string[] }[]
 }
 
@@ -538,7 +538,7 @@ export async function calendar(cb: CB, start: string, dayCount: number): Promise
   const blocks: CalendarData['blocks'] = []
   for (const b of (((blocksJson.data ?? {}) as Json).roomBlocks as Json[]) ?? []) {
     for (const room of (b.rooms as Json[]) ?? []) {
-      blocks.push({ roomID: String(room.roomID), start: String(b.startDate), end: String(b.endDate), reason: String(b.roomBlockReason ?? b.roomBlockType ?? 'Blocked') })
+      blocks.push({ roomBlockID: String(b.roomBlockID ?? ''), type: String(b.roomBlockType ?? ''), roomID: String(room.roomID), start: String(b.startDate), end: String(b.endDate), reason: String(b.roomBlockReason ?? b.roomBlockType ?? 'Blocked') })
     }
   }
 
@@ -948,4 +948,15 @@ export async function allRoomsByType(cb: CB): Promise<{ typeName: string; rooms:
   }
   for (const t of types.values()) t.rooms.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
   return [...types.values()]
+}
+
+/** Removes a room block (all rooms that share it) so the dates open up again. */
+export async function deleteRoomBlock(cb: CB, roomBlockID: string): Promise<void> {
+  const res = await fetch(`${BASE}/deleteRoomBlock?${new URLSearchParams({ propertyID: cb.propertyId, roomBlockID })}`, {
+    method: 'DELETE',
+    headers: { 'x-api-key': cb.apiKey },
+    signal: AbortSignal.timeout(20000),
+  })
+  const json = (await res.json().catch(() => ({}))) as Json
+  if (!res.ok || json.success === false) throw new Error((json.message as string) ?? `Cloudbeds deleteRoomBlock failed: ${res.status}`)
 }

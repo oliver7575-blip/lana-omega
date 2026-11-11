@@ -4,12 +4,13 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import Link from 'next/link'
 import ReservationModal from '@/components/cloudbeds/ReservationModal'
 import NewReservationModal from '@/components/cloudbeds/NewReservationModal'
+import BlockModal from '@/components/cloudbeds/BlockModal'
 import SearchBar from '@/components/cloudbeds/SearchBar'
 import { cbApi } from '@/components/cloudbeds/shared'
 
 interface Booking { reservationID: string; guestName: string; status: string; roomID: string; start: string; end: string }
 interface Unassigned { reservationID: string; guestName: string; roomTypeID: string; start: string; end: string; status: string }
-interface Block { roomID: string; start: string; end: string; reason: string }
+interface Block { roomBlockID: string; type: string; roomID: string; start: string; end: string; reason: string }
 interface RoomType { id: string; name: string; rates: Record<string, number>; rooms: { id: string; name: string }[] }
 interface Chunk {
   today: string
@@ -110,6 +111,7 @@ export default function CalendarPage() {
   const [menu, setMenu] = useState<{ x: number; y: number; reservationID: string; guestName: string; status: string; roomID: string | null } | null>(null)
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null)
   const [busy, setBusy] = useState(false)
+  const [openBlock, setOpenBlock] = useState<Block | null>(null)
   // Click-to-book: first click picks the check-in day, second click the check-out day.
   const [pick, setPick] = useState<{ roomID: string; roomTypeID: string; start: string; hover: string | null } | null>(null)
   const [creating, setCreating] = useState<{ start: string; end: string; roomTypeID?: string; roomID?: string } | 'blank' | 'block' | null>(null)
@@ -492,11 +494,11 @@ export default function CalendarPage() {
                               )
                             })}
                             {blocks.map((b, i) => {
-                              const service = /service|servicio|mainten|repair|mantenim|reparaci/i.test(b.reason)
+                              const service = b.type === 'out_of_service' || /service|servicio|mainten|repair|mantenim|reparaci/i.test(b.reason)
                               return (
                                 <Bar key={`b${i}`} start={b.start} end={addDays(b.end, 1)} viewStart={data.start} totalDays={totalDays} label={b.reason}
                                   bg={service ? HATCH_SERVICE : HATCH_BLOCK} border={service ? '#efc47a' : '#c5cad4'} text={service ? '#7a4a05' : '#4a5262'}
-                                  title={`${service ? 'Out of service' : 'Blocked'}: ${b.reason}`} dayW={dayW} />
+                                  title={`${service ? 'Out of service' : 'Blocked'}: ${b.reason} (click to open)`} dayW={dayW} onClick={() => setOpenBlock(b)} />
                               )
                             })}
                             {stays.map((s) => (
@@ -579,6 +581,28 @@ export default function CalendarPage() {
           }}
         />
       )}
+
+      {openBlock && data && (() => {
+        const type = data.roomTypes.find((t) => t.rooms.some((r) => r.id === openBlock.roomID))
+        const room = type?.rooms.find((r) => r.id === openBlock.roomID)
+        const sameBlock = openBlock.roomBlockID ? data.blocks.filter((b) => b.roomBlockID === openBlock.roomBlockID && b.roomID !== openBlock.roomID) : []
+        const otherRooms = sameBlock.map((b) => data.roomTypes.flatMap((t) => t.rooms).find((r) => r.id === b.roomID)?.name ?? 'another room')
+        return (
+          <BlockModal
+            block={openBlock}
+            roomName={room?.name ?? 'Room'}
+            roomTypeName={type?.name ?? ''}
+            otherRooms={[...new Set(otherRooms)]}
+            onClose={() => setOpenBlock(null)}
+            onRemoved={() => { setOpenBlock(null); setToast({ ok: true, text: `Block removed from ${room?.name ?? 'the room'}.` }); refreshVisible() }}
+            onReplace={() => {
+              setOpenBlock(null)
+              refreshVisible()
+              setCreating({ start: openBlock.start < data.today ? data.today : openBlock.start, end: addDays(openBlock.end, 1), roomTypeID: type?.id, roomID: openBlock.roomID })
+            }}
+          />
+        )
+      })()}
 
       {open && data && <ReservationModal id={open} today={data.today} onClose={() => setOpen(null)} onChanged={refreshVisible} />}
     </div>
