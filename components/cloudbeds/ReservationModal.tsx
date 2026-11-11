@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { cbApi, statusColor, statusLabel } from './shared'
+import { cbApi, statusLabel } from './shared'
 
 type Json = Record<string, unknown>
 
@@ -307,21 +307,33 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
     setConfirmCancel(false)
   }
 
-  const color = statusColor(r?.status ?? '')
+  const pill = (() => {
+    const k = (r?.status ?? '').toLowerCase()
+    if (k === 'checked_in' || k === 'in_house') return { bg: '#cdeee1', border: '#8fd3b8', text: '#0e4d38' }
+    if (k === 'checked_out') return { bg: '#e6e9ef', border: '#c5cad4', text: '#4a5262' }
+    if (k === 'not_confirmed') return { bg: '#fdeccb', border: '#f0c978', text: '#7a4a05' }
+    if (k === 'canceled' || k === 'cancelled') return { bg: '#fde0e0', border: '#f0a9a9', text: '#7a1b1b' }
+    return { bg: '#d6e4fb', border: '#9bbbf0', text: '#17356b' }
+  })()
   const canCancel = r && !['canceled', 'cancelled', 'checked_out', 'no_show'].includes(r.status)
   const isThirdParty = Boolean(r && (r.confirmationCode || /booking\.com|airbnb|expedia|agoda|vrbo|homeaway|hostelworld|tripadvisor|trip\.com|despegar|hotels\.com|google|kayak|trivago/i.test(r.source ?? '')))
   const canCheckIn = r && ['confirmed', 'not_confirmed'].includes(r.status) && r.startDate <= today
-  const label = 'text-sm font-semibold text-[#14213d]'
+  const label = 'mb-0.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-3xl overflow-hidden rounded-xl bg-white text-[#14213d] shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start justify-between px-6 py-4 text-white" style={{ background: color.head }}>
-          <div>
-            <p className="text-lg font-semibold">{r ? `${r.guestName} · ${statusLabel(r.status)}` : 'Loading…'}</p>
-            <p className="text-sm opacity-90">#{id}{r?.source ? ` · ${r.source}` : ''}</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#14213d]/40 p-4" onClick={onClose}>
+      <div className="max-h-[calc(100vh-2rem)] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white text-[#14213d] shadow-[0_24px_64px_rgba(20,33,61,.28)]" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-6 py-4">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <p className="truncate text-xl font-bold tracking-tight">{r ? r.guestName : 'Loading…'}</p>
+              {r && (
+                <span className="rounded-full border px-2.5 py-0.5 text-[11px] font-semibold" style={{ background: pill.bg, borderColor: pill.border, color: pill.text }}>{statusLabel(r.status)}</span>
+              )}
+            </div>
+            <p className="mt-0.5 text-[13px] text-gray-500">#{id}{r?.source ? ` · ${r.source}` : ''}</p>
           </div>
-          <button onClick={onClose} className="text-2xl leading-none opacity-90 hover:opacity-100" aria-label="Close">×</button>
+          <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-300 text-lg leading-none text-gray-600 hover:bg-gray-50" aria-label="Close">×</button>
         </div>
 
         {error && <p className="mx-6 mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
@@ -329,7 +341,7 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
 
         {r && (
           <div className="grid gap-0 sm:grid-cols-[250px_1fr]">
-            <div className="space-y-3 border-b border-gray-200 px-6 py-5 text-sm sm:border-b-0 sm:border-r">
+            <div className="space-y-3.5 border-b border-gray-200 bg-[#fbfbfc] px-6 py-5 text-sm sm:rounded-bl-2xl sm:border-b-0 sm:border-r">
               <div>
                 <p className={label}>Guest</p>
                 <p>{r.guestName || '—'}</p>
@@ -388,24 +400,24 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
               <div className="flex flex-nowrap gap-1.5 border-b border-gray-200 pb-4">
                 {canCheckIn && (
                   <button disabled={busy} onClick={() => act({ action: 'check_in' }, 'Checked in.')}
-                    className="rounded-full border border-blue-300 whitespace-nowrap px-3 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-50 disabled:opacity-60">
+                    className="h-9 rounded-[10px] border border-[#2f66d0] whitespace-nowrap px-3 text-xs font-semibold text-[#2f66d0] hover:bg-blue-50 disabled:opacity-60">
                     Check in
                   </button>
                 )}
                 <button disabled={payBusy} onClick={createPaymentLinkNow}
-                  className="rounded-full border border-gray-300 whitespace-nowrap px-3 py-1.5 text-xs font-semibold text-[#14213d] hover:bg-gray-50 disabled:opacity-60">
+                  className="h-9 rounded-[10px] border border-gray-300 whitespace-nowrap px-3 text-xs font-semibold text-[#14213d] hover:bg-gray-50 disabled:opacity-60">
                   {payBusy ? 'Creating…' : 'Create Payment Link'}
                 </button>
                 {canCancel && (
                   <button disabled={busy} onClick={() => setConfirmCancel(true)}
-                    className="rounded-full border border-red-300 whitespace-nowrap px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60">
+                    className="h-9 rounded-[10px] border border-red-300 whitespace-nowrap px-3 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60">
                     Cancel Reservation
                   </button>
                 )}
               </div>
 
               {confirmCancel && (
-                <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3">
+                <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-3">
                   <p className="text-sm font-semibold text-red-800">Are you sure you want to cancel this reservation?</p>
                   <p className="mt-1 text-sm text-red-900">
                     {r.guestName} · {r.startDate} – {r.endDate} · #{id}
@@ -428,7 +440,7 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
               )}
 
               {(pay || payError) && (
-                <div className="mt-4 rounded-xl border border-[#c9d6f5] bg-[#f3f6fe] p-3">
+                <div className="mt-4 rounded-2xl border border-[#c9d6f5] bg-[#f3f6fe] p-3">
                   <div className="mb-2 flex items-center justify-between">
                     <p className="text-sm font-semibold">{pay ? `Payment link · MXN ${pay.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Payment link'}</p>
                     <button onClick={() => { setPay(null); setPayError(null) }} className="text-lg leading-none text-gray-500 hover:text-gray-800" aria-label="Close">×</button>
@@ -438,8 +450,8 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
                     <>
                       <div className="flex gap-2">
                         <input id="pay-link-input" readOnly value={pay.url} onFocus={(e) => e.currentTarget.select()}
-                          className="min-w-0 flex-1 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-xs outline-none" />
-                        <button onClick={copyPaymentLink} className="rounded-md bg-[#1b2340] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#2a3560]">
+                          className="min-w-0 flex-1 rounded-[10px] border border-gray-300 bg-white px-2 py-1.5 text-xs outline-none" />
+                        <button onClick={copyPaymentLink} className="rounded-md bg-[#1f9d78] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#188a69]">
                           {copied ? 'Copied ✓' : 'Copy link'}
                         </button>
                       </div>
@@ -457,7 +469,7 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
               )}
 
               {quick && (
-                <div className="mt-4 rounded-xl border border-[#b7e0d8] bg-[#f0faf7] p-3">
+                <div className="mt-4 rounded-2xl border border-[#b7e0d8] bg-[#f0faf7] p-3">
                   <div className="mb-2 flex items-center justify-between">
                     <p className="text-sm font-semibold">
                       {quick === 'whatsapp' ? `WhatsApp to ${r.guestName.split(' ')[0] || 'guest'} · ${r.guestPhone}` : `Email to ${r.guestName.split(' ')[0] || 'guest'} · ${r.guestEmail}`}
@@ -484,12 +496,12 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
                   )}
                   {quick === 'email' && (
                     <input value={quickSubject} onChange={(e) => setQuickSubject(e.target.value)} placeholder="Subject"
-                      className="mb-2 w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm outline-none focus:border-[#128c7e]" />
+                      className="mb-2 w-full rounded-[10px] border border-gray-300 bg-white px-3 py-1.5 text-sm outline-none focus:border-[#128c7e]" />
                   )}
                   <textarea value={quickText} onChange={(e) => setQuickText(e.target.value)} rows={4} autoFocus
                     onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) sendQuick() }}
                     placeholder={quick === 'whatsapp' ? (waInfo && !waInfo.windowOpen ? 'Why are you writing? One short sentence.' : 'Write a message… (sent as staff, like on the Messages page)') : 'Write the email…'}
-                    className="w-full resize-none rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#128c7e]" />
+                    className="w-full resize-none rounded-[10px] border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#128c7e]" />
                   {quick === 'email' && (
                     <div className="mt-2 rounded-md border border-dashed border-gray-300 bg-white px-3 py-2">
                       <div className="flex items-center justify-between gap-2">
@@ -501,7 +513,7 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
                       {sigEdit ? (
                         <>
                           <textarea value={sig} onChange={(e) => setSig(e.target.value)} rows={4} placeholder={SIGNATURE_SUGGESTION}
-                            className="mt-1.5 w-full resize-none rounded-md border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-[#128c7e]" />
+                            className="mt-1.5 w-full resize-none rounded-[10px] border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-[#128c7e]" />
                           {!sig.trim() && (
                             <button onClick={() => setSig(SIGNATURE_SUGGESTION)} className="mt-1 text-xs font-semibold text-[#128c7e] hover:underline">Use this suggestion</button>
                           )}
@@ -532,7 +544,7 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
               {(r.specialRequests || notes.length > 0) && (
                 <div className="mt-4 space-y-2">
                   {r.specialRequests && (
-                    <div className="rounded-md bg-amber-50 px-3 py-2 text-sm">
+                    <div className="rounded-xl bg-amber-50 px-3 py-2 text-sm">
                       <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Special requests</p>
                       <p className="whitespace-pre-wrap">{r.specialRequests}</p>
                     </div>
@@ -542,7 +554,7 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
                       <p className="mb-1 text-sm font-semibold">Notes</p>
                       <div className="max-h-40 space-y-1.5 overflow-y-auto">
                         {notes.map((n, i) => (
-                          <div key={i} className="rounded-md bg-gray-50 px-3 py-2 text-sm">
+                          <div key={i} className="rounded-xl bg-gray-50 px-3 py-2 text-sm">
                             <p className="whitespace-pre-wrap">{n.text}</p>
                             <p className="mt-0.5 text-[11px] text-gray-500">{[n.author, n.date.slice(0, 16)].filter(Boolean).join(' · ')}</p>
                           </div>
@@ -556,9 +568,9 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
               <p className="mb-1.5 mt-4 text-sm font-semibold">Estimated arrival time</p>
               <div className="flex gap-2">
                 <input type="time" value={time} onChange={(e) => setTime(e.target.value)}
-                  className="w-28 rounded-md border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-[#3b6fe0]" />
+                  className="w-28 rounded-[10px] border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-[#3b6fe0]" />
                 <button disabled={busy || !time} onClick={() => act({ action: 'arrival_time', time }, 'Arrival time updated.')}
-                  className="rounded-md bg-[#1b2340] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#2a3560] disabled:opacity-50">
+                  className="rounded-[10px] bg-[#1f9d78] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#188a69] disabled:opacity-50">
                   Update
                 </button>
               </div>
@@ -568,16 +580,16 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
                 <div className="mt-3 grid grid-cols-2 gap-3">
                   <label className="text-xs text-gray-600">Arrival
                     <input type="date" value={checkin} onChange={(e) => setCheckin(e.target.value)}
-                      className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm text-[#14213d] outline-none focus:border-[#3b6fe0]" />
+                      className="mt-1 w-full rounded-[10px] border border-gray-300 px-2 py-1.5 text-sm text-[#14213d] outline-none focus:border-[#3b6fe0]" />
                   </label>
                   <label className="text-xs text-gray-600">Departure
                     <input type="date" value={checkout} onChange={(e) => setCheckout(e.target.value)}
-                      className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm text-[#14213d] outline-none focus:border-[#3b6fe0]" />
+                      className="mt-1 w-full rounded-[10px] border border-gray-300 px-2 py-1.5 text-sm text-[#14213d] outline-none focus:border-[#3b6fe0]" />
                   </label>
                 </div>
                 <button disabled={busy || (checkin === r.startDate && checkout === r.endDate)}
                   onClick={() => act({ action: 'dates', checkin, checkout }, 'Stay dates saved.')}
-                  className="mt-3 w-full rounded-md bg-[#3b6fe0] py-2 text-sm font-semibold text-white hover:bg-[#2f5fcc] disabled:opacity-50">
+                  className="mt-3 w-full rounded-[10px] bg-[#1f9d78] py-2 text-sm font-semibold text-white hover:bg-[#188a69] disabled:opacity-50">
                   Save stay dates
                 </button>
               </details>
