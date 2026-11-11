@@ -263,6 +263,46 @@ export interface AvailableRoom {
   name: string
 }
 
+/**
+ * Free physical rooms for [start, end), grouped by room type. A room is taken when an active
+ * reservation overlaps those nights or a block covers any of them (a block's end date is inclusive).
+ */
+export async function freeRoomsByType(cb: CB, start: string, end: string, excludeReservationID = ''): Promise<Map<string, AvailableRoom[]>> {
+  const [roomsJson, reservations, blocksJson] = await Promise.all([
+    cbGet(cb, 'getRooms', { propertyIDs: cb.propertyId, pageSize: 100 }),
+    listReservations(cb, { checkInTo: end, checkOutFrom: start, includeAllRooms: true }),
+    cbGet(cb, 'getRoomBlocks', { propertyID: cb.propertyId, startDate: start, endDate: end }).catch(() => ({ data: {} })),
+  ])
+
+  const occupied = new Set<string>()
+  for (const r of reservations) {
+    if (!ACTIVE(r.status) || String(r.reservationID) === excludeReservationID) continue
+    for (const room of (r.rooms as Json[]) ?? []) {
+      if (!room.roomID) continue
+      const s = String(room.roomCheckIn ?? r.startDate)
+      const e = String(room.roomCheckOut ?? r.endDate)
+      if (s < end && e > start) occupied.add(String(room.roomID))
+    }
+  }
+  for (const b of (((blocksJson.data ?? {}) as Json).roomBlocks as Json[]) ?? []) {
+    if (!(String(b.startDate) < end && String(b.endDate) >= start)) continue
+    for (const room of (b.rooms as Json[]) ?? []) occupied.add(String(room.roomID))
+  }
+
+  const out = new Map<string, AvailableRoom[]>()
+  for (const prop of (roomsJson.data as Json[]) ?? []) {
+    for (const r of (prop.rooms as Json[]) ?? []) {
+      if (r.isVirtual) continue
+      const id = String(r.roomID)
+      const typeID = String(r.roomTypeID)
+      if (!out.has(typeID)) out.set(typeID, [])
+      if (!occupied.has(id)) out.get(typeID)!.push({ id, name: String(r.roomName ?? '') })
+    }
+  }
+  for (const list of out.values()) list.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+  return out
+}
+
 /** Physical rooms of a room type that are free for [start, end) — for the panel's "change room" picker. */
 export async function availableRoomsOfType(
   cb: CB,
@@ -271,34 +311,7 @@ export async function availableRoomsOfType(
   end: string,
   excludeReservationID: string
 ): Promise<AvailableRoom[]> {
-  const [roomsJson, reservations, blocksJson] = await Promise.all([
-    cbGet(cb, 'getRooms', { propertyIDs: cb.propertyId, pageSize: 100 }),
-    listReservations(cb, { checkInTo: end, checkOutFrom: start, includeAllRooms: true }),
-    cbGet(cb, 'getRoomBlocks', { propertyID: cb.propertyId, startDate: start, endDate: end }).catch(() => ({ data: {} })),
-  ])
-
-  const allRooms: AvailableRoom[] = []
-  for (const prop of (roomsJson.data as Json[]) ?? []) {
-    for (const r of (prop.rooms as Json[]) ?? []) {
-      if (r.isVirtual) continue
-      if (String(r.roomTypeID) === roomTypeID) allRooms.push({ id: String(r.roomID), name: String(r.roomName ?? '') })
-    }
-  }
-
-  const occupied = new Set<string>()
-  for (const r of reservations) {
-    if (!ACTIVE(r.status) || String(r.reservationID) === excludeReservationID) continue
-    for (const room of (r.rooms as Json[]) ?? []) {
-      if (room.roomID) occupied.add(String(room.roomID))
-    }
-  }
-  for (const b of (((blocksJson.data ?? {}) as Json).roomBlocks as Json[]) ?? []) {
-    for (const room of (b.rooms as Json[]) ?? []) occupied.add(String(room.roomID))
-  }
-
-  return allRooms
-    .filter((r) => !occupied.has(r.id))
-    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+  return (await freeRoomsByType(cb, start, end, excludeReservationID)).get(roomTypeID) ?? []
 }
 
 export async function setArrivalTime(cb: CB, reservationID: string, time: string) {
@@ -750,19 +763,24 @@ export async function availability(cb: CB, start: string, end: string, adults: n
     children,
     pageSize: 100,
   })
+  // Counted per room type from the physical rooms, so a type's number never includes other categories.
+  const free = await freeRoomsByType(cb, start, end).catch(() => null)
   const out: AvailableRoomType[] = []
   for (const prop of (json.data as Json[]) ?? []) {
     for (const rt of (prop.propertyRooms as Json[]) ?? []) {
-      if (Number(rt.roomsAvailable ?? 0) < 1) continue
+      const own = free?.get(String(rt.roomTypeID))
+      if ((own ? own.length : Number(rt.roomsAvailable ?? 0)) < 1) continue
       out.push({
         roomTypeID: String(rt.roomTypeID),
         name: String(rt.roomTypeName ?? ''),
         maxGuests: Number(rt.maxGuests ?? 0),
-        roomsAvailable: Number(rt.roomsAvailable ?? 0),
+        roomsAvailable: free?.get(String(rt.roomTypeID)) ? free.get(String(rt.roomTypeID))!.length : Number(rt.roomsAvailable ?? 0),
         total: rt.roomRate !== undefined && rt.roomRate !== null ? Number(rt.roomRate) : null,
         roomRateID: rt.roomRateID ? String(rt.roomRateID) : null,
         ratePlan: (rt.ratePlanNamePublic as string) || null,
-        rooms: ((rt.individualRooms as Json[]) ?? []).map((r) => ({ roomID: String(r.roomID), roomName: String(r.roomName ?? '') })),
+        rooms: free?.get(String(rt.roomTypeID))
+          ? free.get(String(rt.roomTypeID))!.map((r) => ({ roomID: r.id, roomName: r.name }))
+          : ((rt.individualRooms as Json[]) ?? []).map((r) => ({ roomID: String(r.roomID), roomName: String(r.roomName ?? '') })),
       })
     }
   }

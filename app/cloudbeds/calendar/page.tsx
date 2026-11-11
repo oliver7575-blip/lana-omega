@@ -310,7 +310,7 @@ export default function CalendarPage() {
       for (const t of data.roomTypes) {
         let occ = 0
         for (const b of data.bookings) if (b.start <= d && d < b.end && roomTypeOf[b.roomID] === t.id) occ++
-        for (const bl of data.blocks) if (bl.start <= d && d < bl.end && roomTypeOf[bl.roomID] === t.id) occ++
+        for (const bl of data.blocks) if (bl.start <= d && d <= bl.end && roomTypeOf[bl.roomID] === t.id) occ++
         for (const u of data.unassigned) if (u.start <= d && d < u.end && u.roomTypeID === t.id) occ++
         perType[t.id][d] = Math.max(0, t.rooms.length - occ)
         occupiedTotal += Math.min(occ, t.rooms.length)
