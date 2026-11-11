@@ -901,3 +901,17 @@ export async function createReservation(cb: CB, r: NewReservation): Promise<{ id
   }
   return out
 }
+
+/** Blocks a room for the given dates ("blocked_dates") or takes it out of service, without a reservation. */
+export async function createRoomBlock(
+  cb: CB,
+  b: { roomID: string; startDate: string; endDate: string; type: 'blocked_dates' | 'out_of_service'; reason?: string }
+): Promise<void> {
+  await cbPost(cb, 'postRoomBlock', {
+    roomBlockType: b.type,
+    roomBlockReason: b.reason?.trim() || (b.type === 'out_of_service' ? 'Out of service' : 'Blocked'),
+    startDate: b.startDate,
+    endDate: b.endDate,
+    'rooms[0][roomID]': b.roomID,
+  })
+}

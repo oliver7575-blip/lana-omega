@@ -546,6 +546,11 @@ export default function CalendarPage() {
           today={data.today}
           initial={creating === 'blank' ? undefined : creating}
           onClose={() => setCreating(null)}
+          onBlocked={(text) => {
+            setCreating(null)
+            setToast({ ok: true, text })
+            refreshVisible()
+          }}
           onCreated={(id) => {
             setCreating(null)
             setToast({ ok: true, text: `Reservation #${id} created.` })

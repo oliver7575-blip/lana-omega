@@ -29,10 +29,11 @@ function addDays(d: string, n: number) {
 }
 const nights = (a: string, b: string) => Math.max(0, Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86400000))
 
-export default function NewReservationModal({ today, onClose, onCreated, initial }: {
+export default function NewReservationModal({ today, onClose, onCreated, onBlocked, initial }: {
   today: string
   onClose: () => void
   onCreated: (reservationID: string) => void
+  onBlocked?: (text: string) => void
   /** Dates (and optionally the room) picked on the calendar: availability is checked straight away. */
   initial?: { start: string; end: string; roomTypeID?: string; roomID?: string }
 }) {
@@ -58,6 +59,9 @@ export default function NewReservationModal({ today, onClose, onCreated, initial
   const [sendEmail, setSendEmail] = useState(true)
   const [nightly, setNightly] = useState('')
 
+  const [mode, setMode] = useState<'reservation' | 'block'>('reservation')
+  const [blockType, setBlockType] = useState<'blocked_dates' | 'out_of_service'>('blocked_dates')
+  const [blockReason, setBlockReason] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -146,21 +150,40 @@ export default function NewReservationModal({ today, onClose, onCreated, initial
     setSaving(false)
   }
 
+  async function block() {
+    setError(null)
+    setSaving(true)
+    try {
+      await cbApi('/api/cloudbeds/blocks', 'POST', { roomID, startDate: start, endDate: end, type: blockType, reason: blockReason })
+      const roomName = chosen?.rooms.find((r) => r.roomID === roomID)?.roomName ?? 'Room'
+      onBlocked?.(`${roomName} ${blockType === 'out_of_service' ? 'set out of service' : 'blocked'} ${start} → ${end}.`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not block the dates')
+    }
+    setSaving(false)
+  }
+
   const input = 'w-full rounded-md border border-gray-300 px-2 py-1.5 text-[13px] text-[#14213d] outline-none focus:border-[#3b6fe0]'
   const label = 'mb-0.5 block text-[11px] font-semibold uppercase tracking-wide text-gray-600'
   const section = 'mb-1.5 mt-4 text-[13px] font-semibold text-[#14213d]'
   const n = nights(start, end)
+  const blocking = mode === 'block'
+  const canBlock = Boolean(chosen && roomID && !saving)
   const canCreate = Boolean(chosen && firstName.trim() && lastName.trim() && email.trim() && country && paymentMethod && nightlyValid && !saving)
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-10" onClick={onClose}>
       <div className="w-full max-w-xl rounded-xl bg-white text-[#14213d] shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between rounded-t-xl bg-[#5cc3a5] px-5 py-3 text-white">
-          <p className="text-[15px] font-semibold">New reservation</p>
+          <p className="text-[15px] font-semibold">{blocking ? 'Block dates' : 'New reservation'}</p>
           <button onClick={onClose} className="text-2xl leading-none opacity-90 hover:opacity-100" aria-label="Close">×</button>
         </div>
 
         <div className="max-h-[calc(100vh-9rem)] overflow-y-auto px-5 pb-4">
+          <div className="mt-3 inline-flex overflow-hidden rounded-md border border-gray-300 text-[12px] font-semibold">
+            <button onClick={() => setMode('reservation')} className={`px-3 py-1.5 ${!blocking ? 'bg-[#3b6fe0] text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>Reservation</button>
+            <button onClick={() => setMode('block')} className={`px-3 py-1.5 ${blocking ? 'bg-[#3b6fe0] text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>Block dates / Out of service</button>
+          </div>
           <p className={section}>Stay</p>
           <div className="grid grid-cols-4 gap-2">
             <label className="col-span-1"><span className={label}>Check-in</span>
@@ -201,9 +224,9 @@ export default function NewReservationModal({ today, onClose, onCreated, initial
                 </label>
               ))}
               {chosen && chosen.rooms.length > 0 && (
-                <label className="block pt-1"><span className={label}>Room (optional)</span>
+                <label className="block pt-1"><span className={label}>{blocking ? 'Room to block *' : 'Room (optional)'}</span>
                   <select value={roomID} onChange={(e) => setRoomID(e.target.value)} className={input}>
-                    <option value="">Any available {chosen.name}</option>
+                    <option value="">{blocking ? `Select a ${chosen.name} room` : `Any available ${chosen.name}`}</option>
                     {chosen.rooms.map((r) => <option key={r.roomID} value={r.roomID}>{r.roomName}</option>)}
                   </select>
                 </label>
@@ -211,6 +234,21 @@ export default function NewReservationModal({ today, onClose, onCreated, initial
             </div>
           )}
 
+          {blocking && chosen && (
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <label><span className={label}>Type</span>
+                <select value={blockType} onChange={(e) => setBlockType(e.target.value as 'blocked_dates' | 'out_of_service')} className={input}>
+                  <option value="blocked_dates">Block dates</option>
+                  <option value="out_of_service">Out of service</option>
+                </select>
+              </label>
+              <label><span className={label}>Reason</span>
+                <input value={blockReason} onChange={(e) => setBlockReason(e.target.value)} placeholder="Optional" className={input} />
+              </label>
+            </div>
+          )}
+          {blocking && !rooms && <p className="mt-3 text-[12px] text-gray-500">Check availability, then pick the room to block. Rooms with a reservation on these dates can&apos;t be blocked.</p>}
+          {!blocking && <>
           <p className={section}>Guest</p>
           <div className="grid grid-cols-2 gap-2">
             <label><span className={label}>First name *</span><input value={firstName} onChange={(e) => setFirstName(e.target.value)} className={input} /></label>
@@ -256,19 +294,20 @@ export default function NewReservationModal({ today, onClose, onCreated, initial
             <input type="checkbox" checked={sendEmail} onChange={(e) => setSendEmail(e.target.checked)} />
             Send Cloudbeds confirmation email to the guest
           </label>
+          </>}
 
           {error && <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-[12.5px] text-red-700">{error}</p>}
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t border-gray-200 px-5 py-3">
           <span className="text-[12.5px] text-gray-600">
-            {chosen ? <>Total <b className="text-[#14213d]">{effectiveTotal !== null ? `MXN ${Math.round(effectiveTotal).toLocaleString('en-US')}` : '—'}</b> · {n} night{n === 1 ? '' : 's'}</> : 'Check availability and choose a room'}
+            {blocking ? (chosen ? 'No guest or charge — the room just becomes unavailable' : 'Check availability and choose a room') : chosen ? <>Total <b className="text-[#14213d]">{effectiveTotal !== null ? `MXN ${Math.round(effectiveTotal).toLocaleString('en-US')}` : '—'}</b> · {n} night{n === 1 ? '' : 's'}</> : 'Check availability and choose a room'}
           </span>
           <div className="flex gap-2">
             <button onClick={onClose} className="rounded-md border border-gray-300 px-3 py-1.5 text-[12.5px] font-semibold hover:bg-gray-50">Cancel</button>
-            <button onClick={create} disabled={!canCreate}
+            <button onClick={blocking ? block : create} disabled={blocking ? !canBlock : !canCreate}
               className="rounded-md bg-[#5cc3a5] px-4 py-1.5 text-[12.5px] font-semibold uppercase tracking-wide text-white hover:bg-[#4bb294] disabled:opacity-50">
-              {saving ? 'Creating…' : 'Create reservation'}
+              {blocking ? (saving ? 'Blocking…' : blockType === 'out_of_service' ? 'Set out of service' : 'Block dates') : saving ? 'Creating…' : 'Create reservation'}
             </button>
           </div>
         </div>
