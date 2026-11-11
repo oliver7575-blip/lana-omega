@@ -388,7 +388,7 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
               <div className="flex flex-nowrap gap-1.5 border-b border-gray-200 pb-4">
                 {canCheckIn && (
                   <button disabled={busy} onClick={() => act({ action: 'check_in' }, 'Checked in.')}
-                    className="rounded-full bg-[#3b6fe0] whitespace-nowrap px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#2f5fcc] disabled:opacity-60">
+                    className="rounded-full border border-blue-300 whitespace-nowrap px-3 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-50 disabled:opacity-60">
                     Check in
                   </button>
                 )}
