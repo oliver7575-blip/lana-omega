@@ -117,7 +117,7 @@ interface Note { author: string; date: string; text: string }
 /** Booking source pill: Booking.com blue, Airbnb pink, walk-in light green, anything else light grey. */
 function sourceStyle(source: string): React.CSSProperties {
   const s = source.toLowerCase()
-  if (s.includes('booking.com')) return { background: '#e3edff', borderColor: '#b9cffa', color: '#1d4ed8' }
+  if (s.includes('booking.com')) return { background: '#0b4aa8', borderColor: '#0b4aa8', color: '#ffffff' }
   if (s.includes('airbnb')) return { background: '#ffe4ea', borderColor: '#fbb6c4', color: '#d6335a' }
   if (s.includes('walk')) return { background: '#e4f6ee', borderColor: '#bfe6d6', color: '#0e6b4a' }
   return { background: '#f1f3f6', borderColor: '#dde1e8', color: '#4a5262' }
