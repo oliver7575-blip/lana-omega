@@ -495,7 +495,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
               </div>
 
               {mpKind && (
-                <div className={`mt-4 rounded-2xl border p-3 ${mpKind === 'refund' ? 'border-red-200 bg-red-50' : 'border-[#b7e0d8] bg-[#f0faf7]'}`}>
+                <div className={`mt-4 rounded-2xl border p-3 ${mpKind === 'refund' ? 'border-red-200 bg-red-50' : 'border-[#b7e0d8] bg-[#d9f0ea]'}`}>
                   <div className="mb-2 flex items-center justify-between">
                     <p className="text-sm font-semibold">{mpKind === 'refund' ? 'Refund a payment' : 'Add a payment'}</p>
                     <button onClick={() => setMpKind(null)} className="text-lg leading-none text-gray-500 hover:text-gray-800" aria-label="Close">×</button>
