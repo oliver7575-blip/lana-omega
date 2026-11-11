@@ -317,6 +317,7 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
   })()
   const canCancel = r && !['canceled', 'cancelled', 'checked_out', 'no_show'].includes(r.status)
   const isThirdParty = Boolean(r && (r.confirmationCode || /booking\.com|airbnb|expedia|agoda|vrbo|homeaway|hostelworld|tripadvisor|trip\.com|despegar|hotels\.com|google|kayak|trivago/i.test(r.source ?? '')))
+  const canCheckOut = r && ['checked_in', 'in_house'].includes(r.status)
   const canCheckIn = r && ['confirmed', 'not_confirmed'].includes(r.status) && r.startDate <= today
   const label = 'mb-0.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500'
 
@@ -402,6 +403,12 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
                   <button disabled={busy} onClick={() => act({ action: 'check_in' }, 'Checked in.')}
                     className="h-9 rounded-[10px] border border-[#2f66d0] whitespace-nowrap px-3 text-xs font-semibold text-[#2f66d0] hover:bg-blue-50 disabled:opacity-60">
                     Check in
+                  </button>
+                )}
+                {canCheckOut && (
+                  <button disabled={busy} onClick={() => act({ action: 'check_out' }, 'Checked out.')}
+                    className="h-9 rounded-[10px] border border-red-300 whitespace-nowrap px-3 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60">
+                    Check out
                   </button>
                 )}
                 <button disabled={payBusy} onClick={createPaymentLinkNow}
