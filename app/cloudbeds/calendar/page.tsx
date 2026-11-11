@@ -692,7 +692,7 @@ export default function CalendarPage() {
         )
       })()}
 
-      {open && data && <ReservationModal id={open} today={data.today} onClose={() => setOpen(null)} onChanged={refreshVisible} />}
+      {open && data && <ReservationModal id={open} today={data.today} onClose={() => setOpen(null)} onChanged={refreshVisible} onCheckedOut={(text) => setToast({ ok: true, text })} />}
     </div>
   )
 }

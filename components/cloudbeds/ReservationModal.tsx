@@ -114,11 +114,13 @@ interface PaymentLinkResult {
 
 interface Note { author: string; date: string; text: string }
 
-export default function ReservationModal({ id, today, onClose, onChanged }: {
+export default function ReservationModal({ id, today, onClose, onChanged, onCheckedOut }: {
   id: string
   today: string
   onClose: () => void
   onChanged?: () => void
+  /** Called with a short message when a check-out succeeds; the window then closes itself. */
+  onCheckedOut?: (text: string) => void
 }) {
   const [r, setR] = useState<Detail | null>(null)
   const [link, setLink] = useState('')
@@ -173,8 +175,13 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
     try {
       const j = await cbApi<{ reservation: Detail }>(`/api/cloudbeds/reservation/${id}`, 'POST', body)
       apply(j.reservation)
-      setMsg(ok)
       onChanged?.()
+      if (body.action === 'check_out') {
+        onCheckedOut?.(`${j.reservation.guestName}: ${ok.replace(/\.$/, '').toLowerCase()}.`)
+        onClose()
+        return
+      }
+      setMsg(ok)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Cloudbeds error')
     }
