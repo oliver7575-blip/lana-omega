@@ -119,6 +119,12 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
   const [quickText, setQuickText] = useState('')
   const [quickSubject, setQuickSubject] = useState('')
   const [quickBusy, setQuickBusy] = useState(false)
+  const [sigDefault, setSigDefault] = useState('')
+  const [sig, setSig] = useState('')
+  const [sigOn, setSigOn] = useState(true)
+  const [sigEdit, setSigEdit] = useState(false)
+  const [sigCanEdit, setSigCanEdit] = useState(false)
+  const [sigLoaded, setSigLoaded] = useState(false)
   const [waInfo, setWaInfo] = useState<{ conversationId: string; windowOpen: boolean; language: string | null } | null>(null)
   const [helloLang, setHelloLang] = useState<'es' | 'en'>('en')
   const [quickMsg, setQuickMsg] = useState<{ ok: boolean; text: string } | null>(null)
@@ -175,6 +181,17 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
   function openQuick(kind: 'whatsapp' | 'email') {
     setQuick((q) => (q === kind ? null : kind))
     setQuickMsg(null)
+    if (kind === 'email' && !sigLoaded) {
+      fetch('/api/email-signature')
+        .then((res) => res.json())
+        .then((j: { signature?: string; canEdit?: boolean }) => {
+          setSigDefault(j.signature ?? '')
+          setSig(j.signature ?? '')
+          setSigCanEdit(Boolean(j.canEdit))
+        })
+        .catch(() => {})
+        .finally(() => setSigLoaded(true))
+    }
     if (kind === 'whatsapp' && !waInfo) {
       // Is the 24-hour window open? Decides between free text and the approved template.
       cbApi<{ conversationId: string; windowOpen: boolean; language: string | null }>(`/api/cloudbeds/reservation/${id}/conversation`)
@@ -221,13 +238,28 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
           setQuickMsg({ ok: true, text: 'Sent on WhatsApp as the Soirée hello message.' })
         }
       } else {
-        const j = await cbApi<{ to: string }>(`/api/cloudbeds/reservation/${id}/email`, 'POST', { subject: quickSubject, body: quickText })
+        const j = await cbApi<{ to: string }>(`/api/cloudbeds/reservation/${id}/email`, 'POST', { subject: quickSubject, body: quickText, signature: sigOn ? sig : '' })
         setQuickMsg({ ok: true, text: `Email sent to ${j.to}.` })
       }
       setQuickText('')
       if (quick === 'email') setQuickSubject('')
     } catch (e) {
       setQuickMsg({ ok: false, text: e instanceof Error ? e.message : 'Could not send' })
+    }
+    setQuickBusy(false)
+  }
+
+  async function saveSignatureDefault() {
+    setQuickBusy(true)
+    try {
+      const res = await fetch('/api/email-signature', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ signature: sig }) })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error ?? 'Could not save the signature')
+      setSigDefault(sig.trim())
+      setSigEdit(false)
+      setQuickMsg({ ok: true, text: 'Signature saved as the default.' })
+    } catch (e) {
+      setQuickMsg({ ok: false, text: e instanceof Error ? e.message : 'Could not save the signature' })
     }
     setQuickBusy(false)
   }
@@ -373,6 +405,32 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
                     onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) sendQuick() }}
                     placeholder={quick === 'whatsapp' ? (waInfo && !waInfo.windowOpen ? 'Why are you writing? One short sentence.' : 'Write a message… (sent as staff, like on the Messages page)') : 'Write the email…'}
                     className="w-full resize-none rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#128c7e]" />
+                  {quick === 'email' && (
+                    <div className="mt-2 rounded-md border border-dashed border-gray-300 bg-white px-3 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="flex items-center gap-2 text-xs font-semibold text-gray-600">
+                          <input type="checkbox" checked={sigOn} onChange={(e) => setSigOn(e.target.checked)} /> Signature
+                        </label>
+                        <button onClick={() => setSigEdit((v) => !v)} className="text-xs text-[#3b6fe0] hover:underline">{sigEdit ? 'Done' : sig ? 'Edit' : 'Add'}</button>
+                      </div>
+                      {sigEdit ? (
+                        <>
+                          <textarea value={sig} onChange={(e) => setSig(e.target.value)} rows={4} placeholder={'Oliver\nSoirée · Zipolite, Oaxaca\nsoiree.mx'}
+                            className="mt-1.5 w-full resize-none rounded-md border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-[#128c7e]" />
+                          <div className="mt-1 flex items-center gap-3 text-xs">
+                            {sigCanEdit && sig.trim() !== sigDefault && (
+                              <button disabled={quickBusy} onClick={saveSignatureDefault} className="font-semibold text-[#128c7e] hover:underline">Save as default for everyone</button>
+                            )}
+                            <span className="text-gray-500">Changes here apply to this email only unless you save them.</span>
+                          </div>
+                        </>
+                      ) : sigOn && sig ? (
+                        <p className="mt-1 whitespace-pre-wrap text-xs text-gray-600">{sig}</p>
+                      ) : !sig ? (
+                        <p className="mt-1 text-xs text-gray-400">No signature yet.</p>
+                      ) : null}
+                    </div>
+                  )}
                   <div className="mt-2 flex items-center gap-3">
                     <button disabled={quickBusy || !quickText.trim() || (quick === 'email' && !quickSubject.trim())} onClick={sendQuick}
                       className="rounded-full bg-[#128c7e] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#0f776b] disabled:opacity-50">
