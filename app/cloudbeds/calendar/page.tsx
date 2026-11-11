@@ -8,8 +8,8 @@ import BlockModal from '@/components/cloudbeds/BlockModal'
 import SearchBar from '@/components/cloudbeds/SearchBar'
 import { cbApi } from '@/components/cloudbeds/shared'
 
-interface Booking { reservationID: string; guestName: string; status: string; roomID: string; start: string; end: string }
-interface Unassigned { reservationID: string; guestName: string; roomTypeID: string; start: string; end: string; status: string }
+interface Booking { reservationID: string; guestName: string; status: string; roomID: string; start: string; end: string; due?: boolean }
+interface Unassigned { reservationID: string; guestName: string; roomTypeID: string; start: string; end: string; status: string; due?: boolean }
 interface Block { roomBlockID: string; type: string; roomID: string; start: string; end: string; reason: string }
 interface RoomType { id: string; name: string; rates: Record<string, number>; rateID?: string; rooms: { id: string; name: string }[] }
 interface Chunk {
@@ -78,9 +78,9 @@ function mergeChunk(prev: Chunk | null, next: Chunk, from: string, to: string): 
   }
 }
 
-function Bar({ start, end, viewStart, totalDays, label, bg, border, text, onClick, onContextMenu, title, dayW }: {
+function Bar({ start, end, viewStart, totalDays, label, bg, border, text, onClick, onContextMenu, title, dayW, due }: {
   start: string; end: string; viewStart: string; totalDays: number; label: string; bg: string; border: string; text: string; onClick?: () => void
-  onContextMenu?: (e: React.MouseEvent) => void; title?: string; dayW: number
+  onContextMenu?: (e: React.MouseEvent) => void; title?: string; dayW: number; due?: boolean
 }) {
   const from = diff(viewStart, start) + 0.5
   const to = diff(viewStart, end) + 0.5
@@ -95,6 +95,7 @@ function Bar({ start, end, viewStart, totalDays, label, bg, border, text, onClic
       className="absolute top-1 flex items-center overflow-hidden whitespace-nowrap rounded-lg border px-2.5 text-left text-[11px] font-semibold leading-none hover:brightness-95"
       style={{ left: left + 1, width: right - left - 2, height: ROW_H - 8, background: bg, borderColor: border, color: text }}
     >
+      {due && <i aria-label="Balance due" className="absolute left-[3px] top-[3px] h-[6px] w-[6px] rounded-full bg-[#e5484d]" />}
       <span className="truncate">{label}</span>
     </button>
   )
@@ -635,13 +636,13 @@ export default function CalendarPage() {
                             })}
                             {stays.map((s) => (
                               <Bar key={`${s.reservationID}-${s.start}`} start={s.start} end={s.end} viewStart={data.start} totalDays={totalDays}
-                                label={s.guestName} bg={barColors(s.status).bg} border={barColors(s.status).border} text={barColors(s.status).text} onClick={() => setOpen(s.reservationID)} dayW={dayW}
+                                label={s.guestName} due={s.due} bg={barColors(s.status).bg} border={barColors(s.status).border} text={barColors(s.status).text} onClick={() => setOpen(s.reservationID)} dayW={dayW}
                                 onContextMenu={(e) => {
                                   e.preventDefault()
                                   e.stopPropagation()
                                   setMenu({ x: e.clientX, y: e.clientY, reservationID: s.reservationID, guestName: s.guestName, status: s.status, roomID: isUnassigned ? null : room.id })
                                 }}
-                                title={`${s.guestName} · ${s.status.replace(/_/g, ' ')} · ${s.start} → ${s.end}`} />
+                                title={`${s.guestName} · ${s.status.replace(/_/g, ' ')} · ${s.start} → ${s.end}${s.due ? ' · balance due' : ''}`} />
                             ))}
                           </div>
                         </div>
