@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { cloudbedsForCaller } from '@/lib/cloudbeds-caller'
-import { assignRoom, checkIn, cloudbedsLinks, getGuestProfile, getReservationDetail, getReservationNotes, setArrivalTime, setStatus, setStayDates, unassignRoom } from '@/lib/cloudbeds-ops'
+import { assignRoom, checkIn, cloudbedsLinks, getGuestProfile, getReservationDetail, getReservationGuestContact, getReservationNotes, setArrivalTime, setStatus, setStayDates, unassignRoom } from '@/lib/cloudbeds-ops'
 
 export const maxDuration = 60
 
@@ -13,7 +13,16 @@ export async function GET(_r: Request, { params }: { params: Promise<{ id: strin
       getReservationDetail(c.cb, id),
       getReservationNotes(c.cb, id).catch(() => []),
     ])
-    // Contact details are sometimes only on the guest's own profile, not on the reservation.
+    // getReservation doesn't carry the guest's phone/email for this account; the list endpoint with guest details does.
+    if (!reservation.guestPhone || !reservation.guestEmail) {
+      try {
+        const contact = await getReservationGuestContact(c.cb, id)
+        reservation.guestPhone ??= contact.phone
+        reservation.guestEmail ??= contact.email
+      } catch {
+        // Best-effort: the window still works without it.
+      }
+    }
     if (reservation.guestID && (!reservation.guestPhone || !reservation.guestEmail || !reservation.guestCountry)) {
       try {
         const p = await getGuestProfile(c.cb, reservation.guestID)
@@ -28,7 +37,7 @@ export async function GET(_r: Request, { params }: { params: Promise<{ id: strin
         reservation.guestEmail ??= pick('guestEmail', 'email')
         reservation.guestCountry ??= pick('guestCountry', 'country')
       } catch {
-        // Best-effort: the window still works without the profile.
+        // Best-effort.
       }
     }
     return NextResponse.json({ reservation, notes, link: cloudbedsLinks(c.cb.propertyId).reservation(id) })
