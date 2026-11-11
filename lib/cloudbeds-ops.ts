@@ -118,6 +118,29 @@ export interface ReservationDetail {
   total: number | null
   balance: number | null
   estimatedArrivalTime: string | null
+  guestCountry: string | null
+  /** When the reservation was made, as Cloudbeds reports it. */
+  dateCreated: string | null
+  /** The channel's own confirmation code (Airbnb / Booking.com / Expedia…). */
+  confirmationCode: string | null
+  /** Free-text the guest sent with the booking, if any. */
+  specialRequests: string | null
+  /** Cloudbeds' own split of the total: room subtotal, extras, taxes & fees, paid. */
+  breakdown: { subTotal: number | null; additionalItems: number | null; taxesFees: number | null; paid: number | null }
+}
+
+export interface ReservationNote { author: string; date: string; text: string }
+
+/** The notes staff have written on a reservation in Cloudbeds. */
+export async function getReservationNotes(cb: CB, reservationID: string): Promise<ReservationNote[]> {
+  const json = await cbGet(cb, 'getReservationNotes', { propertyID: cb.propertyId, reservationID })
+  return ((json.data as Json[]) ?? [])
+    .map((n) => ({
+      author: String(n.userName ?? n.user ?? '').trim(),
+      date: String(n.dateCreated ?? n.dateModified ?? '').trim(),
+      text: String(n.reservationNote ?? n.note ?? '').trim(),
+    }))
+    .filter((n) => n.text)
 }
 
 /** The raw getReservation record (used by payments to read source, balance and deposit fields). */
@@ -154,11 +177,23 @@ export async function getReservationDetail(cb: CB, reservationID: string): Promi
     children: Number(r.children ?? 0),
   }))
   const rooms = [...assigned, ...unassigned]
+  // Contact details live on the guest entry of guestList, not at the top level.
+  const guestEntry = (d.guestList as Record<string, Json> | undefined)?.[String(d.guestID ?? '')] ?? {}
+  const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
   return {
     reservationID: String(d.reservationID ?? reservationID),
     guestName: String(d.guestName ?? ''),
-    guestEmail: (d.guestEmail as string) ?? null,
-    guestPhone: (d.guestPhone as string) || (d.guestCellPhone as string) || null,
+    guestEmail: text(d.guestEmail) ?? text(guestEntry.guestEmail),
+    guestPhone: text(d.guestPhone) ?? text(d.guestCellPhone) ?? text(guestEntry.guestPhone) ?? text(guestEntry.guestCellPhone),
+    guestCountry: text(d.guestCountry) ?? text(guestEntry.guestCountry),
+    dateCreated: text(d.dateCreated),
+    confirmationCode: text(d.thirdPartyIdentifier),
+    specialRequests: text(d.specialRequests) ?? text(d.guestSpecialRequests),
+    breakdown: (() => {
+      const b = (d.balanceDetailed ?? {}) as Json
+      const num = (v: unknown) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v))
+      return { subTotal: num(b.subTotal), additionalItems: num(b.additionalItems), taxesFees: num(b.taxesFees), paid: num(b.paid) }
+    })(),
     status: String(d.status ?? ''),
     source: (d.source as string) ?? null,
     startDate: String(d.startDate ?? ''),

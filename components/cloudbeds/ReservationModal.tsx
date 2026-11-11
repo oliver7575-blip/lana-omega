@@ -66,7 +66,16 @@ interface Detail {
   total: number | null
   balance: number | null
   estimatedArrivalTime: string | null
+  guestEmail: string | null
+  guestPhone: string | null
+  guestCountry: string | null
+  dateCreated: string | null
+  confirmationCode: string | null
+  specialRequests: string | null
+  breakdown: { subTotal: number | null; additionalItems: number | null; taxesFees: number | null; paid: number | null }
 }
+
+interface Note { author: string; date: string; text: string }
 
 export default function ReservationModal({ id, today, onClose, onChanged }: {
   id: string
@@ -76,6 +85,7 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
 }) {
   const [r, setR] = useState<Detail | null>(null)
   const [link, setLink] = useState('')
+  const [notes, setNotes] = useState<Note[]>([])
   const [error, setError] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -96,8 +106,8 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
   }
 
   useEffect(() => {
-    cbApi<{ reservation: Detail; link: string }>(`/api/cloudbeds/reservation/${id}`)
-      .then((j) => { apply(j.reservation); setLink(j.link) })
+    cbApi<{ reservation: Detail; link: string; notes?: Note[] }>(`/api/cloudbeds/reservation/${id}`)
+      .then((j) => { apply(j.reservation); setLink(j.link); setNotes(j.notes ?? []) })
       .catch((e) => setError(e.message))
   }, [id])
 
@@ -145,7 +155,7 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-2xl overflow-hidden rounded-xl bg-white text-[#14213d] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-3xl overflow-hidden rounded-xl bg-white text-[#14213d] shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between px-6 py-4 text-white" style={{ background: color.head }}>
           <div>
             <p className="text-lg font-semibold">{r ? `${r.guestName} · ${statusLabel(r.status)}` : 'Loading…'}</p>
@@ -158,12 +168,45 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
         {msg && <p className="mx-6 mt-4 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{msg}</p>}
 
         {r && (
-          <div className="grid gap-0 sm:grid-cols-[200px_1fr]">
+          <div className="grid gap-0 sm:grid-cols-[250px_1fr]">
             <div className="space-y-3 border-b border-gray-200 px-6 py-5 text-sm sm:border-b-0 sm:border-r">
+              <div>
+                <p className={label}>Guest</p>
+                <p>{r.guestName || '—'}</p>
+                {r.guestPhone && <p><a href={`tel:${r.guestPhone.replace(/[^\d+]/g, '')}`} className="text-[#3b6fe0] hover:underline">{r.guestPhone}</a></p>}
+                {r.guestEmail && <p className="break-all"><a href={`mailto:${r.guestEmail}`} className="text-[#3b6fe0] hover:underline">{r.guestEmail}</a></p>}
+                {r.guestCountry && <p className="text-gray-500">{r.guestCountry}</p>}
+                {!r.guestPhone && !r.guestEmail && <p className="text-gray-500">No contact details</p>}
+              </div>
+              <div>
+                <p className={label}>Source</p>
+                <p>{r.source ?? '—'}</p>
+                {r.confirmationCode && <p className="break-all text-gray-500">{r.confirmationCode}</p>}
+              </div>
+              <div><p className={label}>Booked on</p><p>{r.dateCreated ? r.dateCreated.slice(0, 10) : '—'}</p></div>
               <div><p className={label}>Check-in / Out</p><p>{r.startDate} – {r.endDate}</p></div>
               <div><p className={label}>Guests</p><p>{r.adults + r.children}</p></div>
               <div><p className={label}>Room</p><p>{r.rooms.map((x) => x.roomName ?? `${x.roomTypeName} (unassigned)`).join(', ') || '—'}</p></div>
-              <div><p className={label}>Grand Total</p><p>MXN {r.total?.toLocaleString('en-US') ?? '—'}</p></div>
+              <div>
+                <p className={label}>Price</p>
+                {(() => {
+                  const m = (n: number | null) => `MXN ${n === null ? '—' : n.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
+                  const b = r.breakdown
+                  const paid = b.paid ?? (r.total !== null && r.balance !== null ? r.total - r.balance : null)
+                  const line = (k: string, v: string, strong = false) => (
+                    <p className={`flex justify-between gap-2 ${strong ? 'mt-1 border-t border-gray-200 pt-1 font-semibold' : ''}`}><span className={strong ? '' : 'text-gray-500'}>{k}</span><span>{v}</span></p>
+                  )
+                  return (
+                    <div className="mt-0.5">
+                      {b.subTotal !== null && line('Room', m(b.subTotal))}
+                      {b.additionalItems !== null && b.additionalItems !== 0 && line('Extras', m(b.additionalItems))}
+                      {b.taxesFees !== null && line('Taxes & fees', m(b.taxesFees))}
+                      {line('Grand total', m(r.total), true)}
+                      {line('Paid', m(paid))}
+                    </div>
+                  )
+                })()}
+              </div>
               <div>
                 <p className={label}>Balance Due</p>
                 <p className={r.balance && r.balance > 0 ? 'text-red-600' : ''}>MXN {r.balance?.toLocaleString('en-US') ?? '—'}</p>
@@ -188,6 +231,30 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
                   {messagesBusy ? 'Opening…' : 'Messages'}
                 </button>
               </div>
+
+              {(r.specialRequests || notes.length > 0) && (
+                <div className="mt-4 space-y-2">
+                  {r.specialRequests && (
+                    <div className="rounded-md bg-amber-50 px-3 py-2 text-sm">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Special requests</p>
+                      <p className="whitespace-pre-wrap">{r.specialRequests}</p>
+                    </div>
+                  )}
+                  {notes.length > 0 && (
+                    <div>
+                      <p className="mb-1 text-sm font-semibold">Notes</p>
+                      <div className="max-h-40 space-y-1.5 overflow-y-auto">
+                        {notes.map((n, i) => (
+                          <div key={i} className="rounded-md bg-gray-50 px-3 py-2 text-sm">
+                            <p className="whitespace-pre-wrap">{n.text}</p>
+                            <p className="mt-0.5 text-[11px] text-gray-500">{[n.author, n.date.slice(0, 16)].filter(Boolean).join(' · ')}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <p className="mb-1.5 mt-4 text-sm font-semibold">Estimated arrival time</p>
               <div className="flex gap-2">
