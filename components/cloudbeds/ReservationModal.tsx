@@ -476,14 +476,10 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
               <div>
                 <p className={label}>Balance Due</p>
                 <p className={r.balance && r.balance > 0 ? 'text-red-600' : ''}>MXN {r.balance?.toLocaleString('en-US') ?? '—'}</p>
-                <div className="mt-2 flex gap-1.5">
-                  <button onClick={() => openMoney('payment')} className="h-7 rounded-lg border border-gray-300 bg-white px-2.5 text-[11.5px] font-semibold hover:bg-gray-50">+ Add payment</button>
-                  <button onClick={() => openMoney('refund')} className="h-7 rounded-lg border border-gray-300 bg-white px-2.5 text-[11.5px] font-semibold text-red-600 hover:bg-red-50">Refund</button>
-                </div>
               </div>
             </div>
             <div className="px-6 py-5">
-              <div className="flex flex-nowrap gap-1.5 border-b border-gray-200 pb-4">
+              <div className="flex flex-wrap gap-1.5 border-b border-gray-200 pb-4">
                 {canCheckIn && (
                   <button disabled={busy} onClick={() => act({ action: 'check_in' }, 'Checked in.')}
                     className="h-9 rounded-[10px] border border-[#2f66d0] whitespace-nowrap px-3 text-xs font-semibold text-[#2f66d0] hover:bg-blue-50 disabled:opacity-60">
@@ -499,6 +495,14 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                 <button disabled={payBusy} onClick={createPaymentLinkNow}
                   className="h-9 rounded-[10px] border border-gray-300 whitespace-nowrap px-3 text-xs font-semibold text-[#14213d] hover:bg-gray-50 disabled:opacity-60">
                   {payBusy ? 'Creating…' : 'Create Payment Link'}
+                </button>
+                <button onClick={() => openMoney('payment')}
+                  className="h-9 rounded-[10px] border border-gray-300 whitespace-nowrap px-3 text-xs font-semibold text-[#14213d] hover:bg-gray-50">
+                  + Add payment
+                </button>
+                <button onClick={() => openMoney('refund')}
+                  className="h-9 rounded-[10px] border border-gray-300 whitespace-nowrap px-3 text-xs font-semibold text-red-600 hover:bg-red-50">
+                  Refund
                 </button>
                 {canCancel && (
                   <button disabled={busy} onClick={() => setConfirmCancel(true)}
