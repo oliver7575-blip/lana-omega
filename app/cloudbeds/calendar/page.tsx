@@ -474,8 +474,8 @@ export default function CalendarPage() {
                       const stays = isUnassigned ? unassigned.map((u) => ({ ...u, roomID: room.id })) : data.bookings.filter((b) => b.roomID === room.id)
                       const blocks = data.blocks.filter((b) => b.roomID === room.id)
                       return (
-                        <div key={room.id} className="flex border-t border-gray-100">
-                          <div className={`sticky left-0 z-10 border-r-2 border-gray-200 bg-white px-2.5 text-[10.5px] font-semibold ${isUnassigned ? 'italic text-amber-700' : ''}`}
+                        <div key={room.id} className="group flex border-t border-gray-200 hover:bg-[#f4f8fb]">
+                          <div className={`sticky left-0 z-10 border-r-2 border-gray-200 bg-white px-2.5 text-[11px] font-semibold group-hover:bg-[#f4f8fb] ${isUnassigned ? 'italic text-amber-700' : ''}`}
                             style={{ width: LEFT_W, minWidth: LEFT_W, height: ROW_H, lineHeight: `${ROW_H}px` }}>
                             {room.name}
                           </div>
@@ -489,7 +489,7 @@ export default function CalendarPage() {
                                 <div key={d}
                                   onClick={canPick ? () => clickDay(room, t.id, d) : undefined}
                                   onMouseEnter={pick && pick.roomID === room.id ? () => setPick((p) => (p ? { ...p, hover: d } : p)) : undefined}
-                                  className={`border-r border-gray-100 ${canPick ? 'cursor-pointer hover:bg-[#e6f6f0]' : ''} ${new Date(`${d}T12:00:00Z`).getUTCDate() === 1 ? 'border-l-2 border-l-gray-300' : ''} ${inRange ? 'bg-[#bfe7d8]' : d === data.today ? 'bg-[#f1fbf7]' : ''}`}
+                                  className={`border-r ${new Date(`${d}T12:00:00Z`).getUTCDay() === 1 ? 'border-r-gray-200' : 'border-r-gray-200/70'} ${[0, 6].includes(new Date(`${d}T12:00:00Z`).getUTCDay()) && d !== data.today && !inRange ? 'bg-[#f8f9fb]' : ''} ${canPick ? 'cursor-pointer hover:bg-[#e6f6f0]' : ''} ${new Date(`${d}T12:00:00Z`).getUTCDate() === 1 ? 'border-l-2 border-l-gray-300' : ''} ${inRange ? 'bg-[#bfe7d8]' : d === data.today ? 'bg-[#f1fbf7]' : ''}`}
                                   style={{ width: dayW, minWidth: dayW }} />
                               )
                             })}
