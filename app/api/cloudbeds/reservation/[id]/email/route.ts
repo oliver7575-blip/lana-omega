@@ -26,10 +26,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!staff) return NextResponse.json({ error: 'No tenant record found' }, { status: 404 })
   const tenantId = staff.tenant_id as string
 
-  const body = (await request.json().catch(() => ({}))) as { subject?: string; body?: string }
+  const body = (await request.json().catch(() => ({}))) as { subject?: string; body?: string; signature?: string }
   const subject = (body.subject ?? '').trim()
-  const text = (body.body ?? '').trim()
-  if (!subject || !text) return NextResponse.json({ error: 'Add a subject and a message.' }, { status: 400 })
+  const message = (body.body ?? '').trim()
+  const signature = (body.signature ?? '').trim().slice(0, 1500)
+  const text = signature ? `${message}\n\n${signature}` : message
+  if (!subject || !message) return NextResponse.json({ error: 'Add a subject and a message.' }, { status: 400 })
 
   try {
     // The address comes from Cloudbeds, never from the browser.
@@ -37,10 +39,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const to = contact.email ?? reservation.guestEmail
     if (!to) return NextResponse.json({ error: 'This guest has no email address on file.' }, { status: 404 })
 
-    const html = text
-      .split(/\n{2,}/)
-      .map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`)
-      .join('')
+    // The message and the signature are separate blocks; the signature keeps its own line breaks.
+    const html =
+      message
+        .split(/\n{2,}/)
+        .map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`)
+        .join('') +
+      (signature ? `<p style="margin-top:20px">${escapeHtml(signature).replace(/\n/g, '<br>')}</p>` : '')
     const res = await sendTenantEmail(tenantId, to, subject, html, { text })
     if (!res.success) return NextResponse.json({ error: res.error ?? 'The email could not be sent.' }, { status: 502 })
 
