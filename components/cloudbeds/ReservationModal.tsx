@@ -114,13 +114,15 @@ interface PaymentLinkResult {
 
 interface Note { author: string; date: string; text: string }
 
-export default function ReservationModal({ id, today, onClose, onChanged, onCheckedOut }: {
+export default function ReservationModal({ id, today, onClose, onChanged, onCheckedOut, onBalance }: {
   id: string
   today: string
   onClose: () => void
   onChanged?: () => void
   /** Called with a short message when a check-in or check-out succeeds; the window then closes itself. */
   onCheckedOut?: (text: string) => void
+  /** Called with the new balance after a payment or refund is recorded. */
+  onBalance?: (reservationID: string, balance: number | null) => void
 }) {
   const [r, setR] = useState<Detail | null>(null)
   const [link, setLink] = useState('')
@@ -188,6 +190,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
     try {
       const j = await cbApi<{ reservation: Detail }>(`/api/cloudbeds/reservation/${id}/payment`, 'POST', { kind: mpKind, amount: Number(mpAmount), method: mpMethod, note: mpNote })
       apply(j.reservation)
+      onBalance?.(id, j.reservation.balance)
       const text = `${mpKind === 'refund' ? 'Refund' : 'Payment'} of MXN ${Number(mpAmount).toLocaleString('en-US')} recorded.`
       setMpKind(null)
       onChanged?.()

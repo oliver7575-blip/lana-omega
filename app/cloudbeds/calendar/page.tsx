@@ -116,6 +116,9 @@ export default function CalendarPage() {
   const [hoverDay, setHoverDay] = useState<string | null>(null) // column under the pointer
   const [markDay, setMarkDay] = useState<string | null>(null) // column marked by clicking its date
   const [typeOrder, setTypeOrder] = useState<string[]>([])
+  // Balance changes made here show at once (Cloudbeds can lag a moment before its list reflects them).
+  const dueOverride = useRef<Map<string, { due: boolean; until: number }>>(new Map())
+  const [, bumpDue] = useState(0)
   const [dragType, setDragType] = useState<string | null>(null)
   const [priceEdit, setPriceEdit] = useState<{ typeID: string; day: string; value: string; through: string; x: number; y: number; busy: boolean; err: string | null } | null>(null)
 
@@ -210,6 +213,15 @@ export default function CalendarPage() {
     if (!el || loading) return
     if (el.scrollLeft < EDGE_PX) loadMore('past')
     else if (el.scrollLeft + el.clientWidth > el.scrollWidth - EDGE_PX) loadMore('future')
+  }
+
+  const dueOf = (id: string, due?: boolean) => {
+    const o = dueOverride.current.get(id)
+    return o && o.until > Date.now() ? o.due : due
+  }
+  const onBalance = (id: string, balance: number | null) => {
+    dueOverride.current.set(id, { due: Number(balance ?? 0) > 0.005, until: Date.now() + 120000 })
+    bumpDue((n) => n + 1)
   }
 
   const savePrice = async () => {
@@ -636,7 +648,7 @@ export default function CalendarPage() {
                             })}
                             {stays.map((s) => (
                               <Bar key={`${s.reservationID}-${s.start}`} start={s.start} end={s.end} viewStart={data.start} totalDays={totalDays}
-                                label={s.guestName} due={s.due} bg={barColors(s.status).bg} border={barColors(s.status).border} text={barColors(s.status).text} onClick={() => setOpen(s.reservationID)} dayW={dayW}
+                                label={s.guestName} due={dueOf(s.reservationID, s.due)} bg={barColors(s.status).bg} border={barColors(s.status).border} text={barColors(s.status).text} onClick={() => setOpen(s.reservationID)} dayW={dayW}
                                 onContextMenu={(e) => {
                                   e.preventDefault()
                                   e.stopPropagation()
@@ -762,7 +774,7 @@ export default function CalendarPage() {
           </>
         )
       })()}
-      {open && data && <ReservationModal id={open} today={data.today} onClose={() => setOpen(null)} onChanged={refreshVisible} onCheckedOut={(text) => setToast({ ok: true, text })} />}
+      {open && data && <ReservationModal id={open} today={data.today} onClose={() => setOpen(null)} onChanged={refreshVisible} onCheckedOut={(text) => setToast({ ok: true, text })} onBalance={onBalance} />}
     </div>
   )
 }
