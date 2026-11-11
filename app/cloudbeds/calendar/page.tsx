@@ -24,16 +24,16 @@ interface Chunk {
 }
 
 const LEFT_W = 156
-const ROW_H = 34
+const ROW_H = 30
 const SPANS = [{ days: 7, label: '1w' }, { days: 14, label: '2w' }, { days: 21, label: '3w' }, { days: 30, label: '1m' }] as const
 const DEFAULT_SPAN = 21 // days that fit on screen by default
 const MIN_DAY_W = 30
 const CHUNK = 28 // days loaded each time you scroll near an edge
 const EDGE_PX = 400
-const MONTH_ROW_H = 22
-const PCT_ROW_H = 20
-const DAY_ROW_H = 46
-const TYPE_ROW_H = 38
+const MONTH_ROW_H = 20
+const PCT_ROW_H = 18
+const DAY_ROW_H = 40
+const TYPE_ROW_H = 34
 
 // Soft bar colours by reservation status (text stays dark enough to read on each).
 const BAR: Record<string, { bg: string; border: string; text: string }> = {
