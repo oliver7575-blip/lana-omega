@@ -337,14 +337,14 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
                   <p>
                     <button onClick={() => openQuick('whatsapp')} title="Send a WhatsApp message"
                       className={`hover:underline ${quick === 'whatsapp' ? 'font-semibold text-[#128c7e]' : 'text-[#3b6fe0]'}`}>{r.guestPhone}</button>
-                    <button onClick={() => openQuick('whatsapp')} title="Send a WhatsApp message" className="ml-2 inline-block rounded-full border border-gray-300 px-2 py-px align-middle text-[10px] font-medium uppercase tracking-wide text-gray-500 hover:border-[#128c7e] hover:text-[#128c7e]">message</button>
+                    <button onClick={() => openQuick('whatsapp')} title="Send a WhatsApp message" className="ml-2 inline-block rounded-full border border-gray-300 px-1.5 py-0 align-middle text-[8px] font-medium uppercase leading-[14px] tracking-wide text-gray-500 hover:border-[#128c7e] hover:text-[#128c7e]">message</button>
                   </p>
                 )}
                 {r.guestEmail && (
                   <p className="break-all">
                     <button onClick={() => openQuick('email')} title="Send an email"
                       className={`break-all text-left hover:underline ${quick === 'email' ? 'font-semibold text-[#128c7e]' : 'text-[#3b6fe0]'}`}>{r.guestEmail}</button>
-                    <button onClick={() => openQuick('email')} title="Send an email" className="ml-2 inline-block rounded-full border border-gray-300 px-2 py-px align-middle text-[10px] font-medium uppercase tracking-wide text-gray-500 hover:border-[#128c7e] hover:text-[#128c7e]">email</button>
+                    <button onClick={() => openQuick('email')} title="Send an email" className="ml-2 inline-block rounded-full border border-gray-300 px-1.5 py-0 align-middle text-[8px] font-medium uppercase leading-[14px] tracking-wide text-gray-500 hover:border-[#128c7e] hover:text-[#128c7e]">email</button>
                   </p>
                 )}
                 {r.guestCountry && <p>{countryName(r.guestCountry)}</p>}
