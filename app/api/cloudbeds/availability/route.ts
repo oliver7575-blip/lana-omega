@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { cloudbedsForCaller } from '@/lib/cloudbeds-caller'
-import { availability, availableRoomsOfType, bookingOptions } from '@/lib/cloudbeds-ops'
+import { allRoomsByType, availability, availableRoomsOfType, bookingOptions } from '@/lib/cloudbeds-ops'
 
 export const maxDuration = 60
 
@@ -16,6 +16,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url)
   try {
     if (url.searchParams.get('options')) return NextResponse.json(await bookingOptions(c.cb))
+    if (url.searchParams.get('allRooms')) return NextResponse.json({ groups: await allRoomsByType(c.cb) })
     const start = url.searchParams.get('start') ?? ''
     const end = url.searchParams.get('end') ?? ''
     if (!DATE.test(start) || !DATE.test(end) || end <= start) {

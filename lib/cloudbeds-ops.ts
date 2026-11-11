@@ -915,3 +915,19 @@ export async function createRoomBlock(
     'rooms[0][roomID]': b.roomID,
   })
 }
+
+/** Every physical room grouped by room type — for blocking dates, where availability shouldn't gate the choice. */
+export async function allRoomsByType(cb: CB): Promise<{ typeName: string; rooms: { id: string; name: string }[] }[]> {
+  const json = await cbGet(cb, 'getRooms', { propertyIDs: cb.propertyId, pageSize: 100 })
+  const types = new Map<string, { typeName: string; rooms: { id: string; name: string }[] }>()
+  for (const prop of (json.data as Json[]) ?? []) {
+    for (const r of (prop.rooms as Json[]) ?? []) {
+      if (r.isVirtual) continue
+      const id = String(r.roomTypeID)
+      if (!types.has(id)) types.set(id, { typeName: String(r.roomTypeName ?? 'Rooms'), rooms: [] })
+      types.get(id)!.rooms.push({ id: String(r.roomID), name: String(r.roomName ?? '') })
+    }
+  }
+  for (const t of types.values()) t.rooms.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+  return [...types.values()]
+}

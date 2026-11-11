@@ -63,7 +63,7 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
   const [mode, setMode] = useState<'reservation' | 'block'>(initialMode ?? 'reservation')
   const [blockType, setBlockType] = useState<'blocked_dates' | 'out_of_service'>('blocked_dates')
   const [blockReason, setBlockReason] = useState('')
-  const [blockRooms, setBlockRooms] = useState<{ id: string; name: string }[] | null>(null)
+  const [blockGroups, setBlockGroups] = useState<{ typeName: string; rooms: { id: string; name: string }[] }[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -152,28 +152,26 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
     setSaving(false)
   }
 
-  // Block mode: list the type's free rooms (Cloudbeds doesn't always name them in the availability result).
+  // Block mode: every room is offered (availability must not gate it); Cloudbeds rejects a clash itself.
   useEffect(() => {
-    if (mode !== 'block' || !roomTypeID) { setBlockRooms(null); return }
+    if (mode !== 'block' || blockGroups) return
     let alive = true
-    setBlockRooms(null)
-    cbApi<{ rooms: { id: string; name: string }[] }>(`/api/cloudbeds/availability?freeRooms=1&roomTypeID=${roomTypeID}&start=${start}&end=${end}`)
+    cbApi<{ groups: { typeName: string; rooms: { id: string; name: string }[] }[] }>('/api/cloudbeds/availability?allRooms=1')
       .then((j) => {
         if (!alive) return
-        setBlockRooms(j.rooms)
-        if (initial?.roomID && j.rooms.some((r) => r.id === initial.roomID)) setRoomID(initial.roomID)
-        else if (j.rooms.length === 1) setRoomID(j.rooms[0].id)
+        setBlockGroups(j.groups)
+        if (initial?.roomID && j.groups.some((g) => g.rooms.some((r) => r.id === initial.roomID))) setRoomID(initial.roomID)
       })
       .catch((e) => alive && setError(e instanceof Error ? e.message : 'Could not load rooms'))
     return () => { alive = false }
-  }, [mode, roomTypeID, start, end]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mode]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function block() {
     setError(null)
     setSaving(true)
     try {
       await cbApi('/api/cloudbeds/blocks', 'POST', { roomID, startDate: start, endDate: end, type: blockType, reason: blockReason })
-      const roomName = blockRooms?.find((r) => r.id === roomID)?.name ?? 'Room'
+      const roomName = blockGroups?.flatMap((g) => g.rooms).find((r) => r.id === roomID)?.name ?? 'Room'
       onBlocked?.(`${roomName} ${blockType === 'out_of_service' ? 'set out of service' : 'blocked'} ${start} → ${end}.`)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not block the dates')
@@ -186,7 +184,7 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
   const section = 'mb-1.5 mt-4 text-[13px] font-semibold text-[#14213d]'
   const n = nights(start, end)
   const blocking = mode === 'block'
-  const canBlock = Boolean(chosen && roomID && !saving)
+  const canBlock = Boolean(roomID && end > start && !saving)
   const canCreate = Boolean(chosen && firstName.trim() && lastName.trim() && email.trim() && country && paymentMethod && nightlyValid && !saving)
 
   return (
@@ -219,13 +217,13 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
           </div>
           <div className="mt-2 flex items-center justify-between">
             <span className="text-[12px] text-gray-600">{n} night{n === 1 ? '' : 's'}</span>
-            <button onClick={check} disabled={checking || n < 1}
+            {!blocking && <button onClick={check} disabled={checking || n < 1}
               className="rounded-md bg-[#3b6fe0] px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-[#2f5fcc] disabled:opacity-50">
               {checking ? 'Checking…' : rooms ? 'Check again' : 'Check availability'}
-            </button>
+            </button>}
           </div>
 
-          {rooms && (
+          {!blocking && rooms && (
             <div className="mt-2 space-y-1.5">
               {rooms.length === 0 && <p className="rounded-md bg-amber-50 px-3 py-2 text-[12px] text-amber-800">Nothing available for these dates and guests.</p>}
               {rooms.map((r) => (
@@ -241,14 +239,6 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
                   <span className="whitespace-nowrap font-semibold">{r.total !== null ? `MXN ${Math.round(r.total).toLocaleString('en-US')}` : '—'}</span>
                 </label>
               ))}
-              {blocking && chosen && (
-                <label className="block pt-1"><span className={label}>Room to block *</span>
-                  <select value={roomID} onChange={(e) => setRoomID(e.target.value)} className={input} disabled={!blockRooms}>
-                    <option value="">{!blockRooms ? 'Loading rooms…' : blockRooms.length === 0 ? 'No free rooms of this type' : `Select a ${chosen.name} room`}</option>
-                    {blockRooms?.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-                  </select>
-                </label>
-              )}
               {!blocking && chosen && chosen.rooms.length > 0 && (
                 <label className="block pt-1"><span className={label}>{blocking ? 'Room to block *' : 'Room (optional)'}</span>
                   <select value={roomID} onChange={(e) => setRoomID(e.target.value)} className={input}>
@@ -260,20 +250,32 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
             </div>
           )}
 
-          {blocking && chosen && (
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <label><span className={label}>Type</span>
-                <select value={blockType} onChange={(e) => setBlockType(e.target.value as 'blocked_dates' | 'out_of_service')} className={input}>
-                  <option value="blocked_dates">Block dates</option>
-                  <option value="out_of_service">Out of service</option>
+          {blocking && (
+            <div className="mt-3 space-y-2">
+              <label className="block"><span className={label}>Room to block *</span>
+                <select value={roomID} onChange={(e) => setRoomID(e.target.value)} className={input} disabled={!blockGroups}>
+                  <option value="">{blockGroups ? 'Select a room' : 'Loading rooms…'}</option>
+                  {blockGroups?.map((g) => (
+                    <optgroup key={g.typeName} label={g.typeName}>
+                      {g.rooms.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                    </optgroup>
+                  ))}
                 </select>
               </label>
-              <label><span className={label}>Reason</span>
-                <input value={blockReason} onChange={(e) => setBlockReason(e.target.value)} placeholder="Optional" className={input} />
-              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <label><span className={label}>Type</span>
+                  <select value={blockType} onChange={(e) => setBlockType(e.target.value as 'blocked_dates' | 'out_of_service')} className={input}>
+                    <option value="blocked_dates">Block dates</option>
+                    <option value="out_of_service">Out of service</option>
+                  </select>
+                </label>
+                <label><span className={label}>Reason</span>
+                  <input value={blockReason} onChange={(e) => setBlockReason(e.target.value)} placeholder="Optional" className={input} />
+                </label>
+              </div>
+              <p className="text-[11px] text-gray-500">Check-out day is the first night that is free again. If the room has a reservation on these dates, Cloudbeds will refuse the block.</p>
             </div>
           )}
-          {blocking && !rooms && <p className="mt-3 text-[12px] text-gray-500">Check availability, then pick the room to block. Rooms with a reservation on these dates can&apos;t be blocked.</p>}
           {!blocking && <>
           <p className={section}>Guest</p>
           <div className="grid grid-cols-2 gap-2">
@@ -327,7 +329,7 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
 
         <div className="flex items-center justify-between gap-3 border-t border-gray-200 px-5 py-3">
           <span className="text-[12.5px] text-gray-600">
-            {blocking ? (chosen ? 'No guest or charge — the room just becomes unavailable' : 'Check availability and choose a room') : chosen ? <>Total <b className="text-[#14213d]">{effectiveTotal !== null ? `MXN ${Math.round(effectiveTotal).toLocaleString('en-US')}` : '—'}</b> · {n} night{n === 1 ? '' : 's'}</> : 'Check availability and choose a room'}
+            {blocking ? 'No guest or charge — the room just becomes unavailable' : chosen ? <>Total <b className="text-[#14213d]">{effectiveTotal !== null ? `MXN ${Math.round(effectiveTotal).toLocaleString('en-US')}` : '—'}</b> · {n} night{n === 1 ? '' : 's'}</> : 'Check availability and choose a room'}
           </span>
           <div className="flex gap-2">
             <button onClick={onClose} className="rounded-md border border-gray-300 px-3 py-1.5 text-[12.5px] font-semibold hover:bg-gray-50">Cancel</button>
