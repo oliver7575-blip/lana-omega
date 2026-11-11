@@ -119,7 +119,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
   today: string
   onClose: () => void
   onChanged?: () => void
-  /** Called with a short message when a check-out succeeds; the window then closes itself. */
+  /** Called with a short message when a check-in or check-out succeeds; the window then closes itself. */
   onCheckedOut?: (text: string) => void
 }) {
   const [r, setR] = useState<Detail | null>(null)
@@ -218,7 +218,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
       const j = await cbApi<{ reservation: Detail }>(`/api/cloudbeds/reservation/${id}`, 'POST', body)
       apply(j.reservation)
       onChanged?.()
-      if (body.action === 'check_out') {
+      if (body.action === 'check_out' || body.action === 'check_in') {
         onCheckedOut?.(`${j.reservation.guestName}: ${ok.replace(/\.$/, '').toLowerCase()}.`)
         onClose()
         return
