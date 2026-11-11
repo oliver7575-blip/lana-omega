@@ -1021,10 +1021,32 @@ export async function addReservationPayment(
 
 /** Sets the nightly base rate of a room type's rate plan for a date range (end date inclusive). */
 export async function setRoomRate(cb: CB, r: { rateID: string; startDate: string; endDate: string; rate: number }): Promise<void> {
-  await cbPut(cb, 'putRate', {
-    rateID: r.rateID,
-    'rates[0][startDate]': r.startDate,
-    'rates[0][endDate]': r.endDate,
-    'rates[0][rate]': String(r.rate),
-  })
+  const rates = [{ startDate: r.startDate, endDate: r.endDate, rate: r.rate }]
+  const errors: string[] = []
+  // Cloudbeds wants "rates" as a collection: try a JSON body first, then a JSON string in a form field.
+  const attempts: (() => Promise<Response>)[] = [
+    () => fetch(`${BASE}/putRate`, {
+      method: 'PUT',
+      headers: { 'x-api-key': cb.apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ propertyID: cb.propertyId, rateID: r.rateID, rates }),
+      signal: AbortSignal.timeout(20000),
+    }),
+    () => fetch(`${BASE}/putRate`, {
+      method: 'PUT',
+      headers: { 'x-api-key': cb.apiKey, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ propertyID: cb.propertyId, rateID: r.rateID, rates: JSON.stringify(rates) }),
+      signal: AbortSignal.timeout(20000),
+    }),
+  ]
+  for (const go of attempts) {
+    try {
+      const res = await go()
+      const json = (await res.json().catch(() => ({}))) as Json
+      if (res.ok && json.success !== false) return
+      errors.push((json.message as string) ?? `status ${res.status}`)
+    } catch (e) {
+      errors.push(e instanceof Error ? e.message : 'request failed')
+    }
+  }
+  throw new Error(errors.join(' | '))
 }
