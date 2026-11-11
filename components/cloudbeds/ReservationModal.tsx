@@ -85,6 +85,24 @@ function countryName(code: string): string {
   }
 }
 
+const SPANISH_COUNTRIES = ['MX', 'ES', 'AR', 'CO', 'CL', 'PE', 'VE', 'EC', 'GT', 'CU', 'BO', 'DO', 'HN', 'PY', 'SV', 'NI', 'CR', 'PA', 'UY', 'PR']
+
+/** Reasons that fit the second blank of the "hello" template, one plain sentence each. */
+const HELLO_REASONS: Record<'es' | 'en', { label: string; text: string }[]> = {
+  es: [
+    { label: 'After a call', text: 'Como quedamos en nuestra llamada, te escribimos para que tengas nuestro contacto.' },
+    { label: 'Upcoming stay', text: 'Te escribimos por tu próxima estancia con nosotros.' },
+    { label: 'Follow-up', text: 'Te escribimos para dar seguimiento a tu consulta.' },
+    { label: 'Introduction', text: 'Queremos presentarnos antes de tu llegada.' },
+  ],
+  en: [
+    { label: 'After a call', text: "As we agreed on our call, we're writing so you have our contact." },
+    { label: 'Upcoming stay', text: "We're writing about your upcoming stay with us." },
+    { label: 'Follow-up', text: "We're following up on your inquiry." },
+    { label: 'Introduction', text: "We'd like to introduce ourselves before your arrival." },
+  ],
+}
+
 interface Note { author: string; date: string; text: string }
 
 export default function ReservationModal({ id, today, onClose, onChanged }: {
@@ -101,6 +119,8 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
   const [quickText, setQuickText] = useState('')
   const [quickSubject, setQuickSubject] = useState('')
   const [quickBusy, setQuickBusy] = useState(false)
+  const [waInfo, setWaInfo] = useState<{ conversationId: string; windowOpen: boolean; language: string | null } | null>(null)
+  const [helloLang, setHelloLang] = useState<'es' | 'en'>('en')
   const [quickMsg, setQuickMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
@@ -155,6 +175,16 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
   function openQuick(kind: 'whatsapp' | 'email') {
     setQuick((q) => (q === kind ? null : kind))
     setQuickMsg(null)
+    if (kind === 'whatsapp' && !waInfo) {
+      // Is the 24-hour window open? Decides between free text and the approved template.
+      cbApi<{ conversationId: string; windowOpen: boolean; language: string | null }>(`/api/cloudbeds/reservation/${id}/conversation`)
+        .then((j) => {
+          setWaInfo(j)
+          const byCountry = r?.guestCountry && SPANISH_COUNTRIES.includes(r.guestCountry.toUpperCase()) ? 'es' : 'en'
+          setHelloLang(j.language === 'es' ? 'es' : j.language === 'en' || j.language === 'sv' ? 'en' : byCountry)
+        })
+        .catch((e) => setQuickMsg({ ok: false, text: e instanceof Error ? e.message : 'Could not open this guest’s chat' }))
+    }
   }
 
   async function sendQuick() {
@@ -163,21 +193,33 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
     setQuickMsg(null)
     try {
       if (quick === 'whatsapp') {
-        // Same path as the Messages page: find (or open) the guest's conversation, then send a staff reply into it.
-        const conv = await cbApi<{ conversationId: string }>(`/api/cloudbeds/reservation/${id}/conversation`)
-        const res = await fetch(`/api/conversations/${conv.conversationId}/reply`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: quickText }),
-        })
-        const j = await res.json().catch(() => ({}))
-        if (!res.ok) throw new Error(j.error ?? 'Could not send')
-        if (j.deliveryResult && j.deliveryResult.success === false) {
-          setQuickMsg({ ok: false, text: `Saved, but WhatsApp didn't deliver it: ${j.deliveryResult.error}` })
-          setQuickBusy(false)
-          return
+        const conv = waInfo ?? (await cbApi<{ conversationId: string; windowOpen: boolean; language: string | null }>(`/api/cloudbeds/reservation/${id}/conversation`))
+        if (conv.windowOpen) {
+          // Same path as the Messages page: a staff reply into the guest's conversation.
+          const res = await fetch(`/api/conversations/${conv.conversationId}/reply`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: quickText }),
+          })
+          const j = await res.json().catch(() => ({}))
+          if (!res.ok) throw new Error(j.error ?? 'Could not send')
+          if (j.deliveryResult && j.deliveryResult.success === false) {
+            setQuickMsg({ ok: false, text: `Saved, but WhatsApp didn't deliver it: ${j.deliveryResult.error}` })
+            setQuickBusy(false)
+            return
+          }
+          setQuickMsg({ ok: true, text: 'Sent on WhatsApp.' })
+        } else {
+          // Outside the 24-hour window: the approved "hello" template, with the text as its reason sentence.
+          const res = await fetch(`/api/conversations/${conv.conversationId}/hello`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason: quickText, language: helloLang, firstName: r?.guestName.split(' ')[0] }),
+          })
+          const j = await res.json().catch(() => ({}))
+          if (!res.ok) throw new Error(j.error ?? 'Could not send')
+          setQuickMsg({ ok: true, text: 'Sent on WhatsApp as the Soirée hello message.' })
         }
-        setQuickMsg({ ok: true, text: 'Sent on WhatsApp.' })
       } else {
         const j = await cbApi<{ to: string }>(`/api/cloudbeds/reservation/${id}/email`, 'POST', { subject: quickSubject, body: quickText })
         setQuickMsg({ ok: true, text: `Email sent to ${j.to}.` })
@@ -305,13 +347,31 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
                     </p>
                     <button onClick={() => setQuick(null)} className="text-lg leading-none text-gray-500 hover:text-gray-800" aria-label="Close">×</button>
                   </div>
+                  {quick === 'whatsapp' && waInfo && !waInfo.windowOpen && (
+                    <div className="mb-2 rounded-md bg-white px-3 py-2 text-xs text-gray-700">
+                      <p>
+                        This guest hasn&apos;t written in the last 24 hours, so this goes out as Soirée&apos;s approved hello message. Write the reason in one sentence.
+                      </p>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        <span className="text-gray-500">Language</span>
+                        {(['es', 'en'] as const).map((l) => (
+                          <button key={l} onClick={() => setHelloLang(l)}
+                            className={`rounded-full border px-2 py-0.5 ${helloLang === l ? 'border-[#128c7e] bg-[#128c7e] text-white' : 'border-gray-300'}`}>{l === 'es' ? 'Español' : 'English'}</button>
+                        ))}
+                        <span className="ml-2 text-gray-500">Reasons</span>
+                        {HELLO_REASONS[helloLang].map((x) => (
+                          <button key={x.label} onClick={() => setQuickText(x.text)} className="rounded-full border border-gray-300 px-2 py-0.5 hover:bg-gray-50">{x.label}</button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {quick === 'email' && (
                     <input value={quickSubject} onChange={(e) => setQuickSubject(e.target.value)} placeholder="Subject"
                       className="mb-2 w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm outline-none focus:border-[#128c7e]" />
                   )}
                   <textarea value={quickText} onChange={(e) => setQuickText(e.target.value)} rows={4} autoFocus
                     onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) sendQuick() }}
-                    placeholder={quick === 'whatsapp' ? 'Write a message… (sent as staff, like on the Messages page)' : 'Write the email…'}
+                    placeholder={quick === 'whatsapp' ? (waInfo && !waInfo.windowOpen ? 'Why are you writing? One short sentence.' : 'Write a message… (sent as staff, like on the Messages page)') : 'Write the email…'}
                     className="w-full resize-none rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#128c7e]" />
                   <div className="mt-2 flex items-center gap-3">
                     <button disabled={quickBusy || !quickText.trim() || (quick === 'email' && !quickSubject.trim())} onClick={sendQuick}
