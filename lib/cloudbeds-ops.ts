@@ -1021,29 +1021,22 @@ export async function addReservationPayment(
 
 /** Sets the nightly base rate of a room type's rate plan for a date range (end date inclusive). */
 export async function setRoomRate(cb: CB, r: { rateID: string; startDate: string; endDate: string; rate: number }): Promise<void> {
-  const rates = [{ startDate: r.startDate, endDate: r.endDate, rate: r.rate }]
-  const errors: string[] = []
-  // Cloudbeds wants "rates" as a collection: try a JSON body first, then a JSON string in a form field.
-  const attempts: (() => Promise<Response>)[] = [
-    () => fetch(`${BASE}/putRate`, {
-      method: 'PUT',
-      headers: { 'x-api-key': cb.apiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ propertyID: cb.propertyId, rateID: r.rateID, rates }),
-      signal: AbortSignal.timeout(20000),
-    }),
-    () => fetch(`${BASE}/putRate`, {
-      method: 'PUT',
-      headers: { 'x-api-key': cb.apiKey, 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ propertyID: cb.propertyId, rateID: r.rateID, rates: JSON.stringify(rates) }),
-      signal: AbortSignal.timeout(20000),
-    }),
+  // Cloudbeds' interval end date is exclusive (it must be after the start date), so the night after the last one.
+  const endExclusive = addDays(r.endDate, 1)
+  const interval = (prefix: string) => ({
+    [`${prefix}[interval][0][startDate]`]: r.startDate,
+    [`${prefix}[interval][0][endDate]`]: endExclusive,
+    [`${prefix}[interval][0][rate]`]: String(r.rate),
+  })
+  const variants: Record<string, string>[] = [
+    { 'rates[0][rateID]': r.rateID, ...interval('rates[0]') },
+    { rateID: r.rateID, ...interval('rates[0]') },
   ]
-  for (const go of attempts) {
+  const errors: string[] = []
+  for (const fields of variants) {
     try {
-      const res = await go()
-      const json = (await res.json().catch(() => ({}))) as Json
-      if (res.ok && json.success !== false) return
-      errors.push((json.message as string) ?? `status ${res.status}`)
+      await cbPut(cb, 'putRate', fields)
+      return
     } catch (e) {
       errors.push(e instanceof Error ? e.message : 'request failed')
     }
