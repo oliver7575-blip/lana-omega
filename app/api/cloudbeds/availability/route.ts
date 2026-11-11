@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { cloudbedsForCaller } from '@/lib/cloudbeds-caller'
-import { availability, bookingOptions } from '@/lib/cloudbeds-ops'
+import { availability, availableRoomsOfType, bookingOptions } from '@/lib/cloudbeds-ops'
 
 export const maxDuration = 60
 
@@ -20,6 +20,10 @@ export async function GET(request: Request) {
     const end = url.searchParams.get('end') ?? ''
     if (!DATE.test(start) || !DATE.test(end) || end <= start) {
       return NextResponse.json({ error: 'Check-out must be after check-in' }, { status: 400 })
+    }
+    const typeID = url.searchParams.get('roomTypeID')
+    if (url.searchParams.get('freeRooms') && typeID) {
+      return NextResponse.json({ rooms: await availableRoomsOfType(c.cb, typeID, start, end, '') })
     }
     const adults = Math.max(1, Math.min(12, Number(url.searchParams.get('adults')) || 1))
     const children = Math.max(0, Math.min(12, Number(url.searchParams.get('children')) || 0))

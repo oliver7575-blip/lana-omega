@@ -62,6 +62,7 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
   const [mode, setMode] = useState<'reservation' | 'block'>('reservation')
   const [blockType, setBlockType] = useState<'blocked_dates' | 'out_of_service'>('blocked_dates')
   const [blockReason, setBlockReason] = useState('')
+  const [blockRooms, setBlockRooms] = useState<{ id: string; name: string }[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -150,12 +151,28 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
     setSaving(false)
   }
 
+  // Block mode: list the type's free rooms (Cloudbeds doesn't always name them in the availability result).
+  useEffect(() => {
+    if (mode !== 'block' || !roomTypeID) { setBlockRooms(null); return }
+    let alive = true
+    setBlockRooms(null)
+    cbApi<{ rooms: { id: string; name: string }[] }>(`/api/cloudbeds/availability?freeRooms=1&roomTypeID=${roomTypeID}&start=${start}&end=${end}`)
+      .then((j) => {
+        if (!alive) return
+        setBlockRooms(j.rooms)
+        if (initial?.roomID && j.rooms.some((r) => r.id === initial.roomID)) setRoomID(initial.roomID)
+        else if (j.rooms.length === 1) setRoomID(j.rooms[0].id)
+      })
+      .catch((e) => alive && setError(e instanceof Error ? e.message : 'Could not load rooms'))
+    return () => { alive = false }
+  }, [mode, roomTypeID, start, end]) // eslint-disable-line react-hooks/exhaustive-deps
+
   async function block() {
     setError(null)
     setSaving(true)
     try {
       await cbApi('/api/cloudbeds/blocks', 'POST', { roomID, startDate: start, endDate: end, type: blockType, reason: blockReason })
-      const roomName = chosen?.rooms.find((r) => r.roomID === roomID)?.roomName ?? 'Room'
+      const roomName = blockRooms?.find((r) => r.id === roomID)?.name ?? 'Room'
       onBlocked?.(`${roomName} ${blockType === 'out_of_service' ? 'set out of service' : 'blocked'} ${start} → ${end}.`)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not block the dates')
@@ -223,7 +240,15 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
                   <span className="whitespace-nowrap font-semibold">{r.total !== null ? `MXN ${Math.round(r.total).toLocaleString('en-US')}` : '—'}</span>
                 </label>
               ))}
-              {chosen && chosen.rooms.length > 0 && (
+              {blocking && chosen && (
+                <label className="block pt-1"><span className={label}>Room to block *</span>
+                  <select value={roomID} onChange={(e) => setRoomID(e.target.value)} className={input} disabled={!blockRooms}>
+                    <option value="">{!blockRooms ? 'Loading rooms…' : blockRooms.length === 0 ? 'No free rooms of this type' : `Select a ${chosen.name} room`}</option>
+                    {blockRooms?.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                  </select>
+                </label>
+              )}
+              {!blocking && chosen && chosen.rooms.length > 0 && (
                 <label className="block pt-1"><span className={label}>{blocking ? 'Room to block *' : 'Room (optional)'}</span>
                   <select value={roomID} onChange={(e) => setRoomID(e.target.value)} className={input}>
                     <option value="">{blocking ? `Select a ${chosen.name} room` : `Any available ${chosen.name}`}</option>
