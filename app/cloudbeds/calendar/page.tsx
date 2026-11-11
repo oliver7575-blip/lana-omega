@@ -11,7 +11,7 @@ import { cbApi } from '@/components/cloudbeds/shared'
 interface Booking { reservationID: string; guestName: string; status: string; roomID: string; start: string; end: string }
 interface Unassigned { reservationID: string; guestName: string; roomTypeID: string; start: string; end: string; status: string }
 interface Block { roomBlockID: string; type: string; roomID: string; start: string; end: string; reason: string }
-interface RoomType { id: string; name: string; rates: Record<string, number>; rooms: { id: string; name: string }[] }
+interface RoomType { id: string; name: string; rates: Record<string, number>; rateID?: string; rooms: { id: string; name: string }[] }
 interface Chunk {
   today: string
   start: string
@@ -116,6 +116,7 @@ export default function CalendarPage() {
   const [markDay, setMarkDay] = useState<string | null>(null) // column marked by clicking its date
   const [typeOrder, setTypeOrder] = useState<string[]>([])
   const [dragType, setDragType] = useState<string | null>(null)
+  const [priceEdit, setPriceEdit] = useState<{ typeID: string; day: string; value: string; through: string; x: number; y: number; busy: boolean; err: string | null } | null>(null)
 
   // Room type order is a personal preference stored on the staff member's account (so it follows them
   // across browsers). The browser copy is only a fast start / fallback.
@@ -208,6 +209,42 @@ export default function CalendarPage() {
     if (!el || loading) return
     if (el.scrollLeft < EDGE_PX) loadMore('past')
     else if (el.scrollLeft + el.clientWidth > el.scrollWidth - EDGE_PX) loadMore('future')
+  }
+
+  const savePrice = async () => {
+    const pe = priceEdit
+    const cur = dataRef.current
+    if (!pe || !cur) return
+    const t = cur.roomTypes.find((x) => x.id === pe.typeID)
+    const rate = Number(pe.value.replace(',', '.'))
+    if (!t?.rateID) { setPriceEdit({ ...pe, err: 'This category has no editable base rate.' }); return }
+    if (!Number.isFinite(rate) || rate <= 0) { setPriceEdit({ ...pe, err: 'Enter a valid price.' }); return }
+    const through = pe.through && pe.through >= pe.day ? pe.through : pe.day
+    if (diff(pe.day, through) >= 30) { setPriceEdit({ ...pe, err: 'Up to 30 nights at a time.' }); return }
+    setPriceEdit({ ...pe, busy: true, err: null })
+    try {
+      const res = await fetch('/api/cloudbeds/rates', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rateID: t.rateID, startDate: pe.day, endDate: through, rate }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error ?? 'Cloudbeds error')
+      setData((prev) => prev && ({
+        ...prev,
+        roomTypes: prev.roomTypes.map((x) => {
+          if (x.id !== pe.typeID) return x
+          const rates = { ...x.rates }
+          for (let d = pe.day; d <= through; d = addDays(d, 1)) rates[d] = rate
+          return { ...x, rates }
+        }),
+      }))
+      setPriceEdit(null)
+      const nights = diff(pe.day, through) + 1
+      setToast({ ok: true, text: `${t.name}: $${Math.round(rate).toLocaleString('en-US')} set for ${nights === 1 ? pe.day : `${pe.day} to ${through}`}. Cloudbeds may take a moment to apply it.` })
+    } catch (e) {
+      setPriceEdit({ ...pe, busy: false, err: e instanceof Error ? e.message : 'Cloudbeds error' })
+    }
   }
 
   // Live refresh of the part on screen (and a week either side).
@@ -543,7 +580,11 @@ export default function CalendarPage() {
                             {rate ? (
                               <>
                                 <span>{avail ?? ''}</span>
-                                <span className="font-normal">${Math.round(rate).toLocaleString('en-US')}.00</span>
+                                <button
+                                  title="Click to change the price"
+                                  onClick={(e) => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); setPriceEdit({ typeID: t.id, day: d, value: String(Math.round(rate)), through: d, x: r.left, y: r.bottom + 4, busy: false, err: null }) }}
+                                  className="rounded px-1 font-normal underline-offset-2 hover:bg-[#fff3d6] hover:text-[#8a5a00] hover:underline"
+                                >${Math.round(rate).toLocaleString('en-US')}.00</button>
                               </>
                             ) : (
                               <span>{avail || ''}</span>
@@ -692,6 +733,36 @@ export default function CalendarPage() {
         )
       })()}
 
+
+      {priceEdit && (() => {
+        const t = data?.roomTypes.find((x) => x.id === priceEdit.typeID)
+        const left = Math.min(priceEdit.x, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 250)
+        const top = Math.min(priceEdit.y, (typeof window !== 'undefined' ? window.innerHeight : 800) - 200)
+        return (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setPriceEdit(null)} />
+            <div className="fixed z-50 w-[236px] rounded-[12px] border border-[#d9dde4] bg-white p-3 shadow-[0_12px_32px_rgba(20,33,61,.18)]" style={{ left, top }}
+              onKeyDown={(e) => { if (e.key === 'Escape') setPriceEdit(null); if (e.key === 'Enter') savePrice() }}>
+              <div className="text-[12px] font-semibold text-[#14213d]">{t?.name}</div>
+              <div className="mb-2 text-[11px] text-gray-500">{priceEdit.day}</div>
+              <label className="block text-[11px] font-semibold text-gray-600">Price per night
+                <input autoFocus inputMode="decimal" value={priceEdit.value} onFocus={(e) => e.currentTarget.select()}
+                  onChange={(e) => setPriceEdit({ ...priceEdit, value: e.target.value, err: null })}
+                  className="mt-1 h-9 w-full rounded-[8px] border border-[#d9dde4] px-2 text-[14px] font-semibold text-[#14213d] outline-none focus:border-[#1f9d78]" />
+              </label>
+              <label className="mt-2 block text-[11px] font-semibold text-gray-600">Same price through <span className="font-normal text-gray-400">(optional)</span>
+                <input type="date" value={priceEdit.through} min={priceEdit.day} onChange={(e) => setPriceEdit({ ...priceEdit, through: e.target.value, err: null })}
+                  className="mt-1 h-9 w-full rounded-[8px] border border-[#d9dde4] px-2 text-[13px] text-[#14213d] outline-none focus:border-[#1f9d78]" />
+              </label>
+              {priceEdit.err && <div className="mt-2 text-[11.5px] text-red-600">{priceEdit.err}</div>}
+              <div className="mt-3 flex gap-2">
+                <button onClick={savePrice} disabled={priceEdit.busy} className="h-9 flex-1 rounded-[8px] bg-[#1f9d78] text-[13px] font-semibold text-white disabled:opacity-60">{priceEdit.busy ? 'Saving…' : 'Save'}</button>
+                <button onClick={() => setPriceEdit(null)} className="h-9 rounded-[8px] border border-[#d9dde4] px-3 text-[13px] font-semibold text-[#14213d]">Cancel</button>
+              </div>
+            </div>
+          </>
+        )
+      })()}
       {open && data && <ReservationModal id={open} today={data.today} onClose={() => setOpen(null)} onChanged={refreshVisible} onCheckedOut={(text) => setToast({ ok: true, text })} />}
     </div>
   )

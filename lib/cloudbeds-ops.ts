@@ -482,6 +482,8 @@ export interface CalendarData {
     id: string
     name: string
     rates: Record<string, number>
+    /** Base rate plan the nightly price belongs to (needed to change it). */
+    rateID?: string
     rooms: { id: string; name: string }[]
   }[]
   bookings: {
@@ -538,6 +540,7 @@ export async function calendar(cb: CB, start: string, dayCount: number): Promise
   for (const rp of (ratesJson.data as Json[]) ?? []) {
     const t = typeMap.get(String(rp.roomTypeID))
     if (!t || rp.isDerived || rp.promoCode) continue
+    if (!t.rateID && rp.rateID) t.rateID = String(rp.rateID)
     for (const day of (rp.roomRateDetailed as Json[]) ?? []) {
       const date = String(day.date)
       const rate = Number(day.rateBase ?? day.totalRate ?? 0)
@@ -1012,5 +1015,16 @@ export async function addReservationPayment(
     type: p.methodCode,
     amount: String(p.refund ? -amount : amount),
     description: (p.note?.trim() || (p.refund ? 'Refund' : 'Payment')).slice(0, 200),
+  })
+}
+
+
+/** Sets the nightly base rate of a room type's rate plan for a date range (end date inclusive). */
+export async function setRoomRate(cb: CB, r: { rateID: string; startDate: string; endDate: string; rate: number }): Promise<void> {
+  await cbPut(cb, 'putRate', {
+    rateID: r.rateID,
+    'rates[0][startDate]': r.startDate,
+    'rates[0][endDate]': r.endDate,
+    'rates[0][rate]': String(r.rate),
   })
 }
