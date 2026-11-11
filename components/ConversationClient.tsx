@@ -278,3 +278,93 @@ export function GuestEditor({
     </div>
   )
 }
+
+export function ReservationLinker({ conversationId, linked }: { conversationId: string; linked: boolean }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [q, setQ] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [results, setResults] = useState<{ reservationID: string; guestName: string; room: string; status: string; startDate: string; endDate: string }[] | null>(null)
+
+  async function search() {
+    if (!q.trim()) return
+    setBusy(true)
+    setErr(null)
+    const res = await fetch(`/api/conversations/${conversationId}/reservation?q=${encodeURIComponent(q)}`)
+    const j = await res.json().catch(() => ({}))
+    setBusy(false)
+    if (!res.ok) return setErr(j.error ?? 'Search failed')
+    setResults(j.results ?? [])
+  }
+  async function link(reservationId: string) {
+    setBusy(true)
+    setErr(null)
+    const res = await fetch(`/api/conversations/${conversationId}/reservation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reservationId }),
+    })
+    const j = await res.json().catch(() => ({}))
+    setBusy(false)
+    if (!res.ok) return setErr(j.error ?? 'Could not link')
+    setOpen(false)
+    setResults(null)
+    setQ('')
+    router.refresh()
+  }
+  async function unlink() {
+    if (!confirm('Remove the link between this chat and its reservation?')) return
+    await fetch(`/api/conversations/${conversationId}/reservation`, { method: 'DELETE' })
+    router.refresh()
+  }
+
+  return (
+    <div className="mt-2">
+      {!open ? (
+        <div className="flex gap-3 text-xs">
+          <button onClick={() => setOpen(true)} className="text-navy/40 hover:text-clay">
+            {linked ? 'Change reservation' : 'Link to a reservation'}
+          </button>
+          {linked && (
+            <button onClick={unlink} className="text-navy/40 hover:text-clay">
+              Unlink
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && search()}
+              placeholder="Guest name or reservation number"
+              className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-1.5 text-sm text-navy outline-none focus:border-clay"
+            />
+            <button onClick={search} disabled={busy} className="rounded-full bg-ink px-4 py-1.5 text-sm text-white hover:bg-clay disabled:opacity-50">
+              {busy ? '…' : 'Search'}
+            </button>
+          </div>
+          {err && <p className="text-xs text-red-300">{err}</p>}
+          {results && results.length === 0 && <p className="text-xs text-navy/60">No reservations found.</p>}
+          {results?.map((r) => (
+            <button
+              key={r.reservationID}
+              onClick={() => link(r.reservationID)}
+              disabled={busy}
+              className="block w-full rounded-xl border border-line px-3 py-2 text-left hover:bg-white/[0.03] disabled:opacity-50"
+            >
+              <p className="text-sm font-semibold text-white">{r.guestName || 'Guest'}</p>
+              <p className="text-xs text-navy/70">{r.startDate} → {r.endDate} · {r.room}</p>
+              <p className="text-xs text-navy/50">{r.status.replace(/_/g, ' ')} · #{r.reservationID}</p>
+            </button>
+          ))}
+          <button onClick={() => { setOpen(false); setResults(null) }} className="text-xs text-navy/40 hover:text-clay">
+            Cancel
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}

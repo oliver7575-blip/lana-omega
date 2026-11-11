@@ -8,6 +8,7 @@ import {
   Composer,
   GuestEditor,
   NotesEditor,
+  ReservationLinker,
   ScrollToBottom,
   TakeOverButton,
 } from '@/components/ConversationClient'
@@ -189,6 +190,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
             ) : (
               <p className="text-sm text-navy/60">None found.</p>
             )}
+            {conversation.guest_id && <ReservationLinker conversationId={id} linked={Boolean(saved?.confirmation_number)} />}
           </div>
 
           <div>
