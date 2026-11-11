@@ -179,26 +179,29 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
     setSaving(false)
   }
 
-  const input = 'w-full rounded-md border border-gray-300 px-2 py-1.5 text-[13px] text-[#14213d] outline-none focus:border-[#3b6fe0]'
-  const label = 'mb-0.5 block text-[11px] font-semibold uppercase tracking-wide text-gray-600'
-  const section = 'mb-1.5 mt-4 text-[13px] font-semibold text-[#14213d]'
+  const input = 'h-9 w-full rounded-[10px] border border-gray-300 bg-white px-2.5 text-[13px] text-[#14213d] outline-none focus:border-[#1f9d78]'
+  const label = 'mb-1 block text-[11px] font-semibold uppercase tracking-wide text-gray-500'
+  const section = 'mb-2 mt-5 border-t border-gray-100 pt-4 text-[11px] font-semibold uppercase tracking-wider text-gray-500'
   const n = nights(start, end)
   const blocking = mode === 'block'
   const canBlock = Boolean(roomID && end > start && !saving)
   const canCreate = Boolean(chosen && firstName.trim() && lastName.trim() && email.trim() && country && paymentMethod && nightlyValid && !saving)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-10" onClick={onClose}>
-      <div className="w-full max-w-xl rounded-xl bg-white text-[#14213d] shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between rounded-t-xl bg-[#5cc3a5] px-5 py-3 text-white">
-          <p className="text-[15px] font-semibold">{blocking ? 'Block dates' : 'New reservation'}</p>
-          <button onClick={onClose} className="text-2xl leading-none opacity-90 hover:opacity-100" aria-label="Close">×</button>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#14213d]/40 p-4 pt-10" onClick={onClose}>
+      <div className="w-full max-w-xl rounded-2xl bg-white text-[#14213d] shadow-[0_24px_64px_rgba(20,33,61,.28)]" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-6 py-4">
+          <div>
+            <p className="text-xl font-bold tracking-tight">{blocking ? 'Block dates' : 'New reservation'}</p>
+            <p className="mt-0.5 text-[13px] text-gray-500">{start} → {end} · {nights(start, end)} night{nights(start, end) === 1 ? '' : 's'}</p>
+          </div>
+          <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-300 text-lg leading-none text-gray-600 hover:bg-gray-50" aria-label="Close">×</button>
         </div>
 
-        <div className="max-h-[calc(100vh-9rem)] overflow-y-auto px-5 pb-4">
-          <div className="mt-3 inline-flex overflow-hidden rounded-md border border-gray-300 text-[12px] font-semibold">
-            <button onClick={() => setMode('reservation')} className={`px-3 py-1.5 ${!blocking ? 'bg-[#3b6fe0] text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>Reservation</button>
-            <button onClick={() => setMode('block')} className={`px-3 py-1.5 ${blocking ? 'bg-[#3b6fe0] text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>Block dates / Out of service</button>
+        <div className="max-h-[calc(100vh-9rem)] overflow-y-auto px-6 pb-5">
+          <div className="mt-4 inline-flex rounded-[10px] bg-[#e9ecf1] p-[3px] text-[12.5px] font-semibold">
+            <button onClick={() => setMode('reservation')} className={`h-[30px] rounded-lg px-3.5 ${!blocking ? 'bg-white text-[#14213d] shadow-[0_1px_2px_rgba(20,33,61,.12)]' : 'text-gray-600'}`}>Reservation</button>
+            <button onClick={() => setMode('block')} className={`h-[30px] rounded-lg px-3.5 ${blocking ? 'bg-white text-[#14213d] shadow-[0_1px_2px_rgba(20,33,61,.12)]' : 'text-gray-600'}`}>Block dates / Out of service</button>
           </div>
           <p className={section}>Stay</p>
           <div className="grid grid-cols-4 gap-2">
@@ -218,17 +221,17 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
           <div className="mt-2 flex items-center justify-between">
             <span className="text-[12px] text-gray-600">{n} night{n === 1 ? '' : 's'}</span>
             {!blocking && <button onClick={check} disabled={checking || n < 1}
-              className="rounded-md bg-[#3b6fe0] px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-[#2f5fcc] disabled:opacity-50">
+              className="h-9 rounded-[10px] border border-[#2f66d0] px-3.5 text-[12.5px] font-semibold text-[#2f66d0] hover:bg-blue-50 disabled:opacity-50">
               {checking ? 'Checking…' : rooms ? 'Check again' : 'Check availability'}
             </button>}
           </div>
 
           {!blocking && rooms && (
             <div className="mt-2 space-y-1.5">
-              {rooms.length === 0 && <p className="rounded-md bg-amber-50 px-3 py-2 text-[12px] text-amber-800">Nothing available for these dates and guests.</p>}
+              {rooms.length === 0 && <p className="rounded-xl bg-amber-50 px-3 py-2 text-[12px] text-amber-800">Nothing available for these dates and guests.</p>}
               {rooms.map((r) => (
                 <label key={r.roomTypeID}
-                  className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg border px-3 py-2 text-[13px] ${roomTypeID === r.roomTypeID ? 'border-[#3b6fe0] bg-sky-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                  className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-[13px] ${roomTypeID === r.roomTypeID ? 'border-[#1f9d78] bg-[#eefaf5]' : 'border-gray-200 hover:bg-gray-50'}`}>
                   <span className="flex items-center gap-2">
                     <input type="radio" name="roomType" checked={roomTypeID === r.roomTypeID} onChange={() => { setRoomTypeID(r.roomTypeID); setRoomID('') }} />
                     <span>
@@ -330,17 +333,17 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
           </label>
           </>}
 
-          {error && <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-[12.5px] text-red-700">{error}</p>}
+          {error && <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-[12.5px] text-red-700">{error}</p>}
         </div>
 
-        <div className="flex items-center justify-between gap-3 border-t border-gray-200 px-5 py-3">
+        <div className="flex items-center justify-between gap-3 rounded-b-2xl border-t border-gray-200 bg-[#fbfbfc] px-6 py-3.5">
           <span className="text-[12.5px] text-gray-600">
             {blocking ? 'No guest or charge — the room just becomes unavailable' : chosen ? <>Total <b className="text-[#14213d]">{effectiveTotal !== null ? `MXN ${Math.round(effectiveTotal).toLocaleString('en-US')}` : '—'}</b> · {n} night{n === 1 ? '' : 's'}</> : 'Check availability and choose a room'}
           </span>
           <div className="flex gap-2">
-            <button onClick={onClose} className="rounded-md border border-gray-300 px-3 py-1.5 text-[12.5px] font-semibold hover:bg-gray-50">Cancel</button>
+            <button onClick={onClose} className="h-9 rounded-[10px] border border-gray-300 bg-white px-4 text-[13px] font-semibold hover:bg-gray-50">Cancel</button>
             <button onClick={blocking ? block : create} disabled={blocking ? !canBlock : !canCreate}
-              className="rounded-md bg-[#5cc3a5] px-4 py-1.5 text-[12.5px] font-semibold uppercase tracking-wide text-white hover:bg-[#4bb294] disabled:opacity-50">
+              className="h-9 rounded-[10px] bg-[#1f9d78] px-[18px] text-[13px] font-semibold text-white hover:bg-[#188a69] disabled:opacity-50">
               {blocking ? (saving ? 'Blocking…' : blockType === 'out_of_service' ? 'Set out of service' : 'Block dates') : saving ? 'Creating…' : 'Create reservation'}
             </button>
           </div>
