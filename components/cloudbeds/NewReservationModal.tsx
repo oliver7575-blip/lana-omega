@@ -29,11 +29,12 @@ function addDays(d: string, n: number) {
 }
 const nights = (a: string, b: string) => Math.max(0, Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86400000))
 
-export default function NewReservationModal({ today, onClose, onCreated, onBlocked, initial }: {
+export default function NewReservationModal({ today, onClose, onCreated, onBlocked, initial, initialMode }: {
   today: string
   onClose: () => void
   onCreated: (reservationID: string) => void
   onBlocked?: (text: string) => void
+  initialMode?: 'reservation' | 'block'
   /** Dates (and optionally the room) picked on the calendar: availability is checked straight away. */
   initial?: { start: string; end: string; roomTypeID?: string; roomID?: string }
 }) {
@@ -59,7 +60,7 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
   const [sendEmail, setSendEmail] = useState(true)
   const [nightly, setNightly] = useState('')
 
-  const [mode, setMode] = useState<'reservation' | 'block'>('reservation')
+  const [mode, setMode] = useState<'reservation' | 'block'>(initialMode ?? 'reservation')
   const [blockType, setBlockType] = useState<'blocked_dates' | 'out_of_service'>('blocked_dates')
   const [blockReason, setBlockReason] = useState('')
   const [blockRooms, setBlockRooms] = useState<{ id: string; name: string }[] | null>(null)

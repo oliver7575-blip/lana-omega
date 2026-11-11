@@ -5,7 +5,7 @@ import Link from 'next/link'
 import ReservationModal from '@/components/cloudbeds/ReservationModal'
 import NewReservationModal from '@/components/cloudbeds/NewReservationModal'
 import SearchBar from '@/components/cloudbeds/SearchBar'
-import { cbApi, statusColor } from '@/components/cloudbeds/shared'
+import { cbApi } from '@/components/cloudbeds/shared'
 
 interface Booking { reservationID: string; guestName: string; status: string; roomID: string; start: string; end: string }
 interface Unassigned { reservationID: string; guestName: string; roomTypeID: string; start: string; end: string; status: string }
@@ -22,16 +22,30 @@ interface Chunk {
   blocks: Block[]
 }
 
-const LEFT_W = 128
-const ROW_H = 21
+const LEFT_W = 156
+const ROW_H = 34
 const VISIBLE_DAYS = 21 // how many days fit on screen
 const MIN_DAY_W = 30
 const CHUNK = 28 // days loaded each time you scroll near an edge
 const EDGE_PX = 400
-const MONTH_ROW_H = 16
-const PCT_ROW_H = 16
-const DAY_ROW_H = 30
-const TYPE_ROW_H = 30
+const MONTH_ROW_H = 22
+const PCT_ROW_H = 20
+const DAY_ROW_H = 46
+const TYPE_ROW_H = 38
+
+// Soft bar colours by reservation status (text stays dark enough to read on each).
+const BAR: Record<string, { bg: string; border: string; text: string }> = {
+  confirmed: { bg: '#d6e4fb', border: '#9bbbf0', text: '#17356b' },
+  not_confirmed: { bg: '#fdeccb', border: '#f0c978', text: '#7a4a05' },
+  checked_in: { bg: '#cdeee1', border: '#8fd3b8', text: '#0e4d38' },
+  checked_out: { bg: '#e6e9ef', border: '#c5cad4', text: '#4a5262' },
+}
+function barColors(status: string) {
+  const k = status.toLowerCase()
+  return BAR[k === 'in_house' ? 'checked_in' : k] ?? BAR.confirmed
+}
+const HATCH_BLOCK = 'repeating-linear-gradient(135deg,#e3e6ec 0 5px,#f1f3f6 5px 10px)'
+const HATCH_SERVICE = 'repeating-linear-gradient(135deg,#fde7c2 0 5px,#fff4de 5px 10px)'
 
 function addDays(d: string, n: number) {
   const x = new Date(`${d}T12:00:00Z`)
@@ -63,8 +77,8 @@ function mergeChunk(prev: Chunk | null, next: Chunk, from: string, to: string): 
   }
 }
 
-function Bar({ start, end, viewStart, totalDays, label, color, onClick, onContextMenu, title, dayW }: {
-  start: string; end: string; viewStart: string; totalDays: number; label: string; color: string; onClick?: () => void
+function Bar({ start, end, viewStart, totalDays, label, bg, border, text, onClick, onContextMenu, title, dayW }: {
+  start: string; end: string; viewStart: string; totalDays: number; label: string; bg: string; border: string; text: string; onClick?: () => void
   onContextMenu?: (e: React.MouseEvent) => void; title?: string; dayW: number
 }) {
   const from = diff(viewStart, start) + 0.5
@@ -77,8 +91,8 @@ function Bar({ start, end, viewStart, totalDays, label, color, onClick, onContex
       onClick={onClick}
       onContextMenu={onContextMenu}
       title={title ?? label}
-      className="absolute top-[3px] flex h-[15px] items-center overflow-hidden whitespace-nowrap pl-2.5 pr-2 text-left text-[9.5px] font-semibold leading-none text-white hover:brightness-95"
-      style={{ left, width: right - left, background: color, clipPath: 'polygon(0 0, calc(100% - 6px) 0, 100% 50%, calc(100% - 6px) 100%, 0 100%, 6px 50%)' }}
+      className="absolute top-1 flex items-center overflow-hidden whitespace-nowrap rounded-lg border px-2.5 text-left text-[11px] font-semibold leading-none hover:brightness-95"
+      style={{ left: left + 1, width: right - left - 2, height: ROW_H - 8, background: bg, borderColor: border, color: text }}
     >
       <span className="truncate">{label}</span>
     </button>
@@ -98,7 +112,7 @@ export default function CalendarPage() {
   const [busy, setBusy] = useState(false)
   // Click-to-book: first click picks the check-in day, second click the check-out day.
   const [pick, setPick] = useState<{ roomID: string; roomTypeID: string; start: string; hover: string | null } | null>(null)
-  const [creating, setCreating] = useState<{ start: string; end: string; roomTypeID?: string; roomID?: string } | 'blank' | null>(null)
+  const [creating, setCreating] = useState<{ start: string; end: string; roomTypeID?: string; roomID?: string } | 'blank' | 'block' | null>(null)
   const scroller = useRef<HTMLDivElement>(null)
   const pendingShift = useRef(0) // columns added on the left, to keep the view still
   const scrollToDay = useRef<string | null>(null)
@@ -328,35 +342,41 @@ export default function CalendarPage() {
 
   return (
     <div className="p-2 md:p-3">
-      <div className="min-h-[calc(100vh-1.5rem)] rounded-2xl bg-[#f7f9fb] p-3.5 text-[#14213d]">
-        <div className="mb-2 flex flex-wrap items-end justify-between gap-3">
-          <div>
+      <div className="min-h-[calc(100vh-1.5rem)] rounded-2xl bg-[#f6f7f9] p-5 text-[#14213d]">
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <div className="mr-2">
             <Link href="/cloudbeds" className="text-xs font-semibold text-[#3b6fe0] hover:underline">← Activity</Link>
-            <h1 className="text-lg font-semibold leading-tight">Reservation calendar</h1>
-            <p className="text-[11px] text-gray-600">{roomCount} rooms · live assignments from Cloudbeds · scroll sideways to move through time · right-click a reservation for actions · click two days in a room row to book</p>
+            <h1 className="text-[22px] font-bold leading-tight tracking-tight">Calendar</h1>
+            <p className="flex items-center gap-1.5 text-[12.5px] text-gray-600">
+              {roomCount} rooms
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Updates automatically
+            </p>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="mr-1 flex items-center gap-1.5 text-xs text-gray-600"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Updates automatically</span>
-            <button onClick={() => scrollBy(-7)} className="rounded-full border border-gray-200 bg-white px-2.5 py-0.5 text-sm hover:bg-gray-50" aria-label="Back a week">←</button>
-            <button onClick={() => data && jumpTo(data.today)} className="rounded-full border border-gray-200 bg-white px-3 py-0.5 text-sm font-semibold hover:bg-gray-50">Today</button>
-            <button onClick={() => scrollBy(7)} className="rounded-full border border-gray-200 bg-white px-2.5 py-0.5 text-sm hover:bg-gray-50" aria-label="Forward a week">→</button>
+            <button onClick={() => scrollBy(-7)} className="h-9 w-9 rounded-[10px] border border-gray-300 bg-white text-base hover:bg-gray-50" aria-label="Back a week">‹</button>
+            <button onClick={() => data && jumpTo(data.today)} className="h-9 rounded-[10px] border border-gray-300 bg-white px-3.5 text-[13px] font-semibold hover:bg-gray-50">Today</button>
+            <button onClick={() => scrollBy(7)} className="h-9 w-9 rounded-[10px] border border-gray-300 bg-white text-base hover:bg-gray-50" aria-label="Forward a week">›</button>
           </div>
+          <div className="flex items-center gap-1.5 text-[13px]">
+            <input type="date" value={goTo} onChange={(e) => setGoTo(e.target.value)} aria-label="Go to date"
+              className="h-9 rounded-[10px] border border-gray-300 bg-white px-2.5 text-[13px] outline-none focus:border-[#3b6fe0]" />
+            <button onClick={() => goTo && jumpTo(goTo)} className="h-9 rounded-[10px] border border-gray-300 bg-white px-3.5 text-[13px] font-semibold hover:bg-gray-50">Go</button>
+          </div>
+          <div className="min-w-[220px] flex-1 rounded-[10px] border border-gray-300 bg-white px-2 py-0.5"><SearchBar onOpen={setOpen} /></div>
+          {data && (
+            <>
+              <button onClick={() => setCreating('block')} className="h-9 rounded-[10px] border border-gray-300 bg-white px-4 text-[13px] font-semibold hover:bg-gray-50">Block dates</button>
+              <button onClick={() => setCreating('blank')} className="h-9 rounded-[10px] bg-[#1f9d78] px-[18px] text-[13px] font-semibold text-white hover:bg-[#188a69]">+ Create new reservation</button>
+            </>
+          )}
         </div>
 
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-2 py-1">
-          <SearchBar onOpen={setOpen} />
-          <div className="flex items-center gap-2 text-xs">
-            {data && (
-              <button onClick={() => setCreating('blank')}
-                className="rounded-full bg-[#5cc3a5] px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-white hover:bg-[#4bb294]">
-                Create new reservation
-              </button>
-            )}
-            <span className="text-gray-700">Go to date</span>
-            <input type="date" value={goTo} onChange={(e) => setGoTo(e.target.value)}
-              className="rounded-md border border-gray-300 px-2 py-1 text-xs outline-none focus:border-[#3b6fe0]" />
-            <button onClick={() => goTo && jumpTo(goTo)} className="rounded-full bg-[#3b6fe0] px-3 py-1 text-xs font-semibold text-white hover:bg-[#2f5fcc]">Go</button>
-          </div>
+        <div className="mb-3 flex flex-wrap items-center gap-x-[18px] gap-y-1 text-xs text-gray-600">
+          {([['Confirmed', BAR.confirmed.bg, BAR.confirmed.border], ['Not confirmed', BAR.not_confirmed.bg, BAR.not_confirmed.border], ['Checked in', BAR.checked_in.bg, BAR.checked_in.border], ['Checked out', BAR.checked_out.bg, BAR.checked_out.border], ['Blocked', HATCH_BLOCK, '#c5cad4'], ['Out of service', HATCH_SERVICE, '#efc47a']] as const).map(([l, bg, bd]) => (
+            <span key={l} className="flex items-center gap-1.5"><i className="h-3 w-3 rounded border" style={{ background: bg, borderColor: bd }} />{l}</span>
+          ))}
+          <span className="flex-1" />
+          <span>Click a start and an end day on a room to book or block · right-click a reservation for actions</span>
         </div>
 
         {pick && (
@@ -369,7 +389,7 @@ export default function CalendarPage() {
         {!data && !error && <p className="py-10 text-center text-sm text-gray-500">Loading the calendar…</p>}
 
         {data && (
-          <div ref={scroller} onScroll={onScroll} className="relative overflow-x-auto rounded-xl border border-gray-200 bg-white">
+          <div ref={scroller} onScroll={onScroll} className="relative overflow-x-auto rounded-2xl border border-gray-200 bg-white shadow-[0_1px_2px_rgba(20,33,61,.04)]">
             {loading && (
               <div className={`pointer-events-none sticky top-0 z-30 ${loading === 'past' ? 'left-0' : 'left-0'} h-0`}>
                 <span className="absolute left-2 top-1 rounded bg-white/90 px-2 py-0.5 text-[10px] text-gray-500 shadow">Loading {loading === 'past' ? 'earlier' : 'later'} days…</span>
@@ -391,7 +411,7 @@ export default function CalendarPage() {
                   const pct = roomCount ? ((dayStats?.occupiedByDay[d] ?? 0) / roomCount) * 100 : 0
                   const isToday = d === data.today
                   return (
-                    <div key={d} className={`flex items-center justify-center border-r border-gray-200 ${isToday ? 'border-x border-x-[#8ec3ee] bg-[#c6e1f7] text-[#1f5fd6]' : ''}`} style={{ width: dayW, minWidth: dayW, height: PCT_ROW_H }}>
+                    <div key={d} className={`flex items-center justify-center border-r border-gray-200 ${isToday ? 'bg-[#eefaf5] text-[#1f7d60]' : ''}`} style={{ width: dayW, minWidth: dayW, height: PCT_ROW_H }}>
                       {pct.toFixed(2)}%
                     </div>
                   )
@@ -405,10 +425,10 @@ export default function CalendarPage() {
                   const isToday = d === data.today
                   return (
                     <div key={d}
-                      className={`flex flex-col items-center justify-center border-r text-center leading-tight border-gray-200 ${dt.getUTCDate() === 1 ? 'border-l-2 border-l-gray-300' : ''} ${isToday ? 'border-x border-x-[#8ec3ee] bg-[#c6e1f7] text-[#1f5fd6]' : ''}`}
+                      className={`flex flex-col items-center justify-center border-r text-center leading-tight border-gray-200 ${dt.getUTCDate() === 1 ? 'border-l-2 border-l-gray-300' : ''} ${isToday ? 'bg-[#eefaf5] text-[#1f7d60]' : ''}`}
                       style={{ width: dayW, minWidth: dayW, height: DAY_ROW_H }}>
-                      <span>{dt.getUTCDate()}</span>
-                      <span className="font-normal text-gray-500">{dt.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }).slice(0, 2)}</span>
+                      <span className="text-[10px] font-medium text-gray-500">{dt.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })}</span>
+                      <span className={`mt-0.5 flex h-6 min-w-6 items-center justify-center rounded-full text-[12.5px] font-semibold ${isToday ? 'bg-[#1f9d78] text-white' : ''}`}>{dt.getUTCDate()}</span>
                     </div>
                   )
                 })}
@@ -432,7 +452,7 @@ export default function CalendarPage() {
                         const rate = t.rates[d]
                         return (
                           <div key={d}
-                            className={`flex flex-col items-center justify-center border-r border-gray-200 leading-tight ${new Date(`${d}T12:00:00Z`).getUTCDate() === 1 ? 'border-l-2 border-l-gray-300' : ''} ${d === data.today ? 'border-x border-x-[#8ec3ee] bg-[#d6eafa] font-semibold text-[#1f5fd6]' : ''}`}
+                            className={`flex flex-col items-center justify-center border-r border-gray-200 leading-tight ${new Date(`${d}T12:00:00Z`).getUTCDate() === 1 ? 'border-l-2 border-l-gray-300' : ''} ${d === data.today ? 'bg-[#e6f6ef] font-semibold text-[#1f7d60]' : ''}`}
                             style={{ width: dayW, minWidth: dayW, height: TYPE_ROW_H }}>
                             {rate ? (
                               <>
@@ -467,16 +487,21 @@ export default function CalendarPage() {
                                 <div key={d}
                                   onClick={canPick ? () => clickDay(room, t.id, d) : undefined}
                                   onMouseEnter={pick && pick.roomID === room.id ? () => setPick((p) => (p ? { ...p, hover: d } : p)) : undefined}
-                                  className={`border-r border-gray-100 ${canPick ? 'cursor-pointer hover:bg-[#e6f6f0]' : ''} ${new Date(`${d}T12:00:00Z`).getUTCDate() === 1 ? 'border-l-2 border-l-gray-300' : ''} ${inRange ? 'bg-[#bfe7d8]' : d === data.today ? 'border-x border-x-[#8ec3ee] bg-[#e4f1fc]' : ''}`}
+                                  className={`border-r border-gray-100 ${canPick ? 'cursor-pointer hover:bg-[#e6f6f0]' : ''} ${new Date(`${d}T12:00:00Z`).getUTCDate() === 1 ? 'border-l-2 border-l-gray-300' : ''} ${inRange ? 'bg-[#bfe7d8]' : d === data.today ? 'bg-[#f1fbf7]' : ''}`}
                                   style={{ width: dayW, minWidth: dayW }} />
                               )
                             })}
-                            {blocks.map((b, i) => (
-                              <Bar key={`b${i}`} start={b.start} end={addDays(b.end, 1)} viewStart={data.start} totalDays={totalDays} label={b.reason} color="#d9433f" title={`Blocked: ${b.reason}`} dayW={dayW} />
-                            ))}
+                            {blocks.map((b, i) => {
+                              const service = /service|servicio|mainten|repair|mantenim|reparaci/i.test(b.reason)
+                              return (
+                                <Bar key={`b${i}`} start={b.start} end={addDays(b.end, 1)} viewStart={data.start} totalDays={totalDays} label={b.reason}
+                                  bg={service ? HATCH_SERVICE : HATCH_BLOCK} border={service ? '#efc47a' : '#c5cad4'} text={service ? '#7a4a05' : '#4a5262'}
+                                  title={`${service ? 'Out of service' : 'Blocked'}: ${b.reason}`} dayW={dayW} />
+                              )
+                            })}
                             {stays.map((s) => (
                               <Bar key={`${s.reservationID}-${s.start}`} start={s.start} end={s.end} viewStart={data.start} totalDays={totalDays}
-                                label={s.guestName} color={statusColor(s.status).bar} onClick={() => setOpen(s.reservationID)} dayW={dayW}
+                                label={s.guestName} bg={barColors(s.status).bg} border={barColors(s.status).border} text={barColors(s.status).text} onClick={() => setOpen(s.reservationID)} dayW={dayW}
                                 onContextMenu={(e) => {
                                   e.preventDefault()
                                   e.stopPropagation()
@@ -495,11 +520,6 @@ export default function CalendarPage() {
           </div>
         )}
 
-        <div className="mt-1.5 flex flex-wrap gap-4 text-[10.5px] text-gray-600">
-          {[['#7fc0e4', 'Confirmed'], ['#f3c46b', 'Not confirmed'], ['#6ab77a', 'Checked in'], ['#b8c1cc', 'Checked out'], ['#d9433f', 'Blocked']].map(([c, l]) => (
-            <span key={l} className="flex items-center gap-1.5"><span className="h-2.5 w-4 rounded-sm" style={{ background: c }} />{l}</span>
-          ))}
-        </div>
       </div>
 
       {menu && (
@@ -544,7 +564,8 @@ export default function CalendarPage() {
       {creating && data && (
         <NewReservationModal
           today={data.today}
-          initial={creating === 'blank' ? undefined : creating}
+          initial={creating === 'blank' || creating === 'block' ? undefined : creating}
+          initialMode={creating === 'block' ? 'block' : undefined}
           onClose={() => setCreating(null)}
           onBlocked={(text) => {
             setCreating(null)
