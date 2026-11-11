@@ -25,7 +25,8 @@ interface Chunk {
 
 const LEFT_W = 156
 const ROW_H = 34
-const VISIBLE_DAYS = 21 // how many days fit on screen
+const SPANS = [{ days: 7, label: '1w' }, { days: 14, label: '2w' }, { days: 21, label: '3w' }, { days: 30, label: '1m' }] as const
+const DEFAULT_SPAN = 21 // days that fit on screen by default
 const MIN_DAY_W = 30
 const CHUNK = 28 // days loaded each time you scroll near an edge
 const EDGE_PX = 400
@@ -124,6 +125,10 @@ export default function CalendarPage() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [open, setOpen] = useState<string | null>(null)
   const [dayW, setDayW] = useState(44)
+  const [span, setSpan] = useState<number>(DEFAULT_SPAN) // days shown at once: 7, 14, 21 or 30
+  useEffect(() => {
+    try { const v = Number(localStorage.getItem('calendarSpan')); if (SPANS.some((x) => x.days === v)) setSpan(v) } catch { /* ignore */ }
+  }, [])
   const [menu, setMenu] = useState<{ x: number; y: number; reservationID: string; guestName: string; status: string; roomID: string | null } | null>(null)
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null)
   const [busy, setBusy] = useState(false)
@@ -186,12 +191,12 @@ export default function CalendarPage() {
   useEffect(() => {
     const measure = () => {
       const w = scroller.current?.clientWidth ?? 0
-      if (w) setDayW(Math.max(MIN_DAY_W, Math.floor((w - LEFT_W) / VISIBLE_DAYS)))
+      if (w) setDayW(Math.max(MIN_DAY_W, Math.floor((w - LEFT_W) / span)))
     }
     measure()
     window.addEventListener('resize', measure)
     return () => window.removeEventListener('resize', measure)
-  }, [data !== null]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [data !== null, span]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keep the view steady when days are added on the left, and jump to requested days.
   useLayoutEffect(() => {
@@ -282,14 +287,14 @@ export default function CalendarPage() {
     if (!el || !cur) return
     const firstIdx = Math.max(0, Math.floor(el.scrollLeft / dayW) - 7)
     const start = cur.days[Math.min(firstIdx, cur.days.length - 1)]
-    const days = Math.min(VISIBLE_DAYS + 14, 62)
+    const days = Math.min(span + 14, 62)
     try {
       const chunk = await fetchRange(start, days)
       setData((prev) => mergeChunk(prev, { ...chunk, days: prev?.days ?? chunk.days, start: prev?.start ?? chunk.start }, start, addDays(start, days)))
     } catch {
       // Keep showing what we have.
     }
-  }, [dayW])
+  }, [dayW, span])
 
   useEffect(() => {
     const t = setInterval(refreshVisible, 60000)
@@ -374,6 +379,15 @@ export default function CalendarPage() {
       setToast({ ok: false, text: e instanceof Error ? e.message : 'Cloudbeds error' })
     }
     setBusy(false)
+  }
+
+  const changeSpan = (days: number) => {
+    if (days === span) return
+    const el = scroller.current
+    const cur = dataRef.current
+    if (el && cur) scrollToDay.current = cur.days[Math.min(cur.days.length - 1, Math.max(0, Math.floor(el.scrollLeft / dayW)))]
+    try { localStorage.setItem('calendarSpan', String(days)) } catch { /* ignore */ }
+    setSpan(days)
   }
 
   const scrollBy = (days: number) => scroller.current?.scrollBy({ left: days * dayW, behavior: 'smooth' })
@@ -483,6 +497,12 @@ export default function CalendarPage() {
             <button onClick={() => scrollBy(-7)} className="h-9 w-9 rounded-[10px] border border-gray-300 bg-white text-base hover:bg-gray-50" aria-label="Back a week">‹</button>
             <button onClick={() => data && jumpTo(data.today)} className="h-9 rounded-[10px] border border-gray-300 bg-white px-3.5 text-[13px] font-semibold hover:bg-gray-50">Today</button>
             <button onClick={() => scrollBy(7)} className="h-9 w-9 rounded-[10px] border border-gray-300 bg-white text-base hover:bg-gray-50" aria-label="Forward a week">›</button>
+            <div className="ml-1 flex rounded-[10px] bg-[#e9ecf1] p-[3px]" role="group" aria-label="Days shown">
+              {SPANS.map((o) => (
+                <button key={o.days} onClick={() => changeSpan(o.days)} aria-pressed={span === o.days}
+                  className={`h-[30px] rounded-[8px] px-2.5 text-[12.5px] font-semibold ${span === o.days ? 'bg-white text-[#14213d] shadow-sm' : 'text-gray-500 hover:text-[#14213d]'}`}>{o.label}</button>
+              ))}
+            </div>
           </div>
           <div className="flex items-center gap-1.5 text-[13px]">
             <input type="date" value={goTo} onChange={(e) => setGoTo(e.target.value)} aria-label="Go to date"
