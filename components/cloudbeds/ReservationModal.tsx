@@ -352,6 +352,7 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
                   <p className="break-all">
                     <button onClick={() => openQuick('email')} title="Send an email"
                       className={`break-all text-left hover:underline ${quick === 'email' ? 'font-semibold text-[#128c7e]' : 'text-[#3b6fe0]'}`}>{r.guestEmail}</button>
+                    <button onClick={() => openQuick('email')} title="Send an email" className="ml-2 text-xs text-gray-500 hover:underline">email</button>
                   </p>
                 )}
                 {r.guestCountry && <p>{countryName(r.guestCountry)}</p>}
