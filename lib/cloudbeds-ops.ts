@@ -1022,24 +1022,27 @@ export async function addReservationPayment(
 /** Sets the nightly base rate of a room type's rate plan for a date range (end date inclusive). */
 export async function setRoomRate(cb: CB, r: { rateID: string; startDate: string; endDate: string; rate: number }): Promise<void> {
   // Cloudbeds' interval end date is exclusive (it must be after the start date), so the night after the last one.
-  const endExclusive = addDays(r.endDate, 1)
-  const interval = (prefix: string) => ({
-    [`${prefix}[interval][0][startDate]`]: r.startDate,
-    [`${prefix}[interval][0][endDate]`]: endExclusive,
-    [`${prefix}[interval][0][rate]`]: String(r.rate),
-  })
-  const variants: Record<string, string>[] = [
-    { 'rates[0][rateID]': r.rateID, ...interval('rates[0]') },
-    { rateID: r.rateID, ...interval('rates[0]') },
+  const iv = { startDate: r.startDate, endDate: addDays(r.endDate, 1), rate: r.rate }
+  const bodies: unknown[] = [
+    { propertyID: cb.propertyId, rates: [{ rateID: r.rateID, interval: [iv] }] },
+    { propertyID: cb.propertyId, rates: [{ rateID: r.rateID, ...iv }] },
+    { propertyID: cb.propertyId, rateID: r.rateID, rates: [{ interval: [iv] }] },
   ]
   const errors: string[] = []
-  for (const fields of variants) {
+  for (const body of bodies) {
     try {
-      await cbPut(cb, 'putRate', fields)
-      return
+      const res = await fetch(`${BASE}/putRate`, {
+        method: 'PUT',
+        headers: { 'x-api-key': cb.apiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(20000),
+      })
+      const json = (await res.json().catch(() => ({}))) as Json
+      if (res.ok && json.success !== false) return
+      errors.push((json.message as string) ?? `status ${res.status}`)
     } catch (e) {
       errors.push(e instanceof Error ? e.message : 'request failed')
     }
   }
-  throw new Error(errors.join(' | '))
+  throw new Error([...new Set(errors)].join(' | '))
 }
