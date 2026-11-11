@@ -117,12 +117,22 @@ export default function CalendarPage() {
   const [typeOrder, setTypeOrder] = useState<string[]>([])
   const [dragType, setDragType] = useState<string | null>(null)
 
-  // Room type order is a personal view preference, remembered in this browser.
+  // Room type order is a personal preference stored on the staff member's account (so it follows them
+  // across browsers). The browser copy is only a fast start / fallback.
   useEffect(() => {
+    let local: string[] = []
     try {
       const saved = JSON.parse(localStorage.getItem('calendar-room-type-order') ?? '[]')
-      if (Array.isArray(saved)) setTypeOrder(saved.map(String))
+      if (Array.isArray(saved)) local = saved.map(String)
     } catch { /* ignore */ }
+    if (local.length) setTypeOrder(local)
+    cbApi<{ preferences: Record<string, unknown> }>('/api/preferences')
+      .then((j) => {
+        const remote = j.preferences?.calendar_room_type_order
+        if (Array.isArray(remote) && remote.length) setTypeOrder(remote.map(String))
+        else if (local.length) cbApi('/api/preferences', 'PUT', { key: 'calendar_room_type_order', value: local }).catch(() => {}) // move an existing local order to the account
+      })
+      .catch(() => {})
   }, [])
   // Click-to-book: first click picks the check-in day, second click the check-out day.
   const [pick, setPick] = useState<{ roomID: string; roomTypeID: string; start: string; hover: string | null } | null>(null)
@@ -310,6 +320,7 @@ export default function CalendarPage() {
   function saveOrder(ids: string[]) {
     setTypeOrder(ids)
     try { localStorage.setItem('calendar-room-type-order', JSON.stringify(ids)) } catch { /* ignore */ }
+    cbApi('/api/preferences', 'PUT', { key: 'calendar_room_type_order', value: ids }).catch(() => {})
   }
   function moveType(id: string, toId: string) {
     const ids = orderedTypes.map((t) => t.id)
