@@ -307,7 +307,7 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
                   <p>
                     <button onClick={() => openQuick('whatsapp')} title="Send a WhatsApp message"
                       className={`hover:underline ${quick === 'whatsapp' ? 'font-semibold text-[#128c7e]' : 'text-[#3b6fe0]'}`}>{r.guestPhone}</button>
-                    <a href={`tel:${r.guestPhone.replace(/[^\d+]/g, '')}`} title="Call" className="ml-2 text-xs text-gray-500 hover:underline">call</a>
+                    <button onClick={() => openQuick('whatsapp')} title="Send a WhatsApp message" className="ml-2 text-xs text-gray-500 hover:underline">message</button>
                   </p>
                 )}
                 {r.guestEmail && (
