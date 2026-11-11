@@ -248,8 +248,7 @@ export async function checkOut(cb: CB, reservationID: string) {
       for (const room of rooms) {
         await cbPost(cb, 'postRoomCheckOut', {
           reservationID,
-          roomID: String(room.roomID),
-          ...(room.reservationRoomID ? { reservationRoomID: room.reservationRoomID } : {}),
+          ...(room.subReservationID ? { subReservationID: room.subReservationID } : { roomID: String(room.roomID) }),
         })
       }
     } catch {

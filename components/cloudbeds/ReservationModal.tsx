@@ -345,7 +345,18 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
           <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-300 text-lg leading-none text-gray-600 hover:bg-gray-50" aria-label="Close">×</button>
         </div>
 
-        {error && <p className="mx-6 mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+        {error && (
+          <div className="mx-6 mt-4 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
+            <p>{error}</p>
+            {/balance/i.test(error) && (
+              <p className="mt-1 text-[13px] text-red-800">
+                Cloudbeds won&apos;t let an outside app check out a guest with an open balance (only its own screen has the &ldquo;check out anyway&rdquo; step).
+                Either clear the balance first, or{' '}
+                {link ? <a href={link} target="_blank" rel="noreferrer" className="font-semibold underline">open this reservation in Cloudbeds</a> : 'open it in Cloudbeds'} and check out there.
+              </p>
+            )}
+          </div>
+        )}
         {msg && <p className="mx-6 mt-4 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{msg}</p>}
 
         {r && (
