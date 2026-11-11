@@ -103,6 +103,8 @@ const HELLO_REASONS: Record<'es' | 'en', { label: string; text: string }[]> = {
   ],
 }
 
+const SIGNATURE_SUGGESTION = 'Oliver\nSoirée · Zipolite, Oaxaca\nsoiree.mx'
+
 interface Note { author: string; date: string; text: string }
 
 export default function ReservationModal({ id, today, onClose, onChanged }: {
@@ -415,8 +417,11 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
                       </div>
                       {sigEdit ? (
                         <>
-                          <textarea value={sig} onChange={(e) => setSig(e.target.value)} rows={4} placeholder={'Oliver\nSoirée · Zipolite, Oaxaca\nsoiree.mx'}
+                          <textarea value={sig} onChange={(e) => setSig(e.target.value)} rows={4} placeholder={SIGNATURE_SUGGESTION}
                             className="mt-1.5 w-full resize-none rounded-md border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-[#128c7e]" />
+                          {!sig.trim() && (
+                            <button onClick={() => setSig(SIGNATURE_SUGGESTION)} className="mt-1 text-xs font-semibold text-[#128c7e] hover:underline">Use this suggestion</button>
+                          )}
                           <div className="mt-1 flex items-center gap-3 text-xs">
                             {sigCanEdit && sig.trim() !== sigDefault && (
                               <button disabled={quickBusy} onClick={saveSignatureDefault} className="font-semibold text-[#128c7e] hover:underline">Save as default for everyone</button>
