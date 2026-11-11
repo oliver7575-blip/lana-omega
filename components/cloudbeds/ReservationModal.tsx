@@ -445,9 +445,9 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
               <div>
                 <p className={label}>Source</p>
                 {r.source ? (
-                  <span className="mt-0.5 inline-block rounded-full border px-2.5 py-px" style={sourceStyle(r.source)}>{r.source}</span>
+                  <span className="mt-1 inline-block rounded-full border px-2.5 py-px" style={sourceStyle(r.source)}>{r.source}</span>
                 ) : <p>—</p>}
-                {r.confirmationCode && <p className="break-all text-gray-500">{r.confirmationCode}</p>}
+                {r.confirmationCode && <p className="mt-2 break-all pl-2.5 text-gray-500"><span className="mr-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400">Booking no.</span>{r.confirmationCode}</p>}
               </div>
               <div><p className={label}>Booked on</p><p>{r.dateCreated ? r.dateCreated.slice(0, 10) : '—'}</p></div>
               <div><p className={label}>Check-in / Out</p><p>{r.startDate} – {r.endDate}</p></div>
