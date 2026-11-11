@@ -997,3 +997,20 @@ export async function deleteRoomBlock(cb: CB, roomBlockID: string): Promise<void
   }
   throw new Error(`Cloudbeds wouldn't remove the block (${errors.join(' | ')})`)
 }
+
+/**
+ * Records a payment on a reservation's folio with one of the property's payment methods, or a refund
+ * (sent as a negative payment). `methodCode` comes from getPaymentMethods.
+ */
+export async function addReservationPayment(
+  cb: CB,
+  p: { reservationID: string; methodCode: string; amount: number; refund: boolean; note?: string }
+): Promise<void> {
+  const amount = Math.round(Math.abs(p.amount) * 100) / 100
+  await cbPost(cb, 'postPayment', {
+    reservationID: p.reservationID,
+    type: p.methodCode,
+    amount: String(p.refund ? -amount : amount),
+    description: (p.note?.trim() || (p.refund ? 'Refund' : 'Payment')).slice(0, 200),
+  })
+}
