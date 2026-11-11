@@ -188,9 +188,15 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
     try {
       const j = await cbApi<{ reservation: Detail }>(`/api/cloudbeds/reservation/${id}/payment`, 'POST', { kind: mpKind, amount: Number(mpAmount), method: mpMethod, note: mpNote })
       apply(j.reservation)
-      setMsg(`${mpKind === 'refund' ? 'Refund' : 'Payment'} of MXN ${Number(mpAmount).toLocaleString('en-US')} recorded.`)
+      const text = `${mpKind === 'refund' ? 'Refund' : 'Payment'} of MXN ${Number(mpAmount).toLocaleString('en-US')} recorded.`
       setMpKind(null)
       onChanged?.()
+      if (onCheckedOut) {
+        onCheckedOut(`${j.reservation.guestName}: ${text.charAt(0).toLowerCase()}${text.slice(1).replace(/\.$/, '')}.`)
+        onClose()
+        return
+      }
+      setMsg(text)
     } catch (e) {
       setMpErr(e instanceof Error ? e.message : 'Cloudbeds error')
     }
