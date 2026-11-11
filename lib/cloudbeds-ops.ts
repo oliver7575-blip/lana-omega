@@ -119,6 +119,7 @@ export interface ReservationDetail {
   balance: number | null
   estimatedArrivalTime: string | null
   guestCountry: string | null
+  guestID: string | null
   /** When the reservation was made, as Cloudbeds reports it. */
   dateCreated: string | null
   /** The channel's own confirmation code (Airbnb / Booking.com / Expedia…). */
@@ -186,6 +187,7 @@ export async function getReservationDetail(cb: CB, reservationID: string): Promi
     guestEmail: text(d.guestEmail) ?? text(guestEntry.guestEmail),
     guestPhone: text(d.guestPhone) ?? text(d.guestCellPhone) ?? text(guestEntry.guestPhone) ?? text(guestEntry.guestCellPhone),
     guestCountry: text(d.guestCountry) ?? text(guestEntry.guestCountry),
+    guestID: text(d.guestID),
     dateCreated: text(d.dateCreated),
     confirmationCode: text(d.thirdPartyIdentifier),
     specialRequests: text(d.specialRequests) ?? text(d.guestSpecialRequests),
