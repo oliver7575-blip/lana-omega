@@ -113,6 +113,17 @@ export default function CalendarPage() {
   const [busy, setBusy] = useState(false)
   const [openBlock, setOpenBlock] = useState<Block | null>(null)
   const [hoverDay, setHoverDay] = useState<string | null>(null) // column under the pointer
+  const [markDay, setMarkDay] = useState<string | null>(null) // column marked by clicking its date
+  const [typeOrder, setTypeOrder] = useState<string[]>([])
+  const [dragType, setDragType] = useState<string | null>(null)
+
+  // Room type order is a personal view preference, remembered in this browser.
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('calendar-room-type-order') ?? '[]')
+      if (Array.isArray(saved)) setTypeOrder(saved.map(String))
+    } catch { /* ignore */ }
+  }, [])
   // Click-to-book: first click picks the check-in day, second click the check-out day.
   const [pick, setPick] = useState<{ roomID: string; roomTypeID: string; start: string; hover: string | null } | null>(null)
   const [creating, setCreating] = useState<{ start: string; end: string; roomTypeID?: string; roomID?: string } | 'blank' | 'block' | null>(null)
@@ -290,6 +301,33 @@ export default function CalendarPage() {
     }
   }
 
+  const orderedTypes = useMemo(() => {
+    const types = data?.roomTypes ?? []
+    const rank = (id: string) => { const i = typeOrder.indexOf(id); return i === -1 ? Number.MAX_SAFE_INTEGER : i }
+    return [...types].sort((a, b) => rank(a.id) - rank(b.id)) // stable: unknown types keep Cloudbeds' order
+  }, [data, typeOrder])
+
+  function saveOrder(ids: string[]) {
+    setTypeOrder(ids)
+    try { localStorage.setItem('calendar-room-type-order', JSON.stringify(ids)) } catch { /* ignore */ }
+  }
+  function moveType(id: string, toId: string) {
+    const ids = orderedTypes.map((t) => t.id)
+    const from = ids.indexOf(id)
+    const to = ids.indexOf(toId)
+    if (from < 0 || to < 0 || from === to) return
+    ids.splice(to, 0, ids.splice(from, 1)[0])
+    saveOrder(ids)
+  }
+  function shiftType(id: string, dir: -1 | 1) {
+    const ids = orderedTypes.map((t) => t.id)
+    const i = ids.indexOf(id)
+    const j = i + dir
+    if (i < 0 || j < 0 || j >= ids.length) return
+    ;[ids[i], ids[j]] = [ids[j], ids[i]]
+    saveOrder(ids)
+  }
+
   const roomCount = useMemo(() => data?.roomTypes.reduce((s, t) => s + t.rooms.length, 0) ?? 0, [data])
   const totalDays = data?.days.length ?? 0
   const gridW = LEFT_W + totalDays * dayW
@@ -379,7 +417,7 @@ export default function CalendarPage() {
             <span key={l} className="flex items-center gap-1.5"><i className="h-3 w-3 rounded border" style={{ background: bg, borderColor: bd }} />{l}</span>
           ))}
           <span className="flex-1" />
-          <span>Click a start and an end day on a room to book or block · right-click a reservation for actions</span>
+          <span>Click a start and an end day on a room to book or block · right-click a reservation for actions · click a date to mark its whole column</span>
         </div>
 
         {pick && (
@@ -400,7 +438,13 @@ export default function CalendarPage() {
                 <span className="absolute left-2 top-1 rounded bg-white/90 px-2 py-0.5 text-[10px] text-gray-500 shadow">Loading {loading === 'past' ? 'earlier' : 'later'} days…</span>
               </div>
             )}
-            <div style={{ width: gridW }}>
+            <div className="relative" style={{ width: gridW }}>
+              {markDay && data.days.includes(markDay) && (
+                <div className="pointer-events-none absolute bottom-0 top-0" style={{
+                  left: LEFT_W + data.days.indexOf(markDay) * dayW, width: dayW,
+                  background: 'rgba(255,193,59,.22)', boxShadow: 'inset 1px 0 0 rgba(224,150,20,.7), inset -1px 0 0 rgba(224,150,20,.7)',
+                }} />
+              )}
               <div className="sticky top-0 z-20 flex border-b border-gray-200 bg-gray-50 text-[9px] font-semibold text-gray-500">
                 <div className="sticky left-0 z-10 border-r-2 border-gray-200 bg-gray-50" style={{ width: LEFT_W, minWidth: LEFT_W, height: MONTH_ROW_H }} />
                 <div className="relative" style={{ width: totalDays * dayW, height: MONTH_ROW_H }}>
@@ -416,7 +460,7 @@ export default function CalendarPage() {
                   const pct = roomCount ? ((dayStats?.occupiedByDay[d] ?? 0) / roomCount) * 100 : 0
                   const isToday = d === data.today
                   return (
-                    <div key={d} className={`flex items-center justify-center border-r border-gray-200 ${isToday ? 'bg-[#eefaf5] text-[#1f7d60]' : ''}`} style={{ width: dayW, minWidth: dayW, height: PCT_ROW_H }}>
+                    <div key={d} className={`flex items-center justify-center border-r border-gray-200 ${markDay === d ? '!bg-[#ffe9a8]' : ''} ${isToday ? 'bg-[#eefaf5] text-[#1f7d60]' : ''}`} style={{ width: dayW, minWidth: dayW, height: PCT_ROW_H }}>
                       {pct.toFixed(2)}%
                     </div>
                   )
@@ -430,28 +474,44 @@ export default function CalendarPage() {
                   const isToday = d === data.today
                   return (
                     <div key={d}
-                      className={`flex flex-col items-center justify-center border-r text-center leading-tight border-gray-200 ${d === hoverDay ? 'bg-[#dbe8f7]' : ''} ${dt.getUTCDate() === 1 ? 'border-l-2 border-l-gray-300' : ''} ${isToday ? 'bg-[#eefaf5] text-[#1f7d60]' : ''}`}
+                      onClick={() => setMarkDay((m) => (m === d ? null : d))}
+                      title={markDay === d ? 'Click to unmark this day' : 'Click to mark this whole day'}
+                      className={`flex cursor-pointer flex-col items-center justify-center border-r text-center leading-tight border-gray-200 ${markDay === d ? '!bg-[#ffd666]' : ''} ${d === hoverDay ? 'bg-[#dbe8f7]' : ''} ${dt.getUTCDate() === 1 ? 'border-l-2 border-l-gray-300' : ''} ${isToday ? 'bg-[#eefaf5] text-[#1f7d60]' : ''}`}
                       style={{ width: dayW, minWidth: dayW, height: DAY_ROW_H }}>
                       <span className="text-[10px] font-medium text-gray-500">{dt.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })}</span>
-                      <span className={`mt-0.5 flex h-6 min-w-6 items-center justify-center rounded-full text-[12.5px] font-semibold ${isToday ? 'bg-[#1f9d78] text-white' : ''}`}>{dt.getUTCDate()}</span>
+                      <span className={`mt-0.5 flex h-6 min-w-6 items-center justify-center rounded-full text-[12.5px] font-semibold ${isToday ? 'bg-[#1f9d78] text-white' : markDay === d ? 'bg-[#e08a00] text-white' : ''}`}>{dt.getUTCDate()}</span>
                     </div>
                   )
                 })}
               </div>
 
-              {data.roomTypes.map((t) => {
+              {orderedTypes.map((t, ti) => {
                 const isCollapsed = collapsed.has(t.id)
                 const unassigned = data.unassigned.filter((u) => u.roomTypeID === t.id)
                 return (
                   <div key={t.id} className="border-b border-gray-300">
                     <div className="flex bg-gray-50 text-[9px] text-gray-500">
-                      <button
-                        onClick={() => { const n = new Set(collapsed); if (n.has(t.id)) n.delete(t.id); else n.add(t.id); setCollapsed(n) }}
-                        className="sticky left-0 z-10 flex items-center truncate border-r-2 border-gray-200 bg-gray-50 px-2 text-left text-[10.5px] font-semibold text-[#14213d]"
+                      <div
+                        draggable
+                        onDragStart={() => setDragType(t.id)}
+                        onDragOver={(e) => { if (dragType && dragType !== t.id) e.preventDefault() }}
+                        onDrop={() => { if (dragType) moveType(dragType, t.id); setDragType(null) }}
+                        onDragEnd={() => setDragType(null)}
+                        className={`sticky left-0 z-10 flex items-center border-r-2 border-gray-200 bg-gray-50 pl-1 pr-1 ${dragType === t.id ? 'opacity-50' : ''} ${dragType && dragType !== t.id ? 'outline-dashed outline-1 -outline-offset-2 outline-[#1f9d78]/40' : ''}`}
                         style={{ width: LEFT_W, minWidth: LEFT_W, height: TYPE_ROW_H }}
                       >
-                        <span className="mr-1 inline-block shrink-0 text-[10px] text-gray-500">{isCollapsed ? '›' : '⌄'}</span><span className="truncate">{t.name}</span>
-                      </button>
+                        <span title="Drag to re-order" className="cursor-grab select-none px-0.5 text-[11px] leading-none text-gray-400 hover:text-gray-600" aria-hidden="true">⋮⋮</span>
+                        <button
+                          onClick={() => { const n = new Set(collapsed); if (n.has(t.id)) n.delete(t.id); else n.add(t.id); setCollapsed(n) }}
+                          className="flex min-w-0 flex-1 items-center truncate px-1 text-left text-[11px] font-semibold text-[#14213d]"
+                        >
+                          <span className="mr-1 inline-block shrink-0 text-[10px] text-gray-500">{isCollapsed ? '›' : '⌄'}</span><span className="truncate">{t.name}</span>
+                        </button>
+                        <span className="flex shrink-0 flex-col">
+                          <button onClick={() => shiftType(t.id, -1)} disabled={ti === 0} title="Move up" aria-label={`Move ${t.name} up`} className="px-1 text-[8px] leading-[10px] text-gray-400 hover:text-[#14213d] disabled:opacity-30">▲</button>
+                          <button onClick={() => shiftType(t.id, 1)} disabled={ti === orderedTypes.length - 1} title="Move down" aria-label={`Move ${t.name} down`} className="px-1 text-[8px] leading-[10px] text-gray-400 hover:text-[#14213d] disabled:opacity-30">▼</button>
+                        </span>
+                      </div>
                       {data.days.map((d) => {
                         const avail = dayStats?.perType[t.id]?.[d]
                         const rate = t.rates[d]
