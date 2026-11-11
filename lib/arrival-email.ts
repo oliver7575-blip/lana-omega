@@ -151,6 +151,10 @@ async function replyToGuest(
     await setReply({ reply_status: 'failed', reply_detail: "Lana couldn't write a reply — please answer the guest yourself." })
     return false
   }
+  if (d.decision === 'none') {
+    await setReply({ reply_status: 'not_sent', reply_detail: `No reply needed — ${d.reason || 'nothing to answer'}.` })
+    return true
+  }
   if (d.decision === 'staff' || !d.reply) {
     await setReply({ reply_status: 'not_sent', reply_detail: `Lana didn't reply — ${d.reason || 'needs a person'}.` })
     return false
