@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { cloudbedsForCaller } from '@/lib/cloudbeds-caller'
-import { assignRoom, checkIn, cloudbedsLinks, getReservationDetail, setArrivalTime, setStatus, setStayDates, unassignRoom } from '@/lib/cloudbeds-ops'
+import { assignRoom, checkIn, cloudbedsLinks, getReservationDetail, getReservationNotes, setArrivalTime, setStatus, setStayDates, unassignRoom } from '@/lib/cloudbeds-ops'
 
 export const maxDuration = 60
 
@@ -9,8 +9,11 @@ export async function GET(_r: Request, { params }: { params: Promise<{ id: strin
   const c = await cloudbedsForCaller()
   if ('error' in c) return c.error
   try {
-    const reservation = await getReservationDetail(c.cb, id)
-    return NextResponse.json({ reservation, link: cloudbedsLinks(c.cb.propertyId).reservation(id) })
+    const [reservation, notes] = await Promise.all([
+      getReservationDetail(c.cb, id),
+      getReservationNotes(c.cb, id).catch(() => []),
+    ])
+    return NextResponse.json({ reservation, notes, link: cloudbedsLinks(c.cb.propertyId).reservation(id) })
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Cloudbeds error' }, { status: 502 })
   }
