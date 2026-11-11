@@ -232,6 +232,32 @@ export async function setStatus(cb: CB, reservationID: string, status: 'checked_
   await cbPut(cb, 'putReservation', { reservationID, status })
 }
 
+/**
+ * Checks a reservation out. If Cloudbeds refuses the whole-reservation status change (for example because of an
+ * open balance), tries checking out each room instead; if that fails too, the original error is reported.
+ */
+export async function checkOut(cb: CB, reservationID: string) {
+  try {
+    await setStatus(cb, reservationID, 'checked_out')
+    return
+  } catch (first) {
+    try {
+      const r = await getReservationDetail(cb, reservationID)
+      const rooms = r.rooms.filter((x) => x.roomID)
+      if (rooms.length === 0) throw first
+      for (const room of rooms) {
+        await cbPost(cb, 'postRoomCheckOut', {
+          reservationID,
+          roomID: String(room.roomID),
+          ...(room.reservationRoomID ? { reservationRoomID: room.reservationRoomID } : {}),
+        })
+      }
+    } catch {
+      throw first
+    }
+  }
+}
+
 /** Takes the reservation out of one room (or all its rooms), back to "unassigned". */
 export async function unassignRoom(cb: CB, reservationID: string, roomID?: string) {
   const r = await getReservationDetail(cb, reservationID)

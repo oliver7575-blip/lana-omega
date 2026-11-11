@@ -283,6 +283,16 @@ export default function CalendarPage() {
       )
       if (!ok) return
     }
+    if (action === 'check_out') {
+      // Cloudbeds asks staff to acknowledge an open balance before checking out; do the same here.
+      try {
+        const d = await cbApi<{ reservation: { balance: number | null } }>(`/api/cloudbeds/reservation/${m.reservationID}`)
+        const owed = d.reservation.balance ?? 0
+        if (owed > 0 && !confirm(`${m.guestName} still has a balance of MXN ${owed.toLocaleString('en-US')}.\n\nCheck out anyway? The balance stays open on the reservation in Cloudbeds.`)) return
+      } catch {
+        // If the balance can't be read, let Cloudbeds decide.
+      }
+    }
     if (action === 'unassign' && !confirm(`Remove ${m.guestName} from this room? The reservation stays, but without a room.`)) return
     setBusy(true)
     try {

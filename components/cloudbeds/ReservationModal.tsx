@@ -151,6 +151,7 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
   const [guestError, setGuestError] = useState<string | null>(null)
   const [guestLoading, setGuestLoading] = useState(false)
   const [confirmCancel, setConfirmCancel] = useState(false)
+  const [confirmCheckOut, setConfirmCheckOut] = useState(false)
 
   function apply(d: Detail) {
     setR(d)
@@ -406,7 +407,7 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
                   </button>
                 )}
                 {canCheckOut && (
-                  <button disabled={busy} onClick={() => act({ action: 'check_out' }, 'Checked out.')}
+                  <button disabled={busy} onClick={() => (r.balance && r.balance > 0 ? setConfirmCheckOut(true) : act({ action: 'check_out' }, 'Checked out.'))}
                     className="h-9 rounded-[10px] border border-red-300 whitespace-nowrap px-3 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60">
                     Check out
                   </button>
@@ -422,6 +423,23 @@ export default function ReservationModal({ id, today, onClose, onChanged }: {
                   </button>
                 )}
               </div>
+
+              {confirmCheckOut && r.balance && r.balance > 0 && (
+                <div className="mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-3">
+                  <p className="text-sm font-semibold text-amber-900">This guest still has a balance due</p>
+                  <p className="mt-1 text-sm text-amber-900">
+                    {r.guestName} owes <b>MXN {r.balance.toLocaleString('en-US')}</b>. Check out anyway? The balance stays open on the reservation in Cloudbeds.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button disabled={busy} onClick={() => { setConfirmCheckOut(false); act({ action: 'check_out' }, 'Checked out with the balance still open.') }}
+                      className="h-9 rounded-[10px] bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60">Yes, check out anyway</button>
+                    <button onClick={() => { setConfirmCheckOut(false); createPaymentLinkNow() }}
+                      className="h-9 rounded-[10px] border border-gray-300 bg-white px-4 text-sm font-semibold hover:bg-gray-50">Send payment link instead</button>
+                    <button onClick={() => setConfirmCheckOut(false)}
+                      className="h-9 rounded-[10px] border border-gray-300 bg-white px-4 text-sm font-semibold hover:bg-gray-50">Back</button>
+                  </div>
+                </div>
+              )}
 
               {confirmCancel && (
                 <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-3">
