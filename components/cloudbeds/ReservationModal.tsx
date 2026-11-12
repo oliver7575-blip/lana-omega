@@ -431,6 +431,8 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
   const paidAmt = r ? (bd?.paid ?? (r.total !== null && r.balance !== null ? r.total - r.balance : null)) : null
   const card = 'rounded-xl border border-[#e6e9f0] bg-white px-3 py-2.5'
   const row = 'flex justify-between gap-3 py-[2px] text-[12px]'
+  const rowL = 'flex items-baseline gap-3 py-[2px] text-[12px]'
+  const lblL = 'w-[52px] shrink-0 text-[#667085]'
   const mini = 'rounded-lg border border-[#e6e9f0] px-2.5 py-2'
   const chipSm = 'ml-2 inline-block rounded-full border border-[#d0d5dd] px-1.5 align-middle text-[8px] font-medium uppercase leading-[14px] tracking-wide text-[#667085] hover:border-[#128c7e] hover:text-[#128c7e]'
 
@@ -450,8 +452,19 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
           <p className="mt-1.5 truncate text-[21px] font-bold leading-tight tracking-tight">{r ? r.guestName : 'Loading…'}</p>
           {r && (
             <>
-              <p className="mt-0.5 text-[11.5px] text-[#b7c9d8]">Booked {r.dateCreated ? r.dateCreated.slice(0, 10) : '—'} · {r.adults} adult{r.adults === 1 ? '' : 's'}{r.children ? ` · ${r.children} child${r.children === 1 ? '' : 'ren'}` : ''}</p>
-              <div className="mt-2.5 flex items-center gap-2.5 pr-0 sm:pr-[230px]">
+              <div className="mt-2 flex flex-col gap-2.5 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+              <div className="min-w-0 flex-1">
+              <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11.5px] text-[#b7c9d8]">
+                <span>Booked {r.dateCreated ? r.dateCreated.slice(0, 10) : '—'} · {r.adults} adult{r.adults === 1 ? '' : 's'}{r.children ? ` · ${r.children} child${r.children === 1 ? '' : 'ren'}` : ''}</span>
+                <span className="inline-flex items-center gap-1.5">· Arrival
+                  <input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Estimated arrival time"
+                    className="h-[20px] w-[74px] rounded-md border border-white/25 bg-white/10 px-1 text-[11px] text-white outline-none [color-scheme:dark] focus:border-white/60" />
+                  {time !== (r.estimatedArrivalTime ?? '') && time && (
+                    <button disabled={busy} onClick={() => act({ action: 'arrival_time', time }, 'Arrival time updated.')} className="rounded-full bg-white/90 px-2 py-px text-[10.5px] font-bold text-[#0e5f47] hover:bg-white disabled:opacity-60">Save</button>
+                  )}
+                </span>
+              </p>
+              <div className="mt-2.5 flex items-center gap-2.5">
                 <div><p className="text-[9.5px] font-semibold tracking-[.08em] text-[#9fb8ca]">CHECK-IN</p><p className="text-[14px] font-bold">{fmtDay(r.startDate)}</p></div>
                 <div className="flex flex-1 items-center">
                   <i className="block h-2.5 w-2.5 rounded-full bg-[#4ade9f]" />
@@ -462,8 +475,9 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                 </div>
                 <div className="text-right"><p className="text-[9.5px] font-semibold tracking-[.08em] text-[#9fb8ca]">CHECK-OUT</p><p className="text-[14px] font-bold">{fmtDay(r.endDate)}</p></div>
               </div>
-              {/* Floating balance */}
-              <div className="mt-5 flex items-center justify-between gap-4 rounded-2xl bg-white px-3 py-1.5 text-[#14213d] shadow-[0_10px_26px_rgba(8,12,24,.25)] sm:absolute sm:bottom-[-24px] sm:right-5 sm:z-10 sm:mt-0 sm:justify-start">
+              </div>
+              {/* Balance */}
+              <div className="flex shrink-0 items-center justify-between gap-4 rounded-2xl bg-white px-3 py-1.5 text-[#14213d] shadow-[0_10px_26px_rgba(8,12,24,.25)] sm:justify-start">
                 <div>
                   <p className={`text-[9.5px] font-bold tracking-[.06em] ${owes ? 'text-[#b42318]' : 'text-[#0e6b4a]'}`}>{owes ? 'BALANCE DUE' : 'PAID IN FULL'}</p>
                   <p className={`text-[16px] font-bold tracking-tight ${owes ? 'text-[#b42318]' : 'text-[#0e6b4a]'}`}>MXN {(r.balance ?? 0).toLocaleString('en-US')}</p>
@@ -472,6 +486,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                   className={`h-[28px] whitespace-nowrap rounded-full px-3 text-[11.5px] font-semibold text-white transition ${mpKind === 'payment' ? 'bg-[#0e5f47] ring-4 ring-[#1f9d78]/25' : 'bg-gradient-to-b from-[#27ad86] to-[#1a8f6c] shadow-[0_4px_10px_rgba(31,157,120,.35),inset_0_1px_0_rgba(255,255,255,.25)] hover:brightness-95'}`}>
                   + Add payment
                 </button>
+              </div>
               </div>
             </>
           )}
@@ -492,7 +507,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
         {msg && <p className="mx-5 mt-2.5 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{msg}</p>}
 
         {r && (
-          <div className="flex flex-col gap-2.5 px-5 pb-3.5 pt-4 sm:pt-10">
+          <div className="flex flex-col gap-2.5 px-5 pb-3.5 pt-4">
             {/* Action row */}
             <div className="flex flex-wrap gap-1 pt-0.5">
               {canCheckIn && (
@@ -707,13 +722,6 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                   </div>
                   <div className="mt-2 border-t border-[#eef0f4] pt-2">
                     <div className={row}><span className="text-[#667085]">Guests</span><span>{r.adults} adult{r.adults === 1 ? '' : 's'} · {r.children} child{r.children === 1 ? '' : 'ren'}</span></div>
-                    <div className={`${row} items-center`}>
-                      <span className="text-[#667085]">Estimated arrival</span>
-                      <span className="flex items-center gap-2">
-                        <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="h-[26px] rounded-[7px] border border-[#dfe3ea] px-2 text-[13px] outline-none focus:border-[#1f9d78]" />
-                        <button disabled={busy || !time} onClick={() => act({ action: 'arrival_time', time }, 'Arrival time updated.')} className="text-[12.5px] font-bold text-[#1f9d78] hover:underline disabled:opacity-40">Update</button>
-                      </span>
-                    </div>
                   </div>
                 </div>
 
@@ -732,18 +740,18 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                 <div className={card}>
                   <p className={lbl}>Guest</p>
                   {r.guestPhone && (
-                    <div className={row}><span className="text-[#667085]">Phone</span>
+                    <div className={rowL}><span className={lblL}>Phone</span>
                       <span><button onClick={() => openQuick('whatsapp')} title="Send a WhatsApp message" className="font-medium text-[#1d4ed8] hover:underline">{r.guestPhone}</button>
                         <button onClick={() => openQuick('whatsapp')} title="Send a WhatsApp message" className={chipSm}>message</button></span>
                     </div>
                   )}
                   {r.guestEmail && (
-                    <div className={row}><span className="text-[#667085]">Email</span>
-                      <span className="min-w-0 break-all text-right"><button onClick={() => openQuick('email')} title="Send an email" className="break-all font-medium text-[#1d4ed8] hover:underline">{r.guestEmail}</button>
+                    <div className={rowL}><span className={lblL}>Email</span>
+                      <span className="min-w-0 break-all"><button onClick={() => openQuick('email')} title="Send an email" className="break-all font-medium text-[#1d4ed8] hover:underline">{r.guestEmail}</button>
                         <button onClick={() => openQuick('email')} title="Send an email" className={chipSm}>email</button></span>
                     </div>
                   )}
-                  {r.guestCountry && <div className={row}><span className="text-[#667085]">Country</span><span>{countryName(r.guestCountry)}</span></div>}
+                  {r.guestCountry && <div className={rowL}><span className={lblL}>Country</span><span>{countryName(r.guestCountry)}</span></div>}
                   {!r.guestPhone && !r.guestEmail && <p className="py-1 text-sm text-gray-500">No contact details</p>}
                 </div>
 
