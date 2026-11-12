@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { cbApi, statusLabel } from './shared'
+import { HELLO_TEXT } from '@/lib/hello-text'
 
 type Json = Record<string, unknown>
 
@@ -656,6 +657,14 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                     onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) sendQuick() }}
                     placeholder={quick === 'whatsapp' ? (waInfo && !waInfo.windowOpen ? 'Why are you writing? One short sentence.' : 'Write a message… (sent as staff, like on the Messages page)') : 'Write the email…'}
                     className="w-full resize-none rounded-[10px] border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#128c7e]" />
+                  {quick === 'whatsapp' && waInfo && !waInfo.windowOpen && (
+                    <div className="mt-2 rounded-md border border-dashed border-[#b7e0d8] bg-white px-3 py-2">
+                      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">This is exactly what the guest will receive</p>
+                      <p className="whitespace-pre-wrap text-[13px] leading-snug text-gray-700">
+                        {HELLO_TEXT[helloLang](r.guestName.split(' ')[0] || 'guest', quickText.replace(/[\n\t]+/g, ' ').trim() || (helloLang === 'es' ? '[tu motivo aquí]' : '[your reason here]'))}
+                      </p>
+                    </div>
+                  )}
                   {quick === 'email' && (
                     <div className="mt-2 rounded-md border border-dashed border-gray-300 bg-white px-3 py-2">
                       <div className="flex items-center justify-between gap-2">

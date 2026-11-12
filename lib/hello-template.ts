@@ -1,11 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { sendMappedTemplate } from './message-templates'
 import { fetchTemplates } from './maintenance-template'
+import { HELLO_TEXT } from './hello-text'
 
 /** The approved "hello" templates: first name in {{1}}, one reason sentence in {{2}}. Used for staff messages outside WhatsApp's 24-hour window. */
 export const HELLO_TEMPLATES = {
-  es: { name: 'soiree_contacto_template', language: 'es_MX', render: (n: string, r: string) => `Hola ${n}, te saludamos desde Soirée, en Zipolite! 🌴\n\n${r}\n\nEste es nuestro contacto directo por WhatsApp: escríbenos por aquí cuando lo necesites.` },
-  en: { name: 'soiree_contacto_template_en', language: 'en', render: (n: string, r: string) => `Hi ${n}, this is Soirée in Zipolite! 🌴\n\n${r}\n\nThis is our direct WhatsApp contact: feel free to message us here whenever you need.` },
+  es: { name: 'soiree_contacto_template', language: 'es_MX', render: HELLO_TEXT.es },
+  en: { name: 'soiree_contacto_template_en', language: 'en', render: HELLO_TEXT.en },
 } as const
 
 export type HelloLang = keyof typeof HELLO_TEMPLATES
