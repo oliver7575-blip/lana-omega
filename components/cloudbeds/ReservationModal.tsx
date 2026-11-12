@@ -445,7 +445,8 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               {r && <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold capitalize">{statusLabel(r.status)}</span>}
               {r?.source && <span className="rounded-full border px-3 py-[3px] text-xs font-semibold" style={sourceStyle(r.source)}>{r.source}</span>}
-              <span className="ml-1 truncate text-[12.5px] uppercase tracking-wide text-[#b7c9d8]">Booking no. {r?.confirmationCode ?? `#${id}`}</span>
+              {r?.confirmationCode && <span className="ml-1 truncate text-[12px] uppercase tracking-wide text-[#b7c9d8]">{r.source || 'Booking'} no. <b className="font-semibold text-white">{r.confirmationCode}</b></span>}
+              <span title="Reservation number inside Cloudbeds" className="rounded-full border border-dashed border-white/40 px-2.5 py-[2px] text-[11px] font-semibold tracking-wide text-[#b6f5d8]">CLOUDBEDS RES. #{id}</span>
             </div>
             <button onClick={onClose} aria-label="Close" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/30 text-lg leading-none text-white hover:bg-white/10">×</button>
           </div>
@@ -507,7 +508,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
         {msg && <p className="mx-5 mt-2.5 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{msg}</p>}
 
         {r && (
-          <div className="flex flex-col gap-2.5 px-5 pb-3.5 pt-4">
+          <div className="flex flex-col gap-3 px-5 pb-4 pt-4">
             {/* Action row */}
             <div className="flex flex-wrap gap-1 pt-0.5">
               {canCheckIn && (
@@ -793,15 +794,6 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                 className={`${priGreen} mt-3 w-full`}>
                 Save stay dates
               </button>
-            </details>
-
-            <details className="rounded-xl border border-[#e6e9f0] px-3 py-2" onToggle={(e) => e.currentTarget.open && loadGuest()}>
-              <summary className="cursor-pointer text-[12px] font-semibold text-[#475467]">Guest details</summary>
-              <div className="mt-3">
-                {guestLoading && <p className="text-sm text-gray-500">Loading…</p>}
-                {guestError && <p className="text-sm text-red-600">{guestError}</p>}
-                {guestProfile && <GuestProfileFields profile={guestProfile} />}
-              </div>
             </details>
 
             {link && (
