@@ -435,7 +435,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
             </div>
             <button onClick={onClose} aria-label="Close" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/30 text-lg leading-none text-white hover:bg-white/10">×</button>
           </div>
-          <p className="mt-1.5 truncate text-[21px] font-bold leading-tight tracking-tight">{r ? r.guestName : 'Loading…'}{r && <span title="Reservation number inside Cloudbeds" className="ml-2.5 text-[12px] font-medium uppercase tracking-wide text-[#b7c9d8]">Res. #{id}</span>}</p>
+          <p className="mt-1.5 truncate text-[21px] font-bold leading-tight tracking-tight">{r ? r.guestName : 'Loading…'}{r && <span title="Reservation number inside Cloudbeds" className="ml-2.5 text-[12px] font-medium uppercase tracking-wide text-[#b7c9d8]">#{id}</span>}</p>
           {r && (
             <>
               <div className="mt-2 flex flex-col gap-2.5 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
