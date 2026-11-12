@@ -443,8 +443,8 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
               <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11.5px] text-[#b7c9d8]">
                 <span>Booked {r.dateCreated ? r.dateCreated.slice(0, 10) : '—'} · {r.adults} adult{r.adults === 1 ? '' : 's'}{r.children ? ` · ${r.children} child${r.children === 1 ? '' : 'ren'}` : ''}</span>
                 <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-white">· Arrival
-                  <input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Estimated arrival time"
-                    className="h-[22px] w-[80px] rounded-md border border-white/30 bg-white/10 px-1 text-[12px] font-bold text-white outline-none [color-scheme:dark] focus:border-white/60" />
+                  <input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Estimated arrival time" style={{ textAlign: 'left' }}
+                    className="h-[22px] w-[84px] rounded-md border border-white/30 bg-white/10 px-1.5 text-left text-[12px] font-bold text-white [&::-webkit-datetime-edit]:p-0 [&::-webkit-datetime-edit]:text-left outline-none [color-scheme:dark] focus:border-white/60" />
                   {time !== (r.estimatedArrivalTime ?? '') && time && (
                     <button disabled={busy} onClick={() => act({ action: 'arrival_time', time }, 'Arrival time updated.')} className="rounded-full bg-white/90 px-2 py-px text-[10.5px] font-bold text-[#0e5f47] hover:bg-white disabled:opacity-60">Save</button>
                   )}
