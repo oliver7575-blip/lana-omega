@@ -245,7 +245,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
       const j = await cbApi<{ reservation: Detail }>(`/api/cloudbeds/reservation/${id}`, 'POST', body)
       apply(j.reservation)
       onChanged?.()
-      if (body.action === 'check_out' || body.action === 'check_in') {
+      if (['check_out', 'check_in', 'dates', 'arrival_time'].includes(String(body.action))) {
         onCheckedOut?.(`${j.reservation.guestName}: ${ok.replace(/\.$/, '').toLowerCase()}.`)
         onClose()
         return
