@@ -111,7 +111,7 @@ function Bar({ start, end, viewStart, totalDays, label, bg, border, text, onClic
       <span className="truncate">{label}</span>
       {(() => {
         const b = sourceBadge(src)
-        return b ? <i title={b.name} className="ml-1.5 inline-flex h-[15px] min-w-[15px] shrink-0 items-center justify-center rounded-[4px] px-0.5 text-[9px] font-bold not-italic leading-none text-white" style={{ background: b.bg }}>{b.t}</i> : null
+        return b ? <i title={b.name} className="ml-1.5 inline-flex h-[15px] min-w-[15px] shrink-0 items-center justify-center rounded-[4px] border bg-white/50 px-0.5 text-[9px] font-bold not-italic leading-none" style={{ borderColor: b.bg, color: b.bg }}>{b.t}</i> : null
       })()}
     </button>
   )
