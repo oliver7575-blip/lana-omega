@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { cbApi } from './shared'
+import { btn, btnLg, field, headerGradient, lbl, priGreen, priSlate } from './ui'
 
 interface RoomType {
   roomTypeID: string
@@ -179,9 +180,9 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
     setSaving(false)
   }
 
-  const input = 'h-9 w-full rounded-[10px] border border-gray-300 bg-white px-2.5 text-[13px] text-[#14213d] outline-none focus:border-[#1f9d78]'
-  const label = 'mb-1 block text-[11px] font-semibold uppercase tracking-wide text-gray-500'
-  const section = 'mb-2 mt-5 border-t border-gray-100 pt-4 text-[11px] font-semibold uppercase tracking-wider text-gray-500'
+  const input = field
+  const label = lbl
+  const section = 'mb-2.5 mt-5 border-t border-[#eef0f4] pt-4 text-[11px] font-semibold uppercase tracking-[.08em] text-[#7a8394]'
   const n = nights(start, end)
   const blocking = mode === 'block'
   const canBlock = Boolean(roomID && end > start && !saving)
@@ -189,19 +190,19 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#14213d]/40 p-4 pt-10" onClick={onClose}>
-      <div className="w-full max-w-xl rounded-2xl bg-white text-[#14213d] shadow-[0_24px_64px_rgba(20,33,61,.28)]" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-6 py-4">
+      <div className="w-full max-w-xl overflow-hidden rounded-[22px] bg-white text-[#14213d] shadow-[0_24px_64px_rgba(20,33,61,.32)]" onClick={(e) => e.stopPropagation()}>
+        <div className={`flex items-center justify-between gap-4 px-6 py-4 text-white ${headerGradient(blocking ? 'slate' : 'blue')}`}>
           <div>
-            <p className="text-xl font-bold tracking-tight">{blocking ? 'Block dates' : 'New reservation'}</p>
-            <p className="mt-0.5 text-[13px] text-gray-500">{start} → {end} · {nights(start, end)} night{nights(start, end) === 1 ? '' : 's'}</p>
+            <p className="text-base font-bold tracking-tight">{blocking ? 'Block dates' : 'New reservation'}</p>
+            <p className="mt-px text-xs text-white/70">{start} → {end} · {nights(start, end)} night{nights(start, end) === 1 ? '' : 's'}</p>
           </div>
-          <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-300 text-lg leading-none text-gray-600 hover:bg-gray-50" aria-label="Close">×</button>
+          <button onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-full border border-white/30 text-base leading-none text-white hover:bg-white/10" aria-label="Close">×</button>
         </div>
 
         <div className="max-h-[calc(100vh-9rem)] overflow-y-auto px-6 pb-5">
-          <div className="mt-4 inline-flex rounded-[10px] bg-[#e9ecf1] p-[3px] text-[12.5px] font-semibold">
-            <button onClick={() => setMode('reservation')} className={`h-[30px] rounded-lg px-3.5 ${!blocking ? 'bg-white text-[#14213d] shadow-[0_1px_2px_rgba(20,33,61,.12)]' : 'text-gray-600'}`}>Reservation</button>
-            <button onClick={() => setMode('block')} className={`h-[30px] rounded-lg px-3.5 ${blocking ? 'bg-white text-[#14213d] shadow-[0_1px_2px_rgba(20,33,61,.12)]' : 'text-gray-600'}`}>Block dates / Out of service</button>
+          <div className="mt-4 inline-flex rounded-full bg-[#e8eef0] p-[3px] text-[12.5px] font-semibold">
+            <button onClick={() => setMode('reservation')} className={`h-[30px] rounded-full px-4 ${!blocking ? 'bg-white text-[#0e5f47] shadow-[0_1px_3px_rgba(16,24,40,.12)]' : 'text-gray-600'}`}>Reservation</button>
+            <button onClick={() => setMode('block')} className={`h-[30px] rounded-full px-4 ${blocking ? 'bg-white text-[#0e5f47] shadow-[0_1px_3px_rgba(16,24,40,.12)]' : 'text-gray-600'}`}>Block dates / Out of service</button>
           </div>
           <p className={section}>Stay</p>
           <div className="grid grid-cols-4 gap-2">
@@ -221,7 +222,7 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
           <div className="mt-2 flex items-center justify-between">
             <span className="text-[12px] text-gray-600">{n} night{n === 1 ? '' : 's'}</span>
             {!blocking && <button onClick={check} disabled={checking || n < 1}
-              className="h-9 rounded-[10px] border border-[#2f66d0] px-3.5 text-[12.5px] font-semibold text-[#2f66d0] hover:bg-blue-50 disabled:opacity-50">
+              className={`${btn} !border-[#c9d9f7] !text-[#2456b8] disabled:opacity-50`}>
               {checking ? 'Checking…' : rooms ? 'Check again' : 'Check availability'}
             </button>}
           </div>
@@ -231,7 +232,7 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
               {rooms.length === 0 && <p className="rounded-xl bg-amber-50 px-3 py-2 text-[12px] text-amber-800">Nothing available for these dates and guests.</p>}
               {rooms.map((r) => (
                 <label key={r.roomTypeID}
-                  className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-[13px] ${roomTypeID === r.roomTypeID ? 'border-[#1f9d78] bg-[#eefaf5]' : 'border-gray-200 hover:bg-gray-50'}`}>
+                  className={`flex cursor-pointer items-center justify-between gap-3 rounded-2xl border px-3.5 py-3 text-[13px] ${roomTypeID === r.roomTypeID ? 'border-[#1f9d78] bg-[#eefaf5] shadow-[0_0_0_3px_rgba(31,157,120,.12)]' : 'border-[#e6e9f0] hover:bg-gray-50'}`}>
                   <span className="flex items-center gap-2">
                     <input type="radio" name="roomType" checked={roomTypeID === r.roomTypeID} onChange={() => { setRoomTypeID(r.roomTypeID); setRoomID('') }} />
                     <span>
@@ -336,14 +337,14 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
           {error && <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-[12.5px] text-red-700">{error}</p>}
         </div>
 
-        <div className="flex items-center justify-between gap-3 rounded-b-2xl border-t border-gray-200 bg-[#fbfbfc] px-6 py-3.5">
+        <div className="flex items-center justify-between gap-3 border-t border-[#eef0f4] bg-[#fbfbfc] px-6 py-3.5">
           <span className="min-w-0 flex-1 text-[12.5px] text-gray-600">
             {blocking ? 'No guest or charge — the room just becomes unavailable' : chosen ? <>Total <b className="text-[#14213d]">{effectiveTotal !== null ? `MXN ${Math.round(effectiveTotal).toLocaleString('en-US')}` : '—'}</b> · {n} night{n === 1 ? '' : 's'}</> : 'Check availability and choose a room'}
           </span>
           <div className="flex shrink-0 gap-2">
-            <button onClick={onClose} className="h-9 whitespace-nowrap rounded-[10px] border border-gray-300 bg-white px-4 text-[13px] font-semibold hover:bg-gray-50">Cancel</button>
+            <button onClick={onClose} className={btnLg}>Cancel</button>
             <button onClick={blocking ? block : create} disabled={blocking ? !canBlock : !canCreate}
-              className="h-9 whitespace-nowrap rounded-[10px] bg-[#1f9d78] px-[18px] text-[13px] font-semibold text-white hover:bg-[#188a69] disabled:opacity-50">
+              className={blocking ? priSlate : priGreen}>
               {blocking ? (saving ? 'Blocking…' : blockType === 'out_of_service' ? 'Set out of service' : 'Block dates') : saving ? 'Creating…' : 'Create reservation'}
             </button>
           </div>

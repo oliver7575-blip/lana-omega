@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import ReservationModal from '@/components/cloudbeds/ReservationModal'
+import { btn, field, headerGradient, lbl, priGreen } from '@/components/cloudbeds/ui'
 import NewReservationModal from '@/components/cloudbeds/NewReservationModal'
 import BlockModal from '@/components/cloudbeds/BlockModal'
 import SearchBar from '@/components/cloudbeds/SearchBar'
@@ -788,23 +789,27 @@ export default function CalendarPage() {
         return (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setPriceEdit(null)} />
-            <div className="fixed z-50 w-[236px] rounded-[12px] border border-[#d9dde4] bg-white p-3 shadow-[0_12px_32px_rgba(20,33,61,.18)]" style={{ left, top }}
+            <div className="fixed z-50 w-[250px] overflow-hidden rounded-[18px] bg-white shadow-[0_18px_44px_rgba(20,33,61,.28)]" style={{ left, top }}
               onKeyDown={(e) => { if (e.key === 'Escape') setPriceEdit(null); if (e.key === 'Enter') savePrice() }}>
-              <div className="text-[12px] font-semibold text-[#14213d]">{t?.name}</div>
-              <div className="mb-2 text-[11px] text-gray-500">{priceEdit.day}</div>
-              <label className="block text-[11px] font-semibold text-gray-600">Price per night
-                <input autoFocus inputMode="decimal" value={priceEdit.value} onFocus={(e) => e.currentTarget.select()}
-                  onChange={(e) => setPriceEdit({ ...priceEdit, value: e.target.value, err: null })}
-                  className="mt-1 h-9 w-full rounded-[8px] border border-[#d9dde4] px-2 text-[14px] font-semibold text-[#14213d] outline-none focus:border-[#1f9d78]" />
-              </label>
-              <label className="mt-2 block text-[11px] font-semibold text-gray-600">Same price through <span className="font-normal text-gray-400">(optional)</span>
-                <input type="date" value={priceEdit.through} min={priceEdit.day} onChange={(e) => setPriceEdit({ ...priceEdit, through: e.target.value, err: null })}
-                  className="mt-1 h-9 w-full rounded-[8px] border border-[#d9dde4] px-2 text-[13px] text-[#14213d] outline-none focus:border-[#1f9d78]" />
-              </label>
-              {priceEdit.err && <div className="mt-2 text-[11.5px] text-red-600">{priceEdit.err}</div>}
-              <div className="mt-3 flex gap-2">
-                <button onClick={savePrice} disabled={priceEdit.busy} className="h-9 flex-1 rounded-[8px] bg-[#1f9d78] text-[13px] font-semibold text-white disabled:opacity-60">{priceEdit.busy ? 'Saving…' : 'Save'}</button>
-                <button onClick={() => setPriceEdit(null)} className="h-9 rounded-[8px] border border-[#d9dde4] px-3 text-[13px] font-semibold text-[#14213d]">Cancel</button>
+              <div className={`px-4 py-2.5 text-white ${headerGradient('blue')}`}>
+                <div className="text-[13px] font-bold">{t?.name}</div>
+                <div className="text-[11px] text-white/70">{priceEdit.day}</div>
+              </div>
+              <div className="space-y-2.5 p-3.5">
+                <label className={lbl}>Price per night
+                  <input autoFocus inputMode="decimal" value={priceEdit.value} onFocus={(e) => e.currentTarget.select()}
+                    onChange={(e) => setPriceEdit({ ...priceEdit, value: e.target.value, err: null })}
+                    className={`${field} mt-1.5 !text-[15px] !font-semibold normal-case tracking-normal`} />
+                </label>
+                <label className={lbl}>Same price through <span className="font-normal normal-case text-gray-400">(optional)</span>
+                  <input type="date" value={priceEdit.through} min={priceEdit.day} onChange={(e) => setPriceEdit({ ...priceEdit, through: e.target.value, err: null })}
+                    className={`${field} mt-1.5 normal-case tracking-normal`} />
+                </label>
+                {priceEdit.err && <div className="text-[11.5px] text-red-600">{priceEdit.err}</div>}
+                <div className="flex justify-end gap-2 pt-0.5">
+                  <button onClick={() => setPriceEdit(null)} className={btn}>Cancel</button>
+                  <button onClick={savePrice} disabled={priceEdit.busy} className={`${priGreen} !h-[34px] !px-4 !text-[12.5px]`}>{priceEdit.busy ? 'Saving…' : 'Save price'}</button>
+                </div>
               </div>
             </div>
           </>
