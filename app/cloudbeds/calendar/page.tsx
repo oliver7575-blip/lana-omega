@@ -524,14 +524,6 @@ export default function CalendarPage() {
           ))}
         </div>
 
-        {pick && (
-          <p className="mb-2 rounded-md bg-[#e6f6f0] px-3 py-1.5 text-xs text-[#1d6b52]">
-            <span className="font-semibold text-[#1d6b52]">Check-in {pick.start}.</span>{' '}
-            <span className="font-semibold text-[#b45309]">Now click the check-out day in the same room row</span>{' '}
-            <span className="font-semibold text-[#c0392b]">(Esc to cancel).</span>
-            <button onClick={() => setPick(null)} className="ml-2 font-semibold text-[#1d6b52] underline">Cancel</button>
-          </p>
-        )}
         {error && <p className="mb-2 rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>}
         {!data && !error && <p className="py-10 text-center text-sm text-gray-500">Loading the calendar…</p>}
 
