@@ -199,7 +199,12 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
     try {
       const j = await cbApi<{ reservation: Detail }>(`/api/cloudbeds/reservation/${id}/payment`, 'POST', { kind: mpKind, amount: Number(mpAmount), method: mpMethod, note: mpNote })
       apply(j.reservation)
-      onBalance?.(id, j.reservation.balance)
+      // Cloudbeds can return the old balance for a moment, so work it out from what was just recorded as well.
+      const amt = Number(mpAmount)
+      const before = r?.balance ?? null
+      const expected = before === null ? null : mpKind === 'refund' ? before + amt : Math.max(0, before - amt)
+      const returned = j.reservation.balance
+      onBalance?.(id, expected === null ? returned : mpKind === 'refund' ? Math.max(expected, returned ?? 0) : Math.min(expected, returned ?? expected))
       const text = `${mpKind === 'refund' ? 'Refund' : 'Payment'} of MXN ${Number(mpAmount).toLocaleString('en-US')} recorded.`
       setMpKind(null)
       onChanged?.()
