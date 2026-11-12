@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { cbApi, statusLabel } from './shared'
 import { HELLO_TEXT } from '@/lib/hello-text'
+import { openHistoryPopup } from './MessageHistoryPopup'
 import { InlinePanel, area, btn, btnLg, chip, field, lbl, priBlue, priGreen, priRed, priTeal } from './ui'
 
 type Json = Record<string, unknown>
@@ -175,21 +176,6 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
   const [mpMethods, setMpMethods] = useState<{ code: string; name: string }[] | null>(null)
   const [mpBusy, setMpBusy] = useState(false)
   const [mpErr, setMpErr] = useState<string | null>(null)
-
-  const [histBusy, setHistBusy] = useState(false)
-  const [histErr, setHistErr] = useState<string | null>(null)
-  // Opens this guest's logged conversation on the Messages page.
-  async function openHistory() {
-    setHistBusy(true)
-    setHistErr(null)
-    try {
-      const conv = await cbApi<{ conversationId: string }>(`/api/cloudbeds/reservation/${id}/conversation`)
-      window.location.assign(`/conversations/${conv.conversationId}`)
-    } catch (e) {
-      setHistErr(e instanceof Error ? e.message : 'Could not open the message history')
-      setHistBusy(false)
-    }
-  }
 
   function openMoney(kind: 'payment' | 'refund') {
     if (!r) return
@@ -526,13 +512,12 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                   💬 Message
                 </button>
               )}
-              <button disabled={histBusy} onClick={openHistory} className={`${btn} ${bt} !border-[#c9d9f7] !text-[#2456b8]`}>{histBusy ? 'Opening…' : 'Message history'}</button>
+              <button onClick={() => openHistoryPopup({ reservationId: id, guestName: r.guestName })} className={`${btn} ${bt} !border-[#c9d9f7] !text-[#2456b8]`}>Message history</button>
               <span className="flex-1" />
               {canCancel && (
                 <button disabled={busy} onClick={() => setConfirmCancel(true)} className={`${btn} ${bt} !border-[#f3cfcb] !bg-[#fffafa] !text-[#b42318]`}>Cancel reservation</button>
               )}
             </div>
-            {histErr && <p className="text-xs text-red-600">{histErr}</p>}
 
             {/* Add payment / refund */}
             {mpKind && (
