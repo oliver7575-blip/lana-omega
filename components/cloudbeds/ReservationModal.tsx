@@ -434,7 +434,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
   const rowL = 'flex items-baseline gap-3 py-[2px] text-[12px]'
   const lblL = 'w-[52px] shrink-0 text-[#667085]'
   const mini = 'rounded-lg border border-[#e6e9f0] px-2.5 py-2'
-  const chipSm = 'ml-2 inline-block rounded-full border border-[#d0d5dd] px-1.5 align-middle text-[8px] font-medium uppercase leading-[14px] tracking-wide text-[#667085] hover:border-[#128c7e] hover:text-[#128c7e]'
+  const chipSm = 'mr-2 inline-block rounded-full border border-[#d0d5dd] px-1.5 align-middle text-[8px] font-medium uppercase leading-[14px] tracking-wide text-[#667085] hover:border-[#128c7e] hover:text-[#128c7e]'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#14213d]/45 p-4" onClick={onClose}>
@@ -456,9 +456,9 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
               <div className="min-w-0 flex-1">
               <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11.5px] text-[#b7c9d8]">
                 <span>Booked {r.dateCreated ? r.dateCreated.slice(0, 10) : '—'} · {r.adults} adult{r.adults === 1 ? '' : 's'}{r.children ? ` · ${r.children} child${r.children === 1 ? '' : 'ren'}` : ''}</span>
-                <span className="inline-flex items-center gap-1.5">· Arrival
+                <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-white">· Arrival
                   <input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Estimated arrival time"
-                    className="h-[20px] w-[74px] rounded-md border border-white/25 bg-white/10 px-1 text-[11px] text-white outline-none [color-scheme:dark] focus:border-white/60" />
+                    className="h-[22px] w-[80px] rounded-md border border-white/30 bg-white/10 px-1 text-[12px] font-bold text-white outline-none [color-scheme:dark] focus:border-white/60" />
                   {time !== (r.estimatedArrivalTime ?? '') && time && (
                     <button disabled={busy} onClick={() => act({ action: 'arrival_time', time }, 'Arrival time updated.')} className="rounded-full bg-white/90 px-2 py-px text-[10.5px] font-bold text-[#0e5f47] hover:bg-white disabled:opacity-60">Save</button>
                   )}
@@ -741,14 +741,14 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                   <p className={lbl}>Guest</p>
                   {r.guestPhone && (
                     <div className={rowL}><span className={lblL}>Phone</span>
-                      <span><button onClick={() => openQuick('whatsapp')} title="Send a WhatsApp message" className="font-medium text-[#1d4ed8] hover:underline">{r.guestPhone}</button>
-                        <button onClick={() => openQuick('whatsapp')} title="Send a WhatsApp message" className={chipSm}>message</button></span>
+                      <span><button onClick={() => openQuick('whatsapp')} title="Send a WhatsApp message" className={chipSm}>message</button>
+                        <button onClick={() => openQuick('whatsapp')} title="Send a WhatsApp message" className="font-medium text-[#1d4ed8] hover:underline">{r.guestPhone}</button></span>
                     </div>
                   )}
                   {r.guestEmail && (
                     <div className={rowL}><span className={lblL}>Email</span>
-                      <span className="min-w-0 break-all"><button onClick={() => openQuick('email')} title="Send an email" className="break-all font-medium text-[#1d4ed8] hover:underline">{r.guestEmail}</button>
-                        <button onClick={() => openQuick('email')} title="Send an email" className={chipSm}>email</button></span>
+                      <span className="min-w-0 break-all"><button onClick={() => openQuick('email')} title="Send an email" className={chipSm}>email</button>
+                        <button onClick={() => openQuick('email')} title="Send an email" className="break-all font-medium text-[#1d4ed8] hover:underline">{r.guestEmail}</button></span>
                     </div>
                   )}
                   {r.guestCountry && <div className={rowL}><span className={lblL}>Country</span><span>{countryName(r.guestCountry)}</span></div>}
