@@ -28,7 +28,7 @@ export const maxDuration = 60
 // How long to wait for more messages before replying, so a guest who sends
 // several quick messages gets one combined answer (same idea as Beta's
 // 10-second debounce).
-const DEBOUNCE_MS = 8000
+const DEBOUNCE_MS = 12000
 
 // How many past messages to give the AI. Keeps long-running conversations
 // from growing without limit.
@@ -856,6 +856,17 @@ async function replyToConversation(args: {
     buildBookingLinkInstruction(tenant?.booking_config as Record<string, unknown>) +
     channelInstruction
 
+  // The newest guest message this reply is answering. If another one arrives while the reply is
+  // being written, this reply is dropped and the newer message's own run answers everything at once.
+  const { data: answeringTo } = await supabase
+    .from('messages')
+    .select('id, created_at')
+    .eq('conversation_id', conversationId)
+    .eq('sender_type', 'guest')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
   // ---- Generate + send --------------------------------------------------------
 
   let replyText: string
@@ -918,6 +929,23 @@ async function replyToConversation(args: {
       console.error('[whatsapp-inbound] outage alert failed', alertErr)
     }
     return { answered: false, reason: 'Lana could not generate a reply' }
+  }
+
+  // Guard against double replies: did the guest write again, or did someone else answer, while this was generated?
+  if (answeringTo) {
+    const { data: after } = await supabase
+      .from('messages')
+      .select('sender_type, created_at')
+      .eq('conversation_id', conversationId)
+      .in('sender_type', ['guest', 'lana', 'staff'])
+      .gt('created_at', answeringTo.created_at as string)
+      .limit(20)
+    const guestWroteAgain = (after ?? []).some((m) => m.sender_type === 'guest')
+    const alreadyAnswered = (after ?? []).some((m) => m.sender_type === 'lana' || m.sender_type === 'staff')
+    if (guestWroteAgain || alreadyAnswered) {
+      console.log('[whatsapp-inbound] dropping a superseded reply', guestWroteAgain ? '(guest wrote again)' : '(already answered)')
+      return { answered: false, reason: guestWroteAgain ? 'The guest wrote again — the newer message gets the answer' : 'Already answered' }
+    }
   }
 
   const photoNote = [
