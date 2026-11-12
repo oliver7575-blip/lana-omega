@@ -511,10 +511,10 @@ export default function CalendarPage() {
           </div>
           <div className="min-w-[220px] flex-1"><SearchBar onOpen={setOpen} /></div>
           {data && (
-            <>
-              <button onClick={() => setCreating('block')} className="h-9 rounded-[10px] border border-gray-300 bg-white px-4 text-[13px] font-semibold hover:bg-gray-50">Block dates</button>
-              <button onClick={() => setCreating('blank')} className="h-9 rounded-[10px] bg-[#1f9d78] px-[18px] text-[13px] font-semibold text-white hover:bg-[#188a69]">+ Create new reservation</button>
-            </>
+            <div className="flex flex-col gap-1.5">
+              <button onClick={() => setCreating('block')} className="h-8 rounded-[10px] border border-gray-300 bg-white px-4 text-[13px] font-semibold hover:bg-gray-50">Block dates</button>
+              <button onClick={() => setCreating('blank')} className="h-8 rounded-[10px] bg-[#1f9d78] px-[18px] text-[13px] font-semibold text-white hover:bg-[#188a69]">+ Create new reservation</button>
+            </div>
           )}
         </div>
 
