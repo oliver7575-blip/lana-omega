@@ -19,7 +19,7 @@ export const priTeal = `${priBase} bg-gradient-to-b from-[#1ba08f] to-[#128c7e] 
 export const priSlate = `${priBase} bg-gradient-to-b from-[#4a5568] to-[#2d3748] shadow-[0_4px_10px_rgba(45,55,72,.35),inset_0_1px_0_rgba(255,255,255,.2)]`
 
 export const field =
-  'h-10 w-full rounded-xl border border-[#dde2ea] bg-white px-3.5 text-[13.5px] font-normal text-[#14213d] shadow-[inset_0_1px_2px_rgba(16,24,40,.04)] outline-none focus:border-[#1f9d78] focus:ring-2 focus:ring-[#1f9d78]/15'
+  'h-9 w-full rounded-xl border border-[#dde2ea] bg-white px-3 text-[12.5px] font-normal text-[#14213d] shadow-[inset_0_1px_2px_rgba(16,24,40,.04)] outline-none focus:border-[#1f9d78] focus:ring-2 focus:ring-[#1f9d78]/15'
 
 export const area =
   'w-full resize-none rounded-[14px] border border-[#dde2ea] bg-white px-3.5 py-2.5 text-[13.5px] leading-relaxed text-[#14213d] shadow-[inset_0_1px_2px_rgba(16,24,40,.04)] outline-none focus:border-[#1f9d78] focus:ring-2 focus:ring-[#1f9d78]/15'
@@ -74,10 +74,10 @@ export function InlinePanel({
   tone, title, subtitle, onClose, children,
 }: { tone: keyof typeof PANEL; title: ReactNode; subtitle?: ReactNode; onClose?: () => void; children: ReactNode }) {
   return (
-    <div className={`space-y-2.5 rounded-2xl border bg-gradient-to-b to-white to-40% p-3.5 ${PANEL[tone]}`}>
+    <div className={`space-y-2 rounded-xl border bg-gradient-to-b to-white to-40% p-3 ${PANEL[tone]}`}>
       <div className="flex items-center gap-3">
         <div className="min-w-0">
-          <p className="text-[14px] font-bold tracking-tight">{title}</p>
+          <p className="text-[13px] font-bold tracking-tight">{title}</p>
           {subtitle && <p className="mt-px text-[12.5px] text-[#667085]">{subtitle}</p>}
         </div>
         {onClose && (
