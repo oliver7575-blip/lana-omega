@@ -436,7 +436,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#14213d]/45 p-4" onClick={onClose}>
-      <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-[660px] flex-col overflow-y-auto rounded-3xl bg-white text-[#14213d] shadow-[0_30px_80px_rgba(8,12,24,.45)]" onClick={(e) => e.stopPropagation()}>
+      <div style={{ zoom: 0.85 }} className="flex max-h-[calc((100vh-2rem)/0.85)] w-full max-w-[700px] flex-col overflow-y-auto rounded-3xl bg-white text-[#14213d] shadow-[0_30px_80px_rgba(8,12,24,.45)]" onClick={(e) => e.stopPropagation()}>
         {/* Banner */}
         <div className="relative shrink-0 bg-gradient-to-br from-[#0f2742] via-[#1b4d6b] to-[#1f7a6a] px-5 pb-3 pt-3.5 text-white">
           <div className="flex items-center justify-between gap-3">
