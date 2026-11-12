@@ -64,7 +64,7 @@ interface Detail {
   endDate: string
   adults: number
   children: number
-  rooms: { roomName: string | null; roomTypeName: string }[]
+  rooms: { roomName: string | null; roomTypeName: string; adults?: number; children?: number }[]
   total: number | null
   balance: number | null
   estimatedArrivalTime: string | null
@@ -722,7 +722,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                 <div className={card}>
                   <p className={lbl}>{r.rooms.length > 1 ? `Rooms (${r.rooms.length})` : 'Room'}</p>
                   <div className="space-y-2">
-                    {(r.rooms.length ? r.rooms : [{ roomName: null, roomTypeName: '—' }]).map((x, i) => (
+                    {(r.rooms.length ? r.rooms : [{ roomName: null, roomTypeName: '—' } as Detail['rooms'][number]]).map((x, i) => (
                       <div key={i} className="flex items-center gap-3">
                         <div className="flex h-8 min-w-[32px] shrink-0 items-center justify-center rounded-lg bg-[#e3edff] px-1.5 text-[14px] font-bold text-[#1d4ed8]">
                           {x.roomName ? (x.roomName.match(/\d+/)?.[0] ?? x.roomName.slice(0, 3)) : '–'}
@@ -731,6 +731,12 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                           <p className="truncate text-[13px] font-bold">{x.roomName ?? 'Not assigned'}</p>
                           <p className="truncate text-[11px] text-[#667085]">{x.roomTypeName}</p>
                         </div>
+                        {r.rooms.length > 1 && (
+                          <p className="ml-auto shrink-0 whitespace-nowrap rounded-full bg-[#f3f5f8] px-2 py-0.5 text-[11px] font-semibold text-[#475467]">
+                            {(x.adults ?? 0) + (x.children ?? 0)} guest{(x.adults ?? 0) + (x.children ?? 0) === 1 ? '' : 's'}
+                            {(x.children ?? 0) > 0 ? ` · ${x.adults ?? 0}A ${x.children}C` : ''}
+                          </p>
+                        )}
                       </div>
                     ))}
                   </div>
