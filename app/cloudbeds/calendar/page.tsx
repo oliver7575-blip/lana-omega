@@ -240,7 +240,7 @@ export default function CalendarPage() {
     return o && o.until > Date.now() ? o.due : due
   }
   const onBalance = (id: string, balance: number | null) => {
-    dueOverride.current.set(id, { due: Number(balance ?? 0) > 0.005, until: Date.now() + 120000 })
+    dueOverride.current.set(id, { due: Number(balance ?? 0) > 0.005, until: Date.now() + 600000 })
     bumpDue((n) => n + 1)
   }
 
@@ -297,8 +297,12 @@ export default function CalendarPage() {
   }, [dayW, span])
 
   useEffect(() => {
-    const t = setInterval(refreshVisible, 60000)
-    return () => clearInterval(t)
+    const t = setInterval(refreshVisible, 30000)
+    // Coming back to this tab (e.g. after clearing a balance in Cloudbeds) refreshes at once.
+    const onShow = () => { if (document.visibilityState === 'visible') refreshVisible() }
+    document.addEventListener('visibilitychange', onShow)
+    window.addEventListener('focus', onShow)
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', onShow); window.removeEventListener('focus', onShow) }
   }, [refreshVisible])
 
   useEffect(() => {
