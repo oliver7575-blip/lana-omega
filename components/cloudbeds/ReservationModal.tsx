@@ -177,6 +177,9 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
 
   function openMoney(kind: 'payment' | 'refund') {
     if (!r) return
+    setQuick(null)
+    setPay(null)
+    setPayError(null)
     setMpKind(kind)
     setMpErr(null)
     setMpNote('')
@@ -265,6 +268,8 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
   }
 
   async function createPaymentLinkNow() {
+    setMpKind(null)
+    setQuick(null)
     setPayBusy(true)
     setPayError(null)
     setPay(null)
@@ -291,6 +296,9 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
   }
 
   function openQuick(kind: 'whatsapp' | 'email') {
+    setMpKind(null)
+    setPay(null)
+    setPayError(null)
     setQuick((q) => (q === kind ? null : kind))
     setQuickMsg(null)
     if (kind === 'email' && !sigLoaded) {
