@@ -175,6 +175,21 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
   const [mpBusy, setMpBusy] = useState(false)
   const [mpErr, setMpErr] = useState<string | null>(null)
 
+  const [histBusy, setHistBusy] = useState(false)
+  const [histErr, setHistErr] = useState<string | null>(null)
+  // Opens this guest's logged conversation on the Messages page.
+  async function openHistory() {
+    setHistBusy(true)
+    setHistErr(null)
+    try {
+      const conv = await cbApi<{ conversationId: string }>(`/api/cloudbeds/reservation/${id}/conversation`)
+      window.location.assign(`/conversations/${conv.conversationId}`)
+    } catch (e) {
+      setHistErr(e instanceof Error ? e.message : 'Could not open the message history')
+      setHistBusy(false)
+    }
+  }
+
   function openMoney(kind: 'payment' | 'refund') {
     if (!r) return
     setQuick(null)
@@ -524,7 +539,12 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                     Cancel Reservation
                   </button>
                 )}
+                <button disabled={histBusy} onClick={openHistory}
+                  className="h-9 rounded-[10px] border border-[#2f66d0] bg-white whitespace-nowrap px-3 text-xs font-semibold text-[#2f66d0] hover:bg-blue-50 disabled:opacity-60">
+                  {histBusy ? 'Opening…' : 'Message History'}
+                </button>
               </div>
+              {histErr && <p className="mt-2 text-xs text-red-600">{histErr}</p>}
 
               {mpKind && (
                 <div className={`mt-4 rounded-2xl border p-3 ${mpKind === 'refund' ? 'border-red-200 bg-red-50' : 'border-[#b7e0d8] bg-[#d9f0ea]'}`}>
