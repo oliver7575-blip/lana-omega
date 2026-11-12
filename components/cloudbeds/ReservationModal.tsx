@@ -417,6 +417,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
   const isThirdParty = Boolean(r && (r.confirmationCode || /booking\.com|airbnb|expedia|agoda|vrbo|homeaway|hostelworld|tripadvisor|trip\.com|despegar|hotels\.com|google|kayak|trivago/i.test(r.source ?? '')))
   const canCheckOut = r && ['checked_in', 'in_house'].includes(r.status)
   const canCheckIn = r && ['confirmed', 'not_confirmed'].includes(r.status) && r.startDate <= today
+  const bt = '!h-[30px] !px-2.5 !text-[12px]'
   const nights = r ? Math.max(1, Math.round((Date.parse(r.endDate) - Date.parse(r.startDate)) / 86400000)) : 0
   const fmtDay = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
   const money = (n: number | null) => `MXN ${n === null ? '—' : n.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
@@ -428,16 +429,16 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
   const roomDigit = r?.rooms[0]?.roomName ? (r.rooms[0].roomName.match(/\d+/)?.[0] ?? r.rooms[0].roomName.slice(0, 3)) : '–'
   const bd = r?.breakdown
   const paidAmt = r ? (bd?.paid ?? (r.total !== null && r.balance !== null ? r.total - r.balance : null)) : null
-  const card = 'rounded-2xl border border-[#e6e9f0] bg-white px-[18px] py-4'
-  const row = 'flex justify-between gap-3 py-[5px] text-[13.5px]'
-  const mini = 'rounded-xl border border-[#e6e9f0] px-3 py-2.5'
+  const card = 'rounded-xl border border-[#e6e9f0] bg-white px-3.5 py-3'
+  const row = 'flex justify-between gap-3 py-[3px] text-[12.5px]'
+  const mini = 'rounded-lg border border-[#e6e9f0] px-2.5 py-2'
   const chipSm = 'ml-2 inline-block rounded-full border border-[#d0d5dd] px-1.5 align-middle text-[8px] font-medium uppercase leading-[14px] tracking-wide text-[#667085] hover:border-[#128c7e] hover:text-[#128c7e]'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#14213d]/45 p-4" onClick={onClose}>
-      <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-[860px] flex-col overflow-y-auto rounded-3xl bg-white text-[#14213d] shadow-[0_30px_80px_rgba(8,12,24,.45)]" onClick={(e) => e.stopPropagation()}>
+      <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-[740px] flex-col overflow-y-auto rounded-3xl bg-white text-[#14213d] shadow-[0_30px_80px_rgba(8,12,24,.45)]" onClick={(e) => e.stopPropagation()}>
         {/* Banner */}
-        <div className="relative shrink-0 bg-gradient-to-br from-[#0f2742] via-[#1b4d6b] to-[#1f7a6a] px-8 pb-6 pt-6 text-white">
+        <div className="relative shrink-0 bg-gradient-to-br from-[#0f2742] via-[#1b4d6b] to-[#1f7a6a] px-6 pb-4 pt-4 text-white">
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               {r && <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold capitalize">{statusLabel(r.status)}</span>}
@@ -446,12 +447,12 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
             </div>
             <button onClick={onClose} aria-label="Close" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/30 text-lg leading-none text-white hover:bg-white/10">×</button>
           </div>
-          <p className="mt-3.5 truncate text-[34px] font-bold leading-tight tracking-tight">{r ? r.guestName : 'Loading…'}</p>
+          <p className="mt-2 truncate text-[26px] font-bold leading-tight tracking-tight">{r ? r.guestName : 'Loading…'}</p>
           {r && (
             <>
               <p className="mt-1 text-[13px] text-[#b7c9d8]">Booked {r.dateCreated ? r.dateCreated.slice(0, 10) : '—'} · {r.adults} adult{r.adults === 1 ? '' : 's'}{r.children ? ` · ${r.children} child${r.children === 1 ? '' : 'ren'}` : ''}</p>
-              <div className="mt-5 flex items-center gap-3.5 pr-0 sm:pr-[320px]">
-                <div><p className="text-[11px] font-semibold tracking-[.08em] text-[#9fb8ca]">CHECK-IN</p><p className="text-xl font-bold">{fmtDay(r.startDate)}</p></div>
+              <div className="mt-3 flex items-center gap-3 pr-0 sm:pr-[280px]">
+                <div><p className="text-[11px] font-semibold tracking-[.08em] text-[#9fb8ca]">CHECK-IN</p><p className="text-base font-bold">{fmtDay(r.startDate)}</p></div>
                 <div className="flex flex-1 items-center">
                   <i className="block h-2.5 w-2.5 rounded-full bg-[#4ade9f]" />
                   <i className="block h-0.5 flex-1 bg-white/30" />
@@ -459,16 +460,16 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                   <i className="block h-0.5 flex-1 bg-white/30" />
                   <i className="block h-2.5 w-2.5 rounded-full border-2 border-white" />
                 </div>
-                <div className="text-right"><p className="text-[11px] font-semibold tracking-[.08em] text-[#9fb8ca]">CHECK-OUT</p><p className="text-xl font-bold">{fmtDay(r.endDate)}</p></div>
+                <div className="text-right"><p className="text-[11px] font-semibold tracking-[.08em] text-[#9fb8ca]">CHECK-OUT</p><p className="text-base font-bold">{fmtDay(r.endDate)}</p></div>
               </div>
               {/* Floating balance */}
-              <div className="mt-5 flex items-center justify-between gap-4 rounded-2xl bg-white px-[18px] py-3 text-[#14213d] shadow-[0_12px_30px_rgba(8,12,24,.25)] sm:absolute sm:bottom-[-34px] sm:right-8 sm:z-10 sm:mt-0 sm:justify-start">
+              <div className="mt-5 flex items-center justify-between gap-4 rounded-2xl bg-white px-3.5 py-2 text-[#14213d] shadow-[0_12px_30px_rgba(8,12,24,.25)] sm:absolute sm:bottom-[-28px] sm:right-6 sm:z-10 sm:mt-0 sm:justify-start">
                 <div>
                   <p className={`text-[11px] font-bold tracking-[.06em] ${owes ? 'text-[#b42318]' : 'text-[#0e6b4a]'}`}>{owes ? 'BALANCE DUE' : 'PAID IN FULL'}</p>
-                  <p className={`text-[22px] font-bold tracking-tight ${owes ? 'text-[#b42318]' : 'text-[#0e6b4a]'}`}>MXN {(r.balance ?? 0).toLocaleString('en-US')}</p>
+                  <p className={`text-[18px] font-bold tracking-tight ${owes ? 'text-[#b42318]' : 'text-[#0e6b4a]'}`}>MXN {(r.balance ?? 0).toLocaleString('en-US')}</p>
                 </div>
                 <button onClick={() => openMoney('payment')}
-                  className={`h-[38px] whitespace-nowrap rounded-full px-[15px] text-[13px] font-semibold text-white transition ${mpKind === 'payment' ? 'bg-[#0e5f47] ring-4 ring-[#1f9d78]/25' : 'bg-gradient-to-b from-[#27ad86] to-[#1a8f6c] shadow-[0_4px_10px_rgba(31,157,120,.35),inset_0_1px_0_rgba(255,255,255,.25)] hover:brightness-95'}`}>
+                  className={`h-[32px] whitespace-nowrap rounded-full px-3.5 text-[12px] font-semibold text-white transition ${mpKind === 'payment' ? 'bg-[#0e5f47] ring-4 ring-[#1f9d78]/25' : 'bg-gradient-to-b from-[#27ad86] to-[#1a8f6c] shadow-[0_4px_10px_rgba(31,157,120,.35),inset_0_1px_0_rgba(255,255,255,.25)] hover:brightness-95'}`}>
                   + Add payment
                 </button>
               </div>
@@ -477,7 +478,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
         </div>
 
         {error && (
-          <div className="mx-8 mt-4 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
+          <div className="mx-6 mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
             <p>{error}</p>
             {/balance/i.test(error) && (
               <p className="mt-1 text-[13px] text-red-800">
@@ -488,32 +489,32 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
             )}
           </div>
         )}
-        {msg && <p className="mx-8 mt-4 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{msg}</p>}
+        {msg && <p className="mx-6 mt-3 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{msg}</p>}
 
         {r && (
-          <div className="flex flex-col gap-3.5 px-8 pb-5 pt-6 sm:pt-7">
+          <div className="flex flex-col gap-3 px-6 pb-4 pt-5 sm:pt-6">
             {/* Action row */}
-            <div className="flex flex-wrap gap-2 pt-1.5">
+            <div className="flex flex-wrap gap-1.5 pt-1">
               {canCheckIn && (
-                <button disabled={busy} onClick={() => act({ action: 'check_in' }, 'Checked in.')} className={`${btn} !border-[#c9d9f7] !bg-[#f3f7ff] !text-[#2456b8]`}>✓ Check in</button>
+                <button disabled={busy} onClick={() => act({ action: 'check_in' }, 'Checked in.')} className={`${btn} ${bt} !border-[#c9d9f7] !bg-[#f3f7ff] !text-[#2456b8]`}>✓ Check in</button>
               )}
               {canCheckOut && (
-                <button disabled={busy} onClick={() => (r.balance && r.balance > 0 ? setConfirmCheckOut(true) : act({ action: 'check_out' }, 'Checked out.'))} className={`${btn} !border-[#f3cfcb] !text-[#b42318]`}>Check out</button>
+                <button disabled={busy} onClick={() => (r.balance && r.balance > 0 ? setConfirmCheckOut(true) : act({ action: 'check_out' }, 'Checked out.'))} className={`${btn} ${bt} !border-[#f3cfcb] !text-[#b42318]`}>Check out</button>
               )}
-              <button disabled={payBusy} onClick={createPaymentLinkNow} className={`${btn} ${pay ? '!border-[#9fd4c5] !bg-[#d9f0ea]' : '!border-[#c3e5db] !bg-[#e6f5f0]'} !text-[#0e5f47]`}>
+              <button disabled={payBusy} onClick={createPaymentLinkNow} className={`${btn} ${bt} ${pay ? '!border-[#9fd4c5] !bg-[#d9f0ea]' : '!border-[#c3e5db] !bg-[#e6f5f0]'} !text-[#0e5f47]`}>
                 🔗 {payBusy ? 'Creating…' : 'Payment link'}
               </button>
-              <button onClick={() => openMoney('refund')} className={`${btn} !text-[#a3362b] ${mpKind === 'refund' ? '!border-[#e8aaa3] !bg-[#fff0ee]' : ''}`}>↩ Refund</button>
+              <button onClick={() => openMoney('refund')} className={`${btn} ${bt} !text-[#a3362b] ${mpKind === 'refund' ? '!border-[#e8aaa3] !bg-[#fff0ee]' : ''}`}>↩ Refund</button>
               {(r.guestPhone || r.guestEmail) && (
                 <button onClick={() => (quick ? setQuick(null) : openQuick(r.guestPhone ? 'whatsapp' : 'email'))}
-                  className={quick ? `${btn} !border-[#128c7e] !bg-[#128c7e] !text-white shadow-[0_3px_8px_rgba(18,140,126,.35)]` : `${btn} !border-[#c9d9f7] !text-[#2456b8]`}>
+                  className={quick ? `${btn} ${bt} !border-[#128c7e] !bg-[#128c7e] !text-white shadow-[0_3px_8px_rgba(18,140,126,.35)]` : `${btn} ${bt} !border-[#c9d9f7] !text-[#2456b8]`}>
                   💬 Message
                 </button>
               )}
-              <button disabled={histBusy} onClick={openHistory} className={`${btn} !border-[#c9d9f7] !text-[#2456b8]`}>{histBusy ? 'Opening…' : 'Message history'}</button>
+              <button disabled={histBusy} onClick={openHistory} className={`${btn} ${bt} !border-[#c9d9f7] !text-[#2456b8]`}>{histBusy ? 'Opening…' : 'Message history'}</button>
               <span className="flex-1" />
               {canCancel && (
-                <button disabled={busy} onClick={() => setConfirmCancel(true)} className={`${btn} !border-[#f3cfcb] !bg-[#fffafa] !text-[#b42318]`}>Cancel reservation</button>
+                <button disabled={busy} onClick={() => setConfirmCancel(true)} className={`${btn} ${bt} !border-[#f3cfcb] !bg-[#fffafa] !text-[#b42318]`}>Cancel reservation</button>
               )}
             </div>
             {histErr && <p className="text-xs text-red-600">{histErr}</p>}
@@ -693,18 +694,18 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                 <div className={mini}><p className="text-[11px] font-semibold uppercase tracking-[.06em] text-[#7a8394]">Arrival</p><p className="mt-0.5 text-[13.5px] font-semibold">{r.estimatedArrivalTime || '—'}</p></div>
               </div>
             ) : (
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-2">
                 {/* Room */}
                 <div className={card}>
                   <p className={lbl}>Room</p>
                   <div className="flex items-center gap-3.5">
-                    <div className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[14px] bg-[#e3edff] text-[22px] font-bold text-[#1d4ed8]">{roomDigit}</div>
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e3edff] text-[18px] font-bold text-[#1d4ed8]">{roomDigit}</div>
                     <div className="min-w-0">
-                      <p className="truncate text-base font-bold">{roomNames}</p>
-                      <p className="truncate text-[13px] text-[#667085]">{roomTypes || '—'}{r.rooms.some((x) => !x.roomName) ? ' · not assigned' : ' · assigned'}</p>
+                      <p className="truncate text-[14.5px] font-bold">{roomNames}</p>
+                      <p className="truncate text-[12px] text-[#667085]">{roomTypes || '—'}{r.rooms.some((x) => !x.roomName) ? ' · not assigned' : ' · assigned'}</p>
                     </div>
                   </div>
-                  <div className="mt-3 border-t border-[#eef0f4] pt-2.5">
+                  <div className="mt-2 border-t border-[#eef0f4] pt-2">
                     <div className={row}><span className="text-[#667085]">Guests</span><span>{r.adults} adult{r.adults === 1 ? '' : 's'} · {r.children} child{r.children === 1 ? '' : 'ren'}</span></div>
                     <div className={`${row} items-center`}>
                       <span className="text-[#667085]">Estimated arrival</span>
@@ -769,8 +770,8 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
               </div>
             )}
 
-            <details className="rounded-2xl border border-[#e6e9f0] px-[18px] py-3">
-              <summary className="cursor-pointer text-[13px] font-semibold text-[#475467]">Quick edit · stay dates</summary>
+            <details className="rounded-xl border border-[#e6e9f0] px-3.5 py-2.5">
+              <summary className="cursor-pointer text-[12.5px] font-semibold text-[#475467]">Quick edit · stay dates</summary>
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <label className={lbl}>Arrival
                   <input type="date" value={checkin} onChange={(e) => setCheckin(e.target.value)} className={`${field} mt-1.5 normal-case tracking-normal`} />
@@ -786,8 +787,8 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
               </button>
             </details>
 
-            <details className="rounded-2xl border border-[#e6e9f0] px-[18px] py-3" onToggle={(e) => e.currentTarget.open && loadGuest()}>
-              <summary className="cursor-pointer text-[13px] font-semibold text-[#475467]">Guest details</summary>
+            <details className="rounded-xl border border-[#e6e9f0] px-3.5 py-2.5" onToggle={(e) => e.currentTarget.open && loadGuest()}>
+              <summary className="cursor-pointer text-[12.5px] font-semibold text-[#475467]">Guest details</summary>
               <div className="mt-3">
                 {guestLoading && <p className="text-sm text-gray-500">Loading…</p>}
                 {guestError && <p className="text-sm text-red-600">{guestError}</p>}

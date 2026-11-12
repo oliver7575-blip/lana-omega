@@ -74,10 +74,10 @@ export function InlinePanel({
   tone, title, subtitle, onClose, children,
 }: { tone: keyof typeof PANEL; title: ReactNode; subtitle?: ReactNode; onClose?: () => void; children: ReactNode }) {
   return (
-    <div className={`space-y-3 rounded-[20px] border bg-gradient-to-b to-white to-40% p-4 ${PANEL[tone]}`}>
+    <div className={`space-y-2.5 rounded-2xl border bg-gradient-to-b to-white to-40% p-3.5 ${PANEL[tone]}`}>
       <div className="flex items-center gap-3">
         <div className="min-w-0">
-          <p className="text-[15px] font-bold tracking-tight">{title}</p>
+          <p className="text-[14px] font-bold tracking-tight">{title}</p>
           {subtitle && <p className="mt-px text-[12.5px] text-[#667085]">{subtitle}</p>}
         </div>
         {onClose && (
