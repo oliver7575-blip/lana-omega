@@ -493,11 +493,11 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                   </button>
                 )}
                 <button disabled={payBusy} onClick={createPaymentLinkNow}
-                  className="h-9 rounded-[10px] border border-gray-300 whitespace-nowrap px-3 text-xs font-semibold text-[#14213d] hover:bg-gray-50 disabled:opacity-60">
+                  className="h-9 rounded-[10px] border border-[#b7e0d8] bg-[#d9f0ea] whitespace-nowrap px-3 text-xs font-semibold text-[#14213d] hover:bg-[#cbe9e1] disabled:opacity-60">
                   {payBusy ? 'Creating…' : 'Create Payment Link'}
                 </button>
                 <button onClick={() => openMoney('payment')}
-                  className="h-9 rounded-[10px] border border-gray-300 whitespace-nowrap px-3 text-xs font-semibold text-[#14213d] hover:bg-gray-50">
+                  className="h-9 rounded-[10px] border border-[#b7e0d8] bg-[#d9f0ea] whitespace-nowrap px-3 text-xs font-semibold text-[#14213d] hover:bg-[#cbe9e1]">
                   + Add payment
                 </button>
                 <button onClick={() => openMoney('refund')}
