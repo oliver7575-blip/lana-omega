@@ -337,13 +337,13 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
         </div>
 
         <div className="flex items-center justify-between gap-3 rounded-b-2xl border-t border-gray-200 bg-[#fbfbfc] px-6 py-3.5">
-          <span className="text-[12.5px] text-gray-600">
+          <span className="min-w-0 flex-1 text-[12.5px] text-gray-600">
             {blocking ? 'No guest or charge — the room just becomes unavailable' : chosen ? <>Total <b className="text-[#14213d]">{effectiveTotal !== null ? `MXN ${Math.round(effectiveTotal).toLocaleString('en-US')}` : '—'}</b> · {n} night{n === 1 ? '' : 's'}</> : 'Check availability and choose a room'}
           </span>
-          <div className="flex gap-2">
-            <button onClick={onClose} className="h-9 rounded-[10px] border border-gray-300 bg-white px-4 text-[13px] font-semibold hover:bg-gray-50">Cancel</button>
+          <div className="flex shrink-0 gap-2">
+            <button onClick={onClose} className="h-9 whitespace-nowrap rounded-[10px] border border-gray-300 bg-white px-4 text-[13px] font-semibold hover:bg-gray-50">Cancel</button>
             <button onClick={blocking ? block : create} disabled={blocking ? !canBlock : !canCreate}
-              className="h-9 rounded-[10px] bg-[#1f9d78] px-[18px] text-[13px] font-semibold text-white hover:bg-[#188a69] disabled:opacity-50">
+              className="h-9 whitespace-nowrap rounded-[10px] bg-[#1f9d78] px-[18px] text-[13px] font-semibold text-white hover:bg-[#188a69] disabled:opacity-50">
               {blocking ? (saving ? 'Blocking…' : blockType === 'out_of_service' ? 'Set out of service' : 'Block dates') : saving ? 'Creating…' : 'Create reservation'}
             </button>
           </div>
