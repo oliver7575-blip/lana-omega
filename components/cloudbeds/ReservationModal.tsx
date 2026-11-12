@@ -748,9 +748,9 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                       <p className="text-[10.5px] font-bold uppercase tracking-[.07em] text-[#a8741c]">Special request</p>
                       <p className="whitespace-pre-wrap">{r.specialRequests}</p>
                     </div>
-                  ) : <p className="text-[13px] text-[#8a93a3]">No special requests</p>}
+                  ) : notes.length === 0 ? <p className="text-[13px] text-[#8a93a3]">No special requests</p> : null}
                   {notes.length > 0 ? (
-                    <div className="mt-2 max-h-32 space-y-1.5 overflow-y-auto">
+                    <div className={`${r.specialRequests ? "mt-2" : ""} max-h-32 space-y-1.5 overflow-y-auto`}>
                       {notes.map((n, i) => (
                         <div key={i} className="rounded-[10px] bg-gray-50 px-3 py-2 text-[13px]">
                           <p className="whitespace-pre-wrap">{n.text}</p>
@@ -758,7 +758,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                         </div>
                       ))}
                     </div>
-                  ) : <p className="mt-2 text-xs text-[#8a93a3]">No internal notes yet</p>}
+                  ) : r.specialRequests ? <p className="mt-2 text-xs text-[#8a93a3]">No internal notes yet</p> : null}
                 </div>
               </div>
             )}
