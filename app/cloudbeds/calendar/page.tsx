@@ -40,7 +40,7 @@ const BAR: Record<string, { bg: string; border: string; text: string }> = {
   confirmed: { bg: '#bcd3f8', border: '#86aaec', text: '#17356b' },
   not_confirmed: { bg: '#fdeccb', border: '#f0c978', text: '#7a4a05' },
   checked_in: { bg: '#b4e6d0', border: '#74c9a6', text: '#0e4d38' },
-  checked_out: { bg: '#e6e9ef', border: '#c5cad4', text: '#4a5262' },
+  checked_out: { bg: '#d5d9e0', border: '#b3bac6', text: '#454d5c' },
 }
 function barColors(status: string) {
   const k = status.toLowerCase()
