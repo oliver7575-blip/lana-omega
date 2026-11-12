@@ -446,11 +446,10 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
               {r && <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold capitalize">{statusLabel(r.status)}</span>}
               {r?.source && <span className="rounded-full border px-3 py-[3px] text-xs font-semibold" style={sourceStyle(r.source)}>{r.source}</span>}
               {r?.confirmationCode && <span className="ml-1 truncate text-[12px] uppercase tracking-wide text-[#b7c9d8]">{r.source || 'Booking'} no. <b className="font-semibold text-white">{r.confirmationCode}</b></span>}
-              <span title="Reservation number inside Cloudbeds" className="rounded-full border border-dashed border-white/40 px-2.5 py-[2px] text-[11px] font-semibold tracking-wide text-[#b6f5d8]">CLOUDBEDS RES. #{id}</span>
             </div>
             <button onClick={onClose} aria-label="Close" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/30 text-lg leading-none text-white hover:bg-white/10">×</button>
           </div>
-          <p className="mt-1.5 truncate text-[21px] font-bold leading-tight tracking-tight">{r ? r.guestName : 'Loading…'}</p>
+          <p className="mt-1.5 truncate text-[21px] font-bold leading-tight tracking-tight">{r ? r.guestName : 'Loading…'}{r && <span title="Reservation number inside Cloudbeds" className="ml-2.5 text-[12px] font-medium uppercase tracking-wide text-[#b7c9d8]">Res. #{id}</span>}</p>
           {r && (
             <>
               <div className="mt-2 flex flex-col gap-2.5 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
