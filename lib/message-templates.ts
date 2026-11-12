@@ -155,7 +155,8 @@ export async function sendMappedTemplate(
   credentials: EncryptedPayload,
   to: string,
   mapping: TemplateMapping,
-  values: Record<string, string | undefined>
+  values: Record<string, string | undefined>,
+  opts?: { bodyNames?: string[] } // for templates whose variables are named ({{first_name}}) instead of numbered
 ): Promise<{ success: boolean; error?: string }> {
   const components: Record<string, unknown>[] = []
   if (mapping.header.length) {
@@ -167,7 +168,7 @@ export async function sendMappedTemplate(
   if (mapping.body.length) {
     components.push({
       type: 'body',
-      parameters: mapping.body.map((k) => ({ type: 'text', text: clean(values[k]) })),
+      parameters: mapping.body.map((k, i) => ({ type: 'text', ...(opts?.bodyNames?.[i] ? { parameter_name: opts.bodyNames[i] } : {}), text: clean(values[k]) })),
     })
   }
   try {

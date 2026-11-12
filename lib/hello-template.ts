@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { sendMappedTemplate } from './message-templates'
+import { fetchTemplates } from './maintenance-template'
 
 /** The approved "hello" templates: first name in {{1}}, one reason sentence in {{2}}. Used for staff messages outside WhatsApp's 24-hour window. */
 export const HELLO_TEMPLATES = {
@@ -18,9 +19,10 @@ export async function loadWhatsApp(db: SupabaseClient, tenantId: string) {
     .eq('integration_type', 'whatsapp')
     .eq('status', 'connected')
     .maybeSingle()
-  const phoneNumberId = (integration?.config as { phone_number_id?: string } | null)?.phone_number_id
+  const cfg = integration?.config as { phone_number_id?: string; waba_id?: string } | null
+  const phoneNumberId = cfg?.phone_number_id
   if (!integration?.credentials || !phoneNumberId) return null
-  return { credentials: integration.credentials, phoneNumberId }
+  return { credentials: integration.credentials, phoneNumberId, wabaId: cfg?.waba_id }
 }
 
 /** Whether WhatsApp still allows free text: the guest wrote within the last 24 hours. */
@@ -46,16 +48,36 @@ export async function sendHelloTemplate(
   if (!wa) return { success: false, error: 'WhatsApp integration not fully configured' }
   const t = HELLO_TEMPLATES[p.lang]
   const reason = p.reason.replace(/[\n\t]+/g, ' ').trim()
+  // Look the template up in Meta: its real language code and status decide whether (and how) it can be sent.
+  let language: string = t.language
+  let bodyNames: string[] | undefined
+  if (wa.wabaId) {
+    try {
+      const found = (await fetchTemplates(wa.wabaId, wa.credentials, t.name)).filter((x) => x.name === t.name)
+      if (found.length === 0) return { success: false, error: `Meta has no template called "${t.name}" on this WhatsApp account.` }
+      const approved = found.filter((x) => x.status === 'APPROVED')
+      if (approved.length === 0) return { success: false, error: `The WhatsApp template "${t.name}" is ${found.map((x) => `${x.status.toLowerCase()} (${x.language})`).join(', ')} in Meta, so it can't be sent yet.` }
+      const pick = approved.find((x) => x.language === t.language) ?? approved[0]
+      language = pick.language
+      if (pick.parameter_format === 'NAMED') {
+        const body = pick.components?.find((c) => c.type === 'BODY')?.text ?? ''
+        const names = [...body.matchAll(/\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g)].map((m) => m[1])
+        if (names.length === 2) bodyNames = names
+      }
+    } catch {
+      // Meta lookup failed: fall back to the built-in settings and let the send report any problem.
+    }
+  }
   const res = await sendMappedTemplate(
     wa.phoneNumberId,
     wa.credentials,
     p.phone,
-    { name: t.name, language: t.language, header: [], body: ['first_name', 'reason'] },
-    { first_name: p.firstName, reason }
+    { name: t.name, language, header: [], body: ['first_name', 'reason'] },
+    { first_name: p.firstName, reason },
+    { bodyNames }
   )
   if (!res.success) {
-    const notApproved = /132001|does not exist|not approved/i.test(res.error ?? '')
-    return { success: false, error: notApproved ? `The WhatsApp template "${t.name}" isn't approved yet in Meta, so it can't be sent.` : res.error ?? 'Could not send' }
+    return { success: false, error: res.error ?? 'Could not send' }
   }
   const text = t.render(p.firstName, reason)
   await db.from('messages').insert({ tenant_id: p.tenantId, conversation_id: p.conversationId, sender_type: 'staff', content: text })
