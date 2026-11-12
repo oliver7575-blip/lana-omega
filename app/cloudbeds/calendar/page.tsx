@@ -125,6 +125,10 @@ export default function CalendarPage() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [open, setOpen] = useState<string | null>(null)
   const [dayW, setDayW] = useState(0) // 0 until the screen width is measured
+  // Today's column is highlighted when the calendar opens (and by the Today button).
+  useEffect(() => {
+    if (data && !markedToday.current) { markedToday.current = true; setMarkDay(data.today) }
+  }, [data])
   const [span, setSpan] = useState<number>(DEFAULT_SPAN) // days shown at once: 7, 14, 21 or 30
   useEffect(() => {
     try { const v = Number(localStorage.getItem('calendarSpan')); if (SPANS.some((x) => x.days === v)) setSpan(v) } catch { /* ignore */ }
@@ -135,6 +139,7 @@ export default function CalendarPage() {
   const [openBlock, setOpenBlock] = useState<Block | null>(null)
   const [hoverDay, setHoverDay] = useState<string | null>(null) // column under the pointer
   const [markDay, setMarkDay] = useState<string | null>(null) // column marked by clicking its date
+  const markedToday = useRef(false)
   const [typeOrder, setTypeOrder] = useState<string[]>([])
   // Balance changes made here show at once (Cloudbeds can lag a moment before its list reflects them).
   const dueOverride = useRef<Map<string, { due: boolean; until: number }>>(new Map())
@@ -499,7 +504,7 @@ export default function CalendarPage() {
           </div>
           <div className="flex items-center gap-1.5">
             <button onClick={() => scrollBy(-7)} className="h-9 w-9 rounded-[10px] border border-gray-300 bg-white text-base hover:bg-gray-50" aria-label="Back a week">‹</button>
-            <button onClick={() => data && jumpTo(data.today)} className="h-9 rounded-[10px] border border-gray-300 bg-white px-3.5 text-[13px] font-semibold hover:bg-gray-50">Today</button>
+            <button onClick={() => { if (data) { jumpTo(data.today); setMarkDay(data.today) } }} className="h-9 rounded-[10px] border border-gray-300 bg-white px-3.5 text-[13px] font-semibold hover:bg-gray-50">Today</button>
             <button onClick={() => scrollBy(7)} className="h-9 w-9 rounded-[10px] border border-gray-300 bg-white text-base hover:bg-gray-50" aria-label="Forward a week">›</button>
             <div className="ml-1 flex rounded-[10px] bg-[#e9ecf1] p-[3px]" role="group" aria-label="Days shown">
               {SPANS.map((o) => (
