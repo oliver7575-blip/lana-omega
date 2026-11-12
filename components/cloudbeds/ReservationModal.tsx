@@ -167,6 +167,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
   const [guestError, setGuestError] = useState<string | null>(null)
   const [guestLoading, setGuestLoading] = useState(false)
   const [confirmCancel, setConfirmCancel] = useState(false)
+  const [confirmPayLink, setConfirmPayLink] = useState(false)
   const [confirmCheckOut, setConfirmCheckOut] = useState(false)
   // Add a payment / refund (Cloudbeds payment methods)
   const [mpKind, setMpKind] = useState<'payment' | 'refund' | null>(null)
@@ -179,6 +180,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
 
   function openMoney(kind: 'payment' | 'refund') {
     if (!r) return
+    setConfirmPayLink(false)
     setQuick(null)
     setPay(null)
     setPayError(null)
@@ -270,6 +272,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
   }
 
   async function createPaymentLinkNow() {
+    setConfirmPayLink(false)
     setMpKind(null)
     setQuick(null)
     setPayBusy(true)
@@ -298,6 +301,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
   }
 
   function openQuick(kind: 'whatsapp' | 'email') {
+    setConfirmPayLink(false)
     setMpKind(null)
     setPay(null)
     setPayError(null)
@@ -408,7 +412,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
   const fmtDay = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
   const money = (n: number | null) => `MXN ${n === null ? '—' : n.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
   const owes = Boolean(r && r.balance && r.balance > 0)
-  const panelOpen = Boolean(r && (mpKind || (confirmCheckOut && owes) || confirmCancel || pay || payError || quick))
+  const panelOpen = Boolean(r && (mpKind || (confirmCheckOut && owes) || confirmCancel || confirmPayLink || pay || payError || quick))
   const firstName = r?.guestName.split(' ')[0] || 'guest'
   const roomNames = r ? r.rooms.map((x) => x.roomName ?? `${x.roomTypeName} (unassigned)`).join(', ') || '—' : ''
   const roomTypes = r ? Array.from(new Set(r.rooms.map((x) => x.roomTypeName).filter(Boolean))).join(', ') : ''
@@ -502,14 +506,20 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
               {canCheckOut && (
                 <button disabled={busy} onClick={() => (r.balance && r.balance > 0 ? setConfirmCheckOut(true) : act({ action: 'check_out' }, 'Checked out.'))} className={`${btn} ${bt} !border-[#f3cfcb] !text-[#b42318]`}>Check out</button>
               )}
-              <button disabled={payBusy} onClick={createPaymentLinkNow} className={`${btn} ${bt} ${pay ? '!border-[#9fd4c5] !bg-[#d9f0ea]' : '!border-[#c3e5db] !bg-[#e6f5f0]'} !text-[#0e5f47]`}>
+              <button disabled={payBusy} onClick={() => { setMpKind(null); setQuick(null); setPay(null); setPayError(null); setConfirmPayLink((v) => !v) }} className={`${btn} ${bt} ${pay || confirmPayLink ? '!border-[#9fd4c5] !bg-[#d9f0ea]' : '!border-[#c3e5db] !bg-[#e6f5f0]'} !text-[#0e5f47]`}>
                 🔗 {payBusy ? 'Creating…' : 'Payment link'}
               </button>
               <button onClick={() => openMoney('refund')} className={`${btn} ${bt} !text-[#a3362b] ${mpKind === 'refund' ? '!border-[#e8aaa3] !bg-[#fff0ee]' : ''}`}>↩ Refund</button>
-              {(r.guestPhone || r.guestEmail) && (
-                <button onClick={() => (quick ? setQuick(null) : openQuick(r.guestPhone ? 'whatsapp' : 'email'))}
-                  className={quick ? `${btn} ${bt} !border-[#128c7e] !bg-[#128c7e] !text-white shadow-[0_3px_8px_rgba(18,140,126,.35)]` : `${btn} ${bt} !border-[#c9d9f7] !text-[#2456b8]`}>
+              {r.guestPhone && (
+                <button onClick={() => (quick === 'whatsapp' ? setQuick(null) : openQuick('whatsapp'))}
+                  className={quick === 'whatsapp' ? `${btn} ${bt} !border-[#128c7e] !bg-[#128c7e] !text-white shadow-[0_3px_8px_rgba(18,140,126,.35)]` : `${btn} ${bt} !border-[#c9d9f7] !text-[#2456b8]`}>
                   💬 Message
+                </button>
+              )}
+              {r.guestEmail && (
+                <button onClick={() => (quick === 'email' ? setQuick(null) : openQuick('email'))}
+                  className={quick === 'email' ? `${btn} ${bt} !border-[#2456b8] !bg-[#2456b8] !text-white shadow-[0_3px_8px_rgba(36,86,184,.35)]` : `${btn} ${bt} !border-[#c9d9f7] !text-[#2456b8]`}>
+                  ✉ Email
                 </button>
               )}
               <button onClick={() => openHistoryPopup({ reservationId: id, guestName: r.guestName })} className={`${btn} ${bt} !border-[#c9d9f7] !text-[#2456b8]`}>Message history</button>
@@ -583,6 +593,19 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                 <div className="flex justify-end gap-2.5">
                   <button disabled={busy} onClick={() => setConfirmCancel(false)} className={btnLg}>Keep reservation</button>
                   <button disabled={busy} onClick={cancelReservation} className={priRed}>{busy ? 'Cancelling…' : 'Yes, cancel reservation'}</button>
+                </div>
+              </InlinePanel>
+            )}
+
+            {/* Confirm payment link */}
+            {confirmPayLink && (
+              <InlinePanel tone="blue" title="Generate a payment link?" subtitle={<>For the balance of <b>{money(r.balance)}</b></>} onClose={() => setConfirmPayLink(false)}>
+                <p className="rounded-xl border border-[#d6e2f8] bg-white px-3 py-2 text-[12.5px] leading-snug text-[#475467]">
+                  This creates a payment link for {r.guestName} and sends it to the guest by email and WhatsApp where contact details are on file.
+                </p>
+                <div className="flex justify-end gap-2.5">
+                  <button onClick={() => setConfirmPayLink(false)} className={btnLg}>Cancel</button>
+                  <button disabled={payBusy} onClick={createPaymentLinkNow} className={priBlue}>{payBusy ? 'Creating…' : 'Yes, generate link'}</button>
                 </div>
               </InlinePanel>
             )}
