@@ -697,13 +697,19 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
               <div className="grid gap-2.5 sm:grid-cols-2">
                 {/* Room */}
                 <div className={card}>
-                  <p className={lbl}>Room</p>
-                  <div className="flex items-center gap-3.5">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#e3edff] text-[15px] font-bold text-[#1d4ed8]">{roomDigit}</div>
-                    <div className="min-w-0">
-                      <p className="truncate text-[13px] font-bold">{roomNames}</p>
-                      <p className="truncate text-[11px] text-[#667085]">{roomTypes || '—'}{r.rooms.some((x) => !x.roomName) ? ' · not assigned' : ' · assigned'}</p>
-                    </div>
+                  <p className={lbl}>{r.rooms.length > 1 ? `Rooms (${r.rooms.length})` : 'Room'}</p>
+                  <div className="space-y-2">
+                    {(r.rooms.length ? r.rooms : [{ roomName: null, roomTypeName: '—' }]).map((x, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <div className="flex h-8 min-w-[32px] shrink-0 items-center justify-center rounded-lg bg-[#e3edff] px-1.5 text-[14px] font-bold text-[#1d4ed8]">
+                          {x.roomName ? (x.roomName.match(/\d+/)?.[0] ?? x.roomName.slice(0, 3)) : '–'}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-[13px] font-bold">{x.roomName ?? 'Not assigned'}</p>
+                          <p className="truncate text-[11px] text-[#667085]">{x.roomTypeName}</p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                   <div className="mt-2 border-t border-[#eef0f4] pt-2">
                     <div className={row}><span className="text-[#667085]">Guests</span><span>{r.adults} adult{r.adults === 1 ? '' : 's'} · {r.children} child{r.children === 1 ? '' : 'ren'}</span></div>
