@@ -37,9 +37,9 @@ const TYPE_ROW_H = 34
 
 // Soft bar colours by reservation status (text stays dark enough to read on each).
 const BAR: Record<string, { bg: string; border: string; text: string }> = {
-  confirmed: { bg: '#d6e4fb', border: '#9bbbf0', text: '#17356b' },
+  confirmed: { bg: '#bcd3f8', border: '#86aaec', text: '#17356b' },
   not_confirmed: { bg: '#fdeccb', border: '#f0c978', text: '#7a4a05' },
-  checked_in: { bg: '#cdeee1', border: '#8fd3b8', text: '#0e4d38' },
+  checked_in: { bg: '#b4e6d0', border: '#74c9a6', text: '#0e4d38' },
   checked_out: { bg: '#e6e9ef', border: '#c5cad4', text: '#4a5262' },
 }
 function barColors(status: string) {
