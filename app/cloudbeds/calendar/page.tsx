@@ -484,7 +484,7 @@ export default function CalendarPage() {
   return (
     <div className="p-2 md:p-3">
       <div className="min-h-[calc(100vh-1.5rem)] rounded-2xl bg-[#f6f7f9] p-5 text-[#14213d]">
-        <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="mb-5 flex flex-wrap items-center gap-3">
           <div className="mr-2">
             <Link href="/cloudbeds" className="text-xs font-semibold text-[#3b6fe0] hover:underline">← Activity</Link>
             <h1 className="text-[22px] font-bold leading-tight tracking-tight">Calendar</h1>
@@ -511,9 +511,9 @@ export default function CalendarPage() {
           </div>
           <div className="min-w-[220px] flex-1"><SearchBar onOpen={setOpen} /></div>
           {data && (
-            <div className="flex flex-col gap-1.5">
-              <button onClick={() => setCreating('block')} className="h-8 rounded-[10px] border border-gray-300 bg-white px-4 text-[13px] font-semibold hover:bg-gray-50">Block dates</button>
-              <button onClick={() => setCreating('blank')} className="h-8 rounded-[10px] bg-[#1f9d78] px-[18px] text-[13px] font-semibold text-white hover:bg-[#188a69]">+ Create new reservation</button>
+            <div className="relative h-9">
+              <button onClick={() => setCreating('block')} className="h-9 rounded-[10px] border border-gray-300 bg-white px-4 text-[13px] font-semibold hover:bg-gray-50">Block dates</button>
+              <button onClick={() => setCreating('blank')} className="absolute right-0 top-full mt-1.5 h-9 whitespace-nowrap rounded-[10px] bg-[#1f9d78] px-[18px] text-[13px] font-semibold text-white hover:bg-[#188a69]">+ Create new reservation</button>
             </div>
           )}
         </div>
