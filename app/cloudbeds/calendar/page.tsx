@@ -679,7 +679,7 @@ export default function CalendarPage() {
                             })}
                             {stays.map((s) => (
                               <Bar key={`${s.reservationID}-${s.start}`} start={s.start} end={s.end} viewStart={data.start} totalDays={totalDays}
-                                label={s.guestName} due={dueOf(s.reservationID, s.due)} src={s.src} bg={barColors(s.end < data.today ? 'checked_out' : s.status).bg} border={barColors(s.end < data.today ? 'checked_out' : s.status).border} text={barColors(s.end < data.today ? 'checked_out' : s.status).text} onClick={() => setOpen(s.reservationID)} dayW={dayW}
+                                label={s.guestName} due={dueOf(s.reservationID, s.due)} src={s.src} bg={barColors(s.status).bg} border={barColors(s.status).border} text={barColors(s.status).text} onClick={() => setOpen(s.reservationID)} dayW={dayW}
                                 onContextMenu={(e) => {
                                   e.preventDefault()
                                   e.stopPropagation()
