@@ -115,20 +115,20 @@ function Bar({ start, end, viewStart, totalDays, label, sub, bg, border, text, e
     )
   }
   const chip = sourceName(src)
+  const barH = ROW_H - 10
   return (
     <button
       onClick={onClick}
       onContextMenu={onContextMenu}
       title={title ?? label}
-      className="absolute top-1 flex items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-[9px] border pl-3 pr-1.5 text-left hover:brightness-110"
-      style={{ left: left + 1, width: w, height: ROW_H - 8, color: text, borderColor: edge, background: `linear-gradient(100deg,${edge}55,${edge}1c)`, boxShadow: `0 0 14px ${edge}44, inset 0 0 12px ${edge}22` }}
+      className="absolute flex items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-full border pl-3.5 pr-2 text-left hover:brightness-110"
+      style={{ left: left + 1, width: w, top: (ROW_H - barH) / 2, height: barH, color: text, borderColor: edge, background: `linear-gradient(100deg,${edge}66,${edge}30)`, boxShadow: `0 0 14px ${edge}44, inset 0 0 12px ${edge}22` }}
     >
-      <i className="absolute bottom-0 left-0 top-0 w-1" style={{ background: edge }} />
-      <span className="min-w-0 flex-1 leading-tight">
-        <span className="block truncate text-[11px] font-bold">{label}</span>
-        {sub && w >= 70 && <span className="block truncate text-[9.5px] opacity-80">{sub}</span>}
+      <span className="min-w-0 flex-1 truncate text-[11.5px] font-bold">
+        {label}
+        {sub && w >= 90 && <span className="ml-1.5 font-medium opacity-75">· {sub}</span>}
       </span>
-      {chip && w >= 150 && <span className="shrink-0 rounded-full border border-white/30 bg-white/[.18] px-1.5 py-[1px] text-[9px] font-semibold">{chip}</span>}
+      {chip && w >= 170 && <span className="shrink-0 rounded-full border border-white/30 bg-white/[.18] px-1.5 py-[1px] text-[9px] font-semibold">{chip}</span>}
       {due && <b aria-label="Balance due" title="Balance due" className="shrink-0 rounded-full bg-white px-1.5 py-[1px] text-[9px] font-bold text-[#d12a3a]">Due</b>}
     </button>
   )
@@ -737,7 +737,7 @@ export default function CalendarPage() {
                             })}
                             {stays.map((s) => (
                               <Bar key={`${s.reservationID}-${s.start}`} start={s.start} end={s.end} viewStart={data.start} totalDays={totalDays}
-                                label={s.guestName} sub={`${diff(s.start, s.end)} night${diff(s.start, s.end) === 1 ? '' : 's'}`} due={dueOf(s.reservationID, s.due)} src={s.src}
+                                label={s.guestName} sub={`${diff(s.start, s.end)}n`} due={dueOf(s.reservationID, s.due)} src={s.src}
                                 edge={statusEdge(s.status)} bg="" border="" text="#fff" onClick={() => setOpen(s.reservationID)} dayW={dayW}
                                 onContextMenu={(e) => {
                                   e.preventDefault()
