@@ -112,8 +112,8 @@ export default function PaymentsPage() {
   const copy = (text: string) => navigator.clipboard?.writeText(text)
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 sm:px-8">
-      <h1 className="font-serif text-4xl italic text-white">Payments</h1>
+    <div className="w-full">
+      <h1 className="text-[20px] font-semibold leading-tight tracking-tight text-white">Payments</h1>
       <p className="mt-1 text-sm text-navy/55">
         Secure payment links for <strong>direct bookings</strong> (Website/Booking Engine). Cloudbeds hosts the payment page and posts the payment to the reservation itself. Booking.com / Airbnb and other travel-platform
         reservations never get a link; Walk-In and other manual reservations are handled by Billing.

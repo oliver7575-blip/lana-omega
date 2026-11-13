@@ -43,22 +43,22 @@ interface PickerTemplate {
 }
 
 const card: React.CSSProperties = {
-  border: '1px solid #232a40',
+  border: '1px solid #34508f',
   borderRadius: 8,
   padding: 20,
   marginBottom: 16,
-  background: '#141a2e',
+  background: '#16285c',
 }
 const muted: React.CSSProperties = { color: 'rgba(231,233,240,0.55)', fontSize: 14 }
 const button: React.CSSProperties = {
   padding: '8px 14px',
   borderRadius: 6,
-  border: '1px solid #232a40',
-  background: '#141a2e',
+  border: '1px solid #34508f',
+  background: '#16285c',
   cursor: 'pointer',
   fontSize: 14,
 }
-const primary: React.CSSProperties = { ...button, background: '#e0806f', color: '#fff', border: '1px solid #e0806f' }
+const primary: React.CSSProperties = { ...button, background: '#6aa2ff', color: '#fff', border: '1px solid #6aa2ff' }
 
 // Sample values for previews.
 const SAMPLE: Record<string, string> = {
@@ -181,7 +181,7 @@ function TemplateCard({
             next[index] = e.target.value
             set(next)
           }}
-          style={{ padding: 6, borderRadius: 6, border: '1px solid #232a40' }}
+          style={{ padding: 6, borderRadius: 6, border: '1px solid #34508f' }}
         >
           {purpose.fields.map((f) => (
             <option key={f.key} value={f.key}>
@@ -242,7 +242,7 @@ function TemplateCard({
               <select
                 value={selected}
                 onChange={(e) => pick(e.target.value)}
-                style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #232a40', marginBottom: 12 }}
+                style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #34508f', marginBottom: 12 }}
               >
                 <option value="">Select an approved template…</option>
                 {list.map((t) => (
@@ -355,7 +355,7 @@ function EmailCard({
         value={subject}
         onChange={(e) => setSubject(e.target.value)}
         disabled={!canEdit}
-        style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #232a40', margin: '4px 0 12px' }}
+        style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #34508f', margin: '4px 0 12px' }}
       />
       <label style={{ fontSize: 14, fontWeight: 600 }}>Message (HTML)</label>
       <textarea
@@ -367,7 +367,7 @@ function EmailCard({
           width: '100%',
           padding: 8,
           borderRadius: 6,
-          border: '1px solid #232a40',
+          border: '1px solid #34508f',
           fontFamily: 'monospace',
           fontSize: 13,
           margin: '4px 0 4px',
@@ -381,8 +381,8 @@ function EmailCard({
         {showPreview ? 'Hide preview' : 'Preview'}
       </button>
       {showPreview && (
-        <div style={{ border: '1px solid #232a40', borderRadius: 6, marginBottom: 12 }}>
-          <div style={{ padding: '8px 12px', borderBottom: '1px solid #232a40', fontSize: 14 }}>
+        <div style={{ border: '1px solid #34508f', borderRadius: 6, marginBottom: 12 }}>
+          <div style={{ padding: '8px 12px', borderBottom: '1px solid #34508f', fontSize: 14 }}>
             <strong>{renderEmail(subject)}</strong>
           </div>
           <iframe
@@ -415,7 +415,7 @@ function EmailCard({
             placeholder="you@example.com"
             value={testTo}
             onChange={(e) => setTestTo(e.target.value)}
-            style={{ padding: 8, borderRadius: 6, border: '1px solid #232a40', minWidth: 200 }}
+            style={{ padding: 8, borderRadius: 6, border: '1px solid #34508f', minWidth: 200 }}
           />
           <button
             style={button}
@@ -557,7 +557,7 @@ export default function AutomationsPage() {
             <h2 style={{ fontSize: 18 }}>{current.label}</h2>
             <p style={muted}>{current.help}</p>
             {current.key === 'post_stay' && !data.postStayEnabled && (
-              <p style={{ ...muted, background: '#141a2e', padding: 12, borderRadius: 6 }}>
+              <p style={{ ...muted, background: '#16285c', padding: 12, borderRadius: 6 }}>
                 Post-stay messages are turned off. Turn them on in <Link href="/settings">Settings</Link>.
               </p>
             )}

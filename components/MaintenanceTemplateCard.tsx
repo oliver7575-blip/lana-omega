@@ -64,7 +64,7 @@ function Bubble({ body, buttons }: { body: string; buttons: string[] }) {
           <span
             key={`${b}-${i}`}
             style={{
-              border: '1px solid #232a40',
+              border: '1px solid #34508f',
               borderRadius: 6,
               padding: '4px 10px',
               fontSize: 13,
@@ -207,7 +207,7 @@ export default function MaintenanceTemplateCard() {
   const inReview = template?.exists && (template.status === 'PENDING' || template.status === 'IN_APPEAL')
 
   return (
-    <div style={{ border: '1px solid #232a40', borderRadius: 8, padding: 16, marginBottom: 24 }}>
+    <div style={{ border: '1px solid #34508f', borderRadius: 8, padding: 16, marginBottom: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 style={{ marginTop: 0, fontSize: 18 }}>WhatsApp reminder template</h2>
         <button onClick={load} disabled={loading || saving}>
@@ -333,7 +333,7 @@ export default function MaintenanceTemplateCard() {
       )}
 
       {pickerOpen && (
-        <div style={{ marginTop: 16, borderTop: '1px solid #232a40', paddingTop: 12 }}>
+        <div style={{ marginTop: 16, borderTop: '1px solid #34508f', paddingTop: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <strong>Templates in your WhatsApp account</strong>
             <button onClick={() => setPickerOpen(false)} type="button">
@@ -354,7 +354,7 @@ export default function MaintenanceTemplateCard() {
             <div
               key={`${t.name}-${t.language}`}
               style={{
-                border: '1px solid #232a40',
+                border: '1px solid #34508f',
                 borderRadius: 8,
                 padding: 12,
                 marginBottom: 8,

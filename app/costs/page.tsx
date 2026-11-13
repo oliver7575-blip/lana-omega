@@ -54,11 +54,11 @@ export default function CostsPage() {
   const sameCurrency = data ? data.meta.currency === data.claude.currency : true
 
   return (
-    <main className="px-5 py-6 md:px-8">
+    <main>
       <div className="mx-auto max-w-3xl">
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="font-display text-3xl italic text-white">Costs</h1>
+            <h1 className="text-[20px] font-semibold leading-tight tracking-tight text-white">Costs</h1>
             <p className="text-sm text-navy/60">Month-to-date spend and the daily record, per provider.</p>
           </div>
           <div className="flex items-center gap-2 text-sm">

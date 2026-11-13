@@ -74,9 +74,10 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
   // Full-screen calendar: the side menu slides out when the pointer touches the left edge of the window
   // and tucks away again once the pointer moves off it. It is a rounded panel inset like the calendar card, covering just the strip the calendar's
   // room column (and the Soirée wordmark above it) occupies, so it covers only that space.
-  const focus = pathname === '/cloudbeds' || pathname.startsWith('/cloudbeds/calendar') || pathname.startsWith('/reservations') || pathname.startsWith('/maintenance')
+  const isCalendar = pathname.startsWith('/cloudbeds/calendar')
+  const focus = !bare
   // The reservations list and the dashboard keep the panel pinned open and moves the page content over instead.
-  const pinned = pathname.startsWith('/reservations') || pathname === '/cloudbeds' || pathname.startsWith('/maintenance')
+  const pinned = !bare && !isCalendar
   useEffect(() => {
     if (!focus || pinned) { setPeek(false); return }
     const onMove = (e: MouseEvent) => {
@@ -108,6 +109,8 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
   const isInbox = pathname.startsWith('/inbox') || pathname.startsWith('/conversations')
   const isReservations = pathname.startsWith('/reservations')
   const legacy = LEGACY.some((p) => pathname.startsWith(p))
+  // Pages that already draw their own Soirée-blue card.
+  const selfStyled = pathname.startsWith('/cloudbeds') || pathname.startsWith('/reservations') || pathname.startsWith('/maintenance')
 
   // Multi-hotel logins: switch hotel, then reload so every page and the live
   // updates follow the newly selected hotel.
@@ -279,10 +282,15 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className={`min-w-0 flex-1 ${pinned ? 'md:pl-[185px]' : ''}`}>
-        {legacy ? (
-          <div className="legacy-dark px-5 py-6 md:px-8">{children}</div>
-        ) : (
+        {selfStyled ? (
           children
+        ) : (
+          // Every other page sits in the same Soirée-blue card as the calendar.
+          <div className="p-2 md:p-3">
+            <div className={`min-h-[calc(100vh-1.5rem)] min-w-0 rounded-2xl p-4 text-[#eaf0fb] antialiased md:p-5 ${legacy ? 'legacy-dark' : ''}`} style={{ background: HOLO_BG }}>
+              {children}
+            </div>
+          </div>
         )}
       </div>
     </div>

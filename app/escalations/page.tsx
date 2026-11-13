@@ -74,7 +74,7 @@ export default function EscalationsPage() {
   const allShownSelected = shown.length > 0 && shown.every((e) => selected.has(e.id))
 
   return (
-    <main className="px-5 py-6 md:px-8">
+    <main>
       <div className="mb-5 flex items-center justify-between">
         <h1 className="font-display text-2xl italic text-white sm:text-3xl">Escalations</h1>
         <p className="text-sm text-navy/60">{total} total</p>

@@ -114,10 +114,10 @@ export default function EmailInquiriesPage() {
   useEffect(() => { setSelected(new Set()) }, [view, filter, showAutomated])
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 sm:px-8">
+    <div className="w-full">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-serif text-4xl italic text-white">Email Inquiries</h1>
+          <h1 className="text-[20px] font-semibold leading-tight tracking-tight text-white">Email Inquiries</h1>
           <p className="mt-1 text-sm text-navy/55">
             Emails to the hotel inbox, sorted by Lana. Booking confirmations and other automated mail are left out.
           </p>

@@ -116,7 +116,7 @@ export default function InboxList({ rows }: { rows: InboxListRow[] }) {
                 {r.status === 'human_takeover' ? (
                   <span className="rounded-full bg-purple-500/15 px-2.5 py-1 text-xs font-medium text-purple-300">human takeover</span>
                 ) : unread ? (
-                  <span className="rounded-full bg-[#1b2340] px-2.5 py-1 text-xs font-medium text-[#8dacff]">new</span>
+                  <span className="rounded-full bg-[#1d3a78] px-2.5 py-1 text-xs font-medium text-[#8dacff]">new</span>
                 ) : null}
                 <div className="flex items-center gap-2">
                   <button

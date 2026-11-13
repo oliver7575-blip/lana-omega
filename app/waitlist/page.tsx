@@ -43,8 +43,8 @@ export default function WaitlistPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-8">
-      <h1 className="font-serif text-4xl italic text-white">Waitlist</h1>
+    <div className="w-full max-w-4xl">
+      <h1 className="text-[20px] font-semibold leading-tight tracking-tight text-white">Waitlist</h1>
       <p className="mt-1 text-sm text-navy/55">Guests waiting for dates that were full. {entries.length > 0 && `${entries.length} waiting.`}</p>
 
       {error && <p className="mt-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>}

@@ -159,7 +159,7 @@ export default function IntegrationsPage() {
         return (
           <div
             key={def.type}
-            style={{ border: '1px solid #232a40', borderRadius: 8, padding: 16, marginBottom: 16 }}
+            style={{ border: '1px solid #34508f', borderRadius: 8, padding: 16, marginBottom: 16 }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>

@@ -39,7 +39,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
 
   if (!conversation || !staff) {
     return (
-      <main className="px-10 py-10">
+      <main>
         <Link href="/inbox" className="text-navy/60 hover:text-navy">← Back to Inbox</Link>
         <p className="mt-6 text-navy/70">Conversation not found.</p>
       </main>
@@ -104,10 +104,10 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
       ? { label: 'human takeover', cls: 'bg-purple-500/15 text-purple-300' }
       : conversation.status === 'closed'
         ? { label: 'closed', cls: 'bg-white/10 text-navy/60' }
-        : { label: 'new', cls: 'bg-[#1b2340] text-[#8dacff]' }
+        : { label: 'new', cls: 'bg-[#1d3a78] text-[#8dacff]' }
 
   return (
-    <main className="flex min-h-screen flex-col md:h-screen">
+    <main className="flex min-h-[calc(100vh-4rem)] flex-col md:h-[calc(100vh-4rem)]">
       <LiveRefresh tables={['messages', 'conversations', 'escalations']} pollMs={15000} />
       <header className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-5 py-4 md:px-8">
         <div className="min-w-0">

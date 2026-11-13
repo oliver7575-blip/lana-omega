@@ -90,7 +90,7 @@ export default function StaffPage() {
         <div
           key={s.id}
           style={{
-            border: '1px solid #232a40',
+            border: '1px solid #34508f',
             borderRadius: 8,
             padding: 12,
             marginBottom: 8,
@@ -113,7 +113,7 @@ export default function StaffPage() {
           + Invite staff member
         </button>
       ) : (
-        <div style={{ marginTop: 16, border: '1px solid #232a40', borderRadius: 8, padding: 16 }}>
+        <div style={{ marginTop: 16, border: '1px solid #34508f', borderRadius: 8, padding: 16 }}>
           <div style={{ marginBottom: 8 }}>
             <label>Full name</label>
             <br />

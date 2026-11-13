@@ -72,7 +72,7 @@ export default function ConversationControls({
 
   if (status === 'closed') {
     return (
-      <div style={{ marginTop: 16, borderTop: '1px solid #232a40', paddingTop: 16 }}>
+      <div style={{ marginTop: 16, borderTop: '1px solid #34508f', paddingTop: 16 }}>
         <p style={{ color: 'rgba(231,233,240,0.55)' }}>This conversation is closed.</p>
         <button onClick={handleReopen}>Reopen</button>
       </div>
@@ -80,11 +80,11 @@ export default function ConversationControls({
   }
 
   return (
-    <div style={{ marginTop: 16, borderTop: '1px solid #232a40', paddingTop: 16 }}>
+    <div style={{ marginTop: 16, borderTop: '1px solid #34508f', paddingTop: 16 }}>
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         <button
           onClick={toggleTakeover}
-          style={{ background: status === 'human_takeover' ? 'rgba(239,68,68,0.15)' : '#141a2e' }}
+          style={{ background: status === 'human_takeover' ? 'rgba(239,68,68,0.15)' : '#16285c' }}
         >
           {status === 'human_takeover'
             ? '✓ You have taken over — click to hand back to AI'

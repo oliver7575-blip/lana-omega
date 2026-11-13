@@ -451,7 +451,7 @@ export default function SettingsPage() {
       {kbMessage && <p>{kbMessage}</p>}
 
       {canEdit && (
-        <div style={{ marginTop: 32, border: '1px solid #232a40', borderRadius: 8, padding: 16 }}>
+        <div style={{ marginTop: 32, border: '1px solid #34508f', borderRadius: 8, padding: 16 }}>
           <h2 style={{ marginTop: 0, fontSize: 18 }}>Staff escalation contacts</h2>
           <p style={{ fontSize: 13, color: 'rgba(231,233,240,0.55)', marginTop: 0 }}>
             WhatsApp numbers your AI concierge will message directly when a guest needs staff
@@ -463,7 +463,7 @@ export default function SettingsPage() {
           {contacts.map((c, i) => (
             <div
               key={i}
-              style={{ border: '1px solid #232a40', borderRadius: 6, padding: 10, marginBottom: 8 }}
+              style={{ border: '1px solid #34508f', borderRadius: 6, padding: 10, marginBottom: 8 }}
             >
               <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
                 <input
@@ -508,7 +508,7 @@ export default function SettingsPage() {
       )}
 
       {canEdit && (
-        <div style={{ marginTop: 32, border: '1px solid #232a40', borderRadius: 8, padding: 16 }}>
+        <div style={{ marginTop: 32, border: '1px solid #34508f', borderRadius: 8, padding: 16 }}>
           <h2 style={{ marginTop: 0, fontSize: 18 }}>Post-stay messages</h2>
           <p style={{ fontSize: 13, color: 'rgba(231,233,240,0.55)', marginTop: 0 }}>
             When on, guests get a feedback message (WhatsApp and/or email) the day after
@@ -528,7 +528,7 @@ export default function SettingsPage() {
       )}
 
       {canEdit && (
-        <div style={{ marginTop: 32, border: '1px solid #232a40', borderRadius: 8, padding: 16 }}>
+        <div style={{ marginTop: 32, border: '1px solid #34508f', borderRadius: 8, padding: 16 }}>
           <h2 style={{ marginTop: 0, fontSize: 18 }}>Booking link</h2>
           <p style={{ fontSize: 13, color: 'rgba(231,233,240,0.55)', marginTop: 0 }}>
             Lets your AI concierge send guests a real link to check availability and book.
@@ -574,7 +574,7 @@ export default function SettingsPage() {
       )}
 
       {canEdit && (
-        <div style={{ marginTop: 32, border: '1px solid #232a40', borderRadius: 8, padding: 16 }}>
+        <div style={{ marginTop: 32, border: '1px solid #34508f', borderRadius: 8, padding: 16 }}>
           <h2 style={{ marginTop: 0, fontSize: 18 }}>Test your concierge</h2>
           <p style={{ fontSize: 13, color: 'rgba(231,233,240,0.55)', marginTop: 0 }}>
             Chats using the persona and knowledge base boxes above, even if you haven't saved them. Nothing here is
@@ -585,7 +585,7 @@ export default function SettingsPage() {
 
           <div
             style={{
-              border: '1px solid #232a40',
+              border: '1px solid #34508f',
               borderRadius: 8,
               minHeight: 120,
               maxHeight: 320,
@@ -607,7 +607,7 @@ export default function SettingsPage() {
                     padding: '8px 12px',
                     borderRadius: 8,
                     maxWidth: '85%',
-                    background: m.role === 'user' ? '#1f2848' : '#141a2e',
+                    background: m.role === 'user' ? '#1f2848' : '#16285c',
                     whiteSpace: 'pre-wrap',
                     textAlign: 'left',
                   }}
@@ -644,7 +644,7 @@ export default function SettingsPage() {
         </div>
       )}
 
-      <div style={{ marginTop: 48, borderTop: '1px solid #232a40', paddingTop: 16 }}>
+      <div style={{ marginTop: 48, borderTop: '1px solid #34508f', paddingTop: 16 }}>
         <h2>Your account</h2>
         <form onSubmit={handleChangePassword}>
           <div style={{ marginBottom: 8 }}>

@@ -7,7 +7,7 @@ html {
   font-size: 14px;
 }
 body {
-  background: #0a0e1a;
+  background: #0a1230;
   color: #e7e9f0;
 }
 ::selection {
@@ -95,7 +95,7 @@ body {
   margin-bottom: 0.5rem;
 }
 .legacy-dark a {
-  color: #e0806f;
+  color: #6aa2ff;
 }
 .legacy-dark a:hover {
   text-decoration: underline;
@@ -105,15 +105,15 @@ body {
 }
 .legacy-dark [style*='border: 1px solid'],
 .legacy-dark [style*='border-radius: 8'] {
-  background-color: #141a2e;
-  border-color: #232a40 !important;
+  background-color: #16285c;
+  border-color: #34508f !important;
 }
 .legacy-dark input:not([type='checkbox']):not([type='radio']),
 .legacy-dark textarea,
 .legacy-dark select {
-  background: #0a0e1a !important;
+  background: #0f1c42 !important;
   color: #e7e9f0 !important;
-  border: 1px solid #232a40 !important;
+  border: 1px solid #34508f !important;
   border-radius: 6px;
   padding: 4px 8px !important;
   font-size: 12.5px !important;
@@ -122,7 +122,7 @@ body {
 .legacy-dark input:focus,
 .legacy-dark textarea:focus,
 .legacy-dark select:focus {
-  border-color: #e0806f !important;
+  border-color: #6aa2ff !important;
 }
 .legacy-dark input::placeholder,
 .legacy-dark textarea::placeholder {
@@ -130,20 +130,20 @@ body {
 }
 .legacy-dark input[type='checkbox'],
 .legacy-dark input[type='radio'] {
-  accent-color: #e0806f;
+  accent-color: #6aa2ff;
 }
 .legacy-dark button {
-  background: #1b2340;
+  background: #1d3a78;
   color: #e7e9f0;
-  border: 1px solid #232a40;
+  border: 1px solid #34508f;
   border-radius: 6px;
   padding: 4px 10px !important;
   font-size: 12px !important;
   cursor: pointer;
 }
 .legacy-dark button:hover:not(:disabled) {
-  background: #e0806f;
-  border-color: #e0806f;
+  background: #6aa2ff;
+  border-color: #6aa2ff;
   color: #fff;
 }
 .legacy-dark button:disabled {
@@ -154,13 +154,13 @@ body {
 }
 .legacy-dark th,
 .legacy-dark td {
-  border-bottom: 1px solid #232a40;
+  border-bottom: 1px solid #34508f;
   padding: 6px 10px;
   text-align: left;
 }
 .legacy-dark pre,
 .legacy-dark code {
-  background: #0a0e1a;
+  background: #0f1c42;
   color: #e7e9f0;
 }
 

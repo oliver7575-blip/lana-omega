@@ -74,8 +74,8 @@ export default function ReviewsPage() {
   const unreadVisible = visible.filter((r) => !r.read)
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 sm:px-8">
-      <h1 className="font-serif text-4xl italic text-white">Reviews</h1>
+    <div className="w-full">
+      <h1 className="text-[20px] font-semibold leading-tight tracking-tight text-white">Reviews</h1>
       <p className="mt-1 text-sm text-navy/55">Guest reviews and feedback — from booking sites and guest emails, and from what guests tell Lana on WhatsApp, Instagram and the website chat.</p>
 
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
