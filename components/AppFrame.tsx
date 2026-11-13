@@ -75,8 +75,10 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
   // and tucks away again once the pointer moves off it. It is a rounded panel inset like the calendar card, covering just the strip the calendar's
   // room column (and the Soirée wordmark above it) occupies, so it covers only that space.
   const focus = pathname === '/cloudbeds' || pathname.startsWith('/cloudbeds/calendar') || pathname.startsWith('/reservations')
+  // The reservations list keeps the panel pinned open and moves the page content over instead.
+  const pinned = pathname.startsWith('/reservations')
   useEffect(() => {
-    if (!focus) { setPeek(false); return }
+    if (!focus || pinned) { setPeek(false); return }
     const onMove = (e: MouseEvent) => {
       if (e.clientX <= 10) setPeek(true)
       else if (e.clientX > 180) setPeek(false)
@@ -85,7 +87,7 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
     window.addEventListener('mousemove', onMove)
     document.documentElement.addEventListener('mouseleave', onLeave)
     return () => { window.removeEventListener('mousemove', onMove); document.documentElement.removeEventListener('mouseleave', onLeave) }
-  }, [focus])
+  }, [focus, pinned])
 
   if (pathname.startsWith('/login')) return <>{children}</>
 
@@ -259,7 +261,7 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
       </div>
       {open && <div className="fixed inset-0 z-30 bg-black/60 md:hidden" onClick={() => setOpen(false)} />}
       {focus && (
-        <span className={`pointer-events-none fixed left-0 top-1/2 z-50 h-16 w-[3px] -translate-y-1/2 rounded-r-full bg-white/30 transition-opacity ${peek ? 'opacity-0' : 'opacity-100'}`} aria-hidden="true" />
+        <span className={`pointer-events-none fixed left-0 top-1/2 z-50 h-16 w-[3px] -translate-y-1/2 rounded-r-full bg-white/30 transition-opacity ${peek || pinned ? 'opacity-0' : 'opacity-100'}`} aria-hidden="true" />
       )}
       <aside
         style={focus ? { background: HOLO_BG } : undefined}
@@ -268,7 +270,7 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
             ? // On the calendar the menu is a floating panel with the same rounded shape as the calendar card:
               // inset 12px from the window edge, 161px wide (just the room-column strip), sliding in over it.
               `md:inset-y-3 md:left-3 md:z-50 md:w-[161px] md:overflow-hidden md:rounded-2xl md:border md:border-[#8fb4ff]/25 ${
-                peek ? 'md:translate-x-0 md:shadow-[0_18px_50px_rgba(0,0,0,.5)]' : 'md:-translate-x-[calc(100%+24px)]'
+                peek || pinned ? 'md:translate-x-0 md:shadow-[0_18px_50px_rgba(0,0,0,.5)]' : 'md:-translate-x-[calc(100%+24px)]'
               } ${open ? 'translate-x-0' : '-translate-x-full'}`
             : `md:sticky md:top-0 md:h-screen md:w-52 md:shrink-0 md:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`
         }`}
@@ -276,7 +278,7 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
         {sidebar}
       </aside>
 
-      <div className="min-w-0 flex-1">
+      <div className={`min-w-0 flex-1 ${pinned ? 'md:pl-[185px]' : ''}`}>
         {legacy ? (
           <div className="legacy-dark px-5 py-6 md:px-8">{children}</div>
         ) : (

@@ -69,10 +69,6 @@ export default function ReservationsList() {
     <div className="p-2 md:p-3">
       <div className="min-h-[calc(100vh-1.5rem)] min-w-0 rounded-2xl p-3 text-[#eaf0fb] antialiased" style={{ background: HOLO_BG }}>
       <div className="mb-3 flex flex-wrap items-center gap-3">
-        <div className="flex h-10 shrink-0 items-center justify-center" style={{ width: 149 }}>
-          <Link href="/cloudbeds" className="font-display text-[40px] font-semibold italic leading-none tracking-tight text-white">Soirée</Link>
-        </div>
-        <div className="h-9 w-px bg-[#8fb4ff]/25" />
         <div className="mr-2">
           <h1 className="text-[20px] font-semibold leading-tight tracking-tight text-white">Reservations</h1>
           <p className="text-[11.5px] text-[#9fb3dc]">Newest bookings first • grouped by day booked</p>
