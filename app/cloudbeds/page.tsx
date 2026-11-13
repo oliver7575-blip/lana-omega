@@ -339,7 +339,7 @@ export default function DashviewPage() {
         </div>
 
         {/* Insights */}
-        <div className="mb-3 grid gap-3 xl:grid-cols-3">
+        <div className="mb-3 grid gap-3 xl:grid-cols-2">
           <Card title="Next 14 nights" sub={ins ? `${ins.totalRooms} rooms • avg rate ${ins.avgRate ? mxn(ins.avgRate) : '—'} / night` : undefined}>
             {!ins ? <p className="py-6 text-center text-[12.5px] text-[#9fb3dc]">Loading…</p> : (
               <div className="flex h-[150px] items-end gap-1.5">
@@ -376,30 +376,10 @@ export default function DashviewPage() {
             )}
           </Card>
 
-          <Card title="Needs attention">
-            {!ins ? <p className="py-6 text-center text-[12.5px] text-[#9fb3dc]">Loading…</p> : (
-              <ul className="space-y-1.5 text-[12.5px]">
-                {[
-                  { n: ins.dueList.length, l: 'with a balance due', c: '#ff6b75', ids: ins.dueList.map((b) => b.reservationID) },
-                  { n: ins.unconfirmed.length, l: 'not confirmed yet', c: AMBER, ids: ins.unconfirmed.map((b) => b.reservationID) },
-                  { n: cal?.unassigned.length ?? 0, l: 'without a room assigned', c: '#a58cff', ids: (cal?.unassigned ?? []).map((u) => u.reservationID) },
-                  { n: cal?.overbookings.length ?? 0, l: 'overbooked rooms', c: '#ff6b75', ids: (cal?.overbookings ?? []).flatMap((o) => o.reservationIDs) },
-                  { n: ins.blockCount, l: 'blocked date ranges', c: GREY, ids: [] as string[] },
-                ].map((x) => (
-                  <li key={x.l}>
-                    <button disabled={!x.ids.length} onClick={() => x.ids[0] && setOpen(x.ids[0])} className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left enabled:hover:bg-white/[0.06]">
-                      <span className="flex h-6 min-w-[28px] items-center justify-center rounded-full px-2 text-[12px] font-bold" style={{ background: x.n ? `${x.c}33` : 'rgba(255,255,255,.06)', color: x.n ? x.c : '#7f93bf' }}>{x.n}</span>
-                      <span className={x.n ? 'text-[#eaf0fb]' : 'text-[#7f93bf]'}>{x.l}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
         </div>
 
-        <div className="mb-3 grid gap-3 xl:grid-cols-3">
-          <Card title="Where bookings come from" sub="Active and upcoming stays, next 30 days" className="xl:col-span-2">
+        <div className="mb-3 grid gap-3">
+          <Card title="Where bookings come from" sub="Active and upcoming stays, next 30 days">
             {!ins ? <p className="py-6 text-center text-[12.5px] text-[#9fb3dc]">Loading…</p> : ins.srcList.length === 0 ? (
               <p className="py-6 text-center text-[12.5px] text-[#9fb3dc]">None available</p>
             ) : (
@@ -415,21 +395,6 @@ export default function DashviewPage() {
                   </li>
                 ))}
               </ul>
-            )}
-          </Card>
-          <Card title="Next 30 days">
-            {!ins ? <p className="py-6 text-center text-[12.5px] text-[#9fb3dc]">Loading…</p> : (
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { v: ins.nights, l: 'Room nights booked' },
-                  { v: ins.upcoming.length, l: 'Arrivals in 14 days' },
-                ].map((x) => (
-                  <div key={x.l} className={`rounded-xl border ${LINE} bg-[#0f1c42]/40 px-3.5 py-2.5`}>
-                    <p className="text-[20px] font-semibold leading-none text-white">{x.v}</p>
-                    <p className="mt-1.5 text-[11.5px] font-medium text-[#9fb3dc]">{x.l}</p>
-                  </div>
-                ))}
-              </div>
             )}
           </Card>
         </div>
