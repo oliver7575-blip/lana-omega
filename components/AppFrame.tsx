@@ -184,7 +184,7 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
     <nav className={`flex h-full flex-col ${focus ? 'pb-5 pl-[11px] pr-3 pt-[15px]' : 'px-3 py-6'}`}>
       {focus ? (
         // Same Soirée wordmark, in the same spot, as the calendar header underneath (centred over its 149px room column).
-        <div className="mb-4 flex h-10 shrink-0 items-center justify-center" style={{ width: 149 }}>
+        <div className="mb-4 flex h-10 shrink-0 items-center justify-center" style={{ width: 165 }}>
           <Link href="/cloudbeds" className="font-display text-[40px] font-semibold italic leading-none tracking-tight text-white">Soirée</Link>
         </div>
       ) : null}
@@ -272,7 +272,7 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
           focus
             ? // On the calendar the menu is a floating panel with the same rounded shape as the calendar card:
               // inset 12px from the window edge, 161px wide (just the room-column strip), sliding in over it.
-              `md:inset-y-3 md:left-3 md:z-50 md:w-[161px] md:overflow-hidden md:rounded-2xl md:border md:border-[#8fb4ff]/25 ${
+              `md:inset-y-3 md:left-3 md:z-50 md:w-[178px] md:overflow-hidden md:rounded-2xl md:border md:border-[#8fb4ff]/25 ${
                 peek || pinned ? 'md:translate-x-0 md:shadow-[0_18px_50px_rgba(0,0,0,.5)]' : 'md:-translate-x-[calc(100%+24px)]'
               } ${open ? 'translate-x-0' : '-translate-x-full'}`
             : `md:sticky md:top-0 md:h-screen md:w-52 md:shrink-0 md:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`
@@ -281,7 +281,7 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
         {sidebar}
       </aside>
 
-      <div className={`min-w-0 flex-1 ${pinned ? 'md:pl-[185px]' : ''}`}>
+      <div className={`min-w-0 flex-1 ${pinned ? 'md:pl-[202px]' : ''}`}>
         {selfStyled ? (
           children
         ) : (

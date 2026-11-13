@@ -24,7 +24,7 @@ interface Chunk {
   blocks: Block[]
 }
 
-const LEFT_W = 148
+const LEFT_W = 164
 const ROW_H = 32
 const SPANS = [{ days: 7, label: '1w' }, { days: 14, label: '2w' }, { days: 21, label: '3w' }, { days: 30, label: '1m' }] as const
 const DEFAULT_SPAN = 21 // days that fit on screen by default
@@ -520,7 +520,7 @@ export default function CalendarPage() {
             <div className="flex shrink-0 items-center justify-center" style={{ width: LEFT_W + 1 }}>
               <Link href="/cloudbeds" title="Back to the dashboard" className="font-display text-[40px] font-semibold italic leading-none tracking-tight text-white hover:opacity-90">Soirée</Link>
             </div>
-            <span className="mx-4 h-9 w-px bg-white/25" />
+            <span className="mr-4 h-9 w-px bg-white/25" />
             <div className="leading-none">
               <h1 className="text-[19px] font-semibold tracking-tight text-[#c9d3e0]">Calendar</h1>
               <p className="mt-1.5 flex items-center gap-1.5 whitespace-nowrap text-[10.5px] text-[#8a9bb0]">
