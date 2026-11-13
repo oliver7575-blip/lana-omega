@@ -214,3 +214,66 @@ export async function sendWhatsAppButtons(
     return { success: false, error: err instanceof Error ? err.message : 'Unknown error' }
   }
 }
+
+const FILE_TYPES: Record<string, 'image' | 'document'> = {
+  'image/jpeg': 'image',
+  'image/png': 'image',
+  'application/pdf': 'document',
+  'application/msword': 'document',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'document',
+  'application/vnd.ms-excel': 'document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'document',
+  'application/vnd.ms-powerpoint': 'document',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'document',
+  'text/plain': 'document',
+}
+
+export const WHATSAPP_FILE_TYPES = Object.keys(FILE_TYPES)
+
+/**
+ * Sends a file the staff member attached: uploads it to WhatsApp, then sends it as a photo
+ * (JPEG/PNG) or a document (PDF, Word, Excel, PowerPoint, text), with an optional caption.
+ */
+export async function sendWhatsAppFile(
+  phoneNumberId: string,
+  encryptedCredentials: EncryptedPayload,
+  to: string,
+  file: { bytes: ArrayBuffer; mime: string; filename: string },
+  caption?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const kind = FILE_TYPES[file.mime]
+    if (!kind) return { success: false, error: `WhatsApp can't send this kind of file (${file.mime || 'unknown'}). Use a JPEG/PNG photo, PDF, Word, Excel, PowerPoint or text file.` }
+    if (kind === 'image' && file.bytes.byteLength > 5 * 1024 * 1024) return { success: false, error: "Photo is over WhatsApp's 5 MB limit" }
+    const { access_token } = decryptCredentials<WhatsAppCredentials>(encryptedCredentials)
+
+    const form = new FormData()
+    form.append('messaging_product', 'whatsapp')
+    form.append('type', file.mime)
+    form.append('file', new Blob([file.bytes], { type: file.mime }), file.filename)
+    const upload = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/media`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${access_token}` },
+      body: form,
+      signal: AbortSignal.timeout(30000),
+    })
+    if (!upload.ok) return { success: false, error: `WhatsApp media upload failed: ${upload.status} ${await upload.text()}` }
+    const { id: mediaId } = (await upload.json()) as { id?: string }
+    if (!mediaId) return { success: false, error: 'WhatsApp media upload returned no id' }
+
+    const cap = caption ? toWhatsAppFormat(caption) : undefined
+    const payload = kind === 'image'
+      ? { type: 'image', image: { id: mediaId, ...(cap ? { caption: cap } : {}) } }
+      : { type: 'document', document: { id: mediaId, filename: file.filename, ...(cap ? { caption: cap } : {}) } }
+    const response = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messaging_product: 'whatsapp', to, ...payload }),
+      signal: AbortSignal.timeout(15000),
+    })
+    if (!response.ok) return { success: false, error: `WhatsApp file send failed: ${response.status} ${await response.text()}` }
+    return { success: true }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unknown error' }
+  }
+}

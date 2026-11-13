@@ -21,6 +21,8 @@ function Popup({ reservationId, guestName, onClose }: Props & { onClose: () => v
   const [err, setErr] = useState<string | null>(null)
   const [status, setStatus] = useState('active')
   const [channel, setChannel] = useState('whatsapp')
+  const [file, setFile] = useState<File | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
   const [ctlBusy, setCtlBusy] = useState<null | 'take' | 'hand' | 'answer'>(null)
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
@@ -62,7 +64,34 @@ function Popup({ reservationId, guestName, onClose }: Props & { onClose: () => v
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }) }, [msgs.length])
 
+  async function sendFile() {
+    if (!conv || !file || busy) return
+    setBusy(true)
+    setNote(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('caption', text)
+      const res = await fetch(`/api/conversations/${conv.conversationId}/attach`, { method: 'POST', body: fd })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error ?? 'Could not send the file')
+      if (j.deliveryResult && j.deliveryResult.success === false) {
+        setNote({ ok: false, text: `Saved, but WhatsApp didn't deliver it: ${j.deliveryResult.error}` })
+      } else {
+        setNote({ ok: true, text: 'File sent.' })
+      }
+      setFile(null)
+      setText('')
+      if (fileRef.current) fileRef.current.value = ''
+      await load(conv)
+    } catch (e) {
+      setNote({ ok: false, text: e instanceof Error ? e.message : 'Could not send the file' })
+    }
+    setBusy(false)
+  }
+
   async function send() {
+    if (file) return sendFile()
     if (!conv || !text.trim() || busy) return
     setBusy(true)
     setNote(null)
@@ -187,12 +216,25 @@ function Popup({ reservationId, guestName, onClose }: Props & { onClose: () => v
             </div>
           </div>
         )}
+        {file && (
+          <div className="flex items-center gap-2 rounded-xl border border-[#c3e5db] bg-[#f0faf6] px-2.5 py-1.5 text-[12px]">
+            <span>📎</span>
+            <span className="min-w-0 flex-1 truncate font-medium">{file.name}</span>
+            <span className="shrink-0 text-[#667085]">{file.size < 1024 * 1024 ? `${Math.max(1, Math.round(file.size / 1024))} KB` : `${(file.size / 1024 / 1024).toFixed(1)} MB`}</span>
+            <button onClick={() => { setFile(null); if (fileRef.current) fileRef.current.value = '' }} aria-label="Remove file" className="shrink-0 text-base leading-none text-[#667085] hover:text-[#14213d]">×</button>
+          </div>
+        )}
         <div className="flex items-end gap-2">
+          <input ref={fileRef} type="file" hidden accept="image/jpeg,image/png,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+            onChange={(e) => { const f = e.target.files?.[0] ?? null; if (f && f.size > 4 * 1024 * 1024) { setNote({ ok: false, text: 'That file is over 4 MB. Choose a smaller one.' }); e.target.value = ''; return } setNote(null); setFile(f) }} />
+          <button type="button" disabled={!conv || !conv.windowOpen || busy} onClick={() => fileRef.current?.click()}
+            title={conv && !conv.windowOpen ? 'Files can be sent once the guest has written in the last 24 hours' : 'Attach a photo or document'}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#dde2ea] bg-white text-[15px] hover:bg-gray-50 disabled:opacity-40">📎</button>
           <textarea value={text} onChange={(e) => setText(e.target.value)} rows={2} disabled={!conv}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
-            placeholder={conv?.windowOpen === false ? 'Why are you writing? One short sentence.' : 'Write a message…'}
+            placeholder={conv?.windowOpen === false ? 'Why are you writing? One short sentence.' : file ? 'Add a caption (optional)…' : 'Write a message…'}
             className="min-w-0 flex-1 resize-none rounded-[14px] border border-[#dde2ea] px-3 py-2 text-[13px] outline-none focus:border-[#128c7e] focus:ring-2 focus:ring-[#128c7e]/15" />
-          <button disabled={!conv || !text.trim() || busy} onClick={send} className={`${priTeal} !h-9 !px-4 !text-[12.5px]`}>{busy ? '…' : 'Send'}</button>
+          <button disabled={!conv || (!text.trim() && !file) || busy} onClick={send} className={`${priTeal} !h-9 !px-4 !text-[12.5px]`}>{busy ? '…' : 'Send'}</button>
         </div>
         {note && <p className={`text-[12px] ${note.ok ? 'text-emerald-700' : 'text-red-600'}`}>{note.text}</p>}
       </div>
