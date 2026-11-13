@@ -34,7 +34,8 @@ export default function ReservationsList() {
   const [error, setError] = useState<string | null>(null)
   const [open, setOpen] = useState<string | null>(null)
   const [q, setQ] = useState('')
-  const today = new Date().toISOString().slice(0, 10)
+  // The hotel's calendar day (Zipolite = Mexico time), not UTC, so "Today" doesn't flip at 6 pm local.
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date())
 
   const load = useCallback(async (p: number, replace: boolean) => {
     setLoading(true)
