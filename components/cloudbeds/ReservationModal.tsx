@@ -419,12 +419,13 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
   const roomDigit = r?.rooms[0]?.roomName ? (r.rooms[0].roomName.match(/\d+/)?.[0] ?? r.rooms[0].roomName.slice(0, 3)) : '–'
   const bd = r?.breakdown
   const paidAmt = r ? (bd?.paid ?? (r.total !== null && r.balance !== null ? r.total - r.balance : null)) : null
-  const card = 'rounded-xl border border-[#8fb4ff]/25 bg-[#0f1c42]/40 px-3 py-2.5'
+  const card = 'rounded-xl border border-[#e4e0d4] bg-[#faf7f0] px-3 py-2.5 text-[#14213d] shadow-[0_2px_8px_rgba(0,0,0,.18)]'
+  const lblC = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[.12em] text-[#7a8394]'
   const row = 'flex justify-between gap-3 py-[2px] text-[12px]'
   const rowL = 'flex items-baseline gap-3 py-[2px] text-[12px]'
-  const lblL = 'w-[52px] shrink-0 text-[#9fb3dc]'
-  const mini = 'rounded-lg border border-[#8fb4ff]/25 px-2.5 py-2'
-  const chipSm = 'mr-2 inline-block rounded-full border border-[#8fb4ff]/35 px-1.5 align-middle text-[8px] font-medium uppercase leading-[14px] tracking-wide text-[#9fb3dc] hover:border-[#128c7e] hover:text-[#5fe0cf]'
+  const lblL = 'w-[52px] shrink-0 text-[#667085]'
+  const mini = 'rounded-lg border border-[#e4e0d4] bg-[#faf7f0] px-2.5 py-2 text-[#14213d]'
+  const chipSm = 'mr-2 inline-block rounded-full border border-[#d0d5dd] px-1.5 align-middle text-[8px] font-medium uppercase leading-[14px] tracking-wide text-[#667085] hover:border-[#128c7e] hover:text-[#5fe0cf]'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#050b1f]/60 p-4" onClick={onClose}>
@@ -715,28 +716,28 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
             {panelOpen ? (
               /* Collapsed summary while a panel is open */
               <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-                <div className={mini}><p className="text-[11px] font-semibold uppercase tracking-[.06em] text-[#9fb3dc]">Room</p><p className="mt-0.5 text-[13.5px] font-semibold">{roomNames}</p></div>
-                <div className={mini}><p className="text-[11px] font-semibold uppercase tracking-[.06em] text-[#9fb3dc]">Total</p><p className="mt-0.5 text-[13.5px] font-semibold">{money(r.total)}</p></div>
-                <div className={mini}><p className="text-[11px] font-semibold uppercase tracking-[.06em] text-[#9fb3dc]">Paid</p><p className="mt-0.5 text-[13.5px] font-semibold text-[#3ccf8a]">{money(paidAmt)}</p></div>
-                <div className={mini}><p className="text-[11px] font-semibold uppercase tracking-[.06em] text-[#9fb3dc]">Arrival</p><p className="mt-0.5 text-[13.5px] font-semibold">{r.estimatedArrivalTime || '—'}</p></div>
+                <div className={mini}><p className="text-[11px] font-semibold uppercase tracking-[.06em] text-[#667085]">Room</p><p className="mt-0.5 text-[13.5px] font-semibold">{roomNames}</p></div>
+                <div className={mini}><p className="text-[11px] font-semibold uppercase tracking-[.06em] text-[#667085]">Total</p><p className="mt-0.5 text-[13.5px] font-semibold">{money(r.total)}</p></div>
+                <div className={mini}><p className="text-[11px] font-semibold uppercase tracking-[.06em] text-[#667085]">Paid</p><p className="mt-0.5 text-[13.5px] font-semibold text-[#0e6b4a]">{money(paidAmt)}</p></div>
+                <div className={mini}><p className="text-[11px] font-semibold uppercase tracking-[.06em] text-[#667085]">Arrival</p><p className="mt-0.5 text-[13.5px] font-semibold">{r.estimatedArrivalTime || '—'}</p></div>
               </div>
             ) : (
               <div className="grid gap-2.5 sm:grid-cols-2">
                 {/* Room */}
                 <div className={card}>
-                  <p className={lbl}>{r.rooms.length > 1 ? `Rooms (${r.rooms.length})` : 'Room'}</p>
+                  <p className={lblC}>{r.rooms.length > 1 ? `Rooms (${r.rooms.length})` : 'Room'}</p>
                   <div className="space-y-2">
                     {(r.rooms.length ? r.rooms : [{ roomName: null, roomTypeName: '—' } as Detail['rooms'][number]]).map((x, i) => (
                       <div key={i} className="flex items-center gap-3">
-                        <div className="flex h-8 min-w-[32px] shrink-0 items-center justify-center rounded-lg bg-[#5b95f5]/25 px-1.5 text-[14px] font-bold text-[#8fb4ff]">
+                        <div className="flex h-8 min-w-[32px] shrink-0 items-center justify-center rounded-lg bg-[#e3edff] px-1.5 text-[14px] font-bold text-[#1d4ed8]">
                           {x.roomName ? (x.roomName.match(/\d+/)?.[0] ?? x.roomName.slice(0, 3)) : '–'}
                         </div>
                         <div className="min-w-0">
                           <p className="truncate text-[13px] font-bold">{x.roomName ?? 'Not assigned'}</p>
-                          <p className="truncate text-[11px] text-[#9fb3dc]">{x.roomTypeName}</p>
+                          <p className="truncate text-[11px] text-[#667085]">{x.roomTypeName}</p>
                         </div>
                         {r.rooms.length > 1 && (
-                          <p className="ml-auto shrink-0 whitespace-nowrap rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-[#cfdcff]">
+                          <p className="ml-auto shrink-0 whitespace-nowrap rounded-full bg-[#eceef2] px-2 py-0.5 text-[11px] font-semibold text-[#475467]">
                             {(x.adults ?? 0) + (x.children ?? 0)} guest{(x.adults ?? 0) + (x.children ?? 0) === 1 ? '' : 's'}
                             {(x.children ?? 0) > 0 ? ` · ${x.adults ?? 0}A ${x.children}C` : ''}
                           </p>
@@ -744,60 +745,60 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                       </div>
                     ))}
                   </div>
-                  <div className="mt-2 border-t border-[#8fb4ff]/15 pt-2">
-                    <div className={row}><span className="text-[#9fb3dc]">Guests</span><span>{r.adults} adult{r.adults === 1 ? '' : 's'} · {r.children} child{r.children === 1 ? '' : 'ren'}</span></div>
+                  <div className="mt-2 border-t border-[#e4e0d4] pt-2">
+                    <div className={row}><span className="text-[#667085]">Guests</span><span>{r.adults} adult{r.adults === 1 ? '' : 's'} · {r.children} child{r.children === 1 ? '' : 'ren'}</span></div>
                   </div>
                 </div>
 
                 {/* Price */}
                 <div className={card}>
-                  <div className="flex justify-between"><p className={lbl}>Price breakdown</p><span className={`text-xs font-semibold ${owes ? 'text-[#ff6b75]' : 'text-[#3ccf8a]'}`}>{owes ? 'Unpaid' : 'Paid'}</span></div>
-                  {bd?.subTotal != null && <div className={row}><span className="text-[#9fb3dc]">Room · {nights} night{nights === 1 ? '' : 's'}</span><span>{money(bd.subTotal)}</span></div>}
-                  {bd?.additionalItems != null && bd.additionalItems !== 0 && <div className={row}><span className="text-[#9fb3dc]">Extras</span><span>{money(bd.additionalItems)}</span></div>}
-                  {bd?.taxesFees != null && <div className={row}><span className="text-[#9fb3dc]">Taxes &amp; fees</span><span>{money(bd.taxesFees)}</span></div>}
-                  <div className={`${row} mt-1 border-t border-[#8fb4ff]/25 pt-2.5 font-bold`}><span>Grand total</span><span>{money(r.total)}</span></div>
-                  <div className={row}><span className="text-[#9fb3dc]">Paid</span><span className="font-semibold text-[#3ccf8a]">{money(paidAmt)}</span></div>
-                  <div className="mt-1.5 h-1.5 rounded-full bg-white/10"><i className="block h-full rounded-full bg-[#1f9d78]" style={{ width: `${r.total ? Math.min(100, Math.max(0, ((paidAmt ?? 0) / r.total) * 100)) : 0}%` }} /></div>
+                  <div className="flex justify-between"><p className={lblC}>Price breakdown</p><span className={`text-xs font-semibold ${owes ? 'text-[#b42318]' : 'text-[#0e6b4a]'}`}>{owes ? 'Unpaid' : 'Paid'}</span></div>
+                  {bd?.subTotal != null && <div className={row}><span className="text-[#667085]">Room · {nights} night{nights === 1 ? '' : 's'}</span><span>{money(bd.subTotal)}</span></div>}
+                  {bd?.additionalItems != null && bd.additionalItems !== 0 && <div className={row}><span className="text-[#667085]">Extras</span><span>{money(bd.additionalItems)}</span></div>}
+                  {bd?.taxesFees != null && <div className={row}><span className="text-[#667085]">Taxes &amp; fees</span><span>{money(bd.taxesFees)}</span></div>}
+                  <div className={`${row} mt-1 border-t border-[#e4e0d4] pt-2.5 font-bold`}><span>Grand total</span><span>{money(r.total)}</span></div>
+                  <div className={row}><span className="text-[#667085]">Paid</span><span className="font-semibold text-[#0e6b4a]">{money(paidAmt)}</span></div>
+                  <div className="mt-1.5 h-1.5 rounded-full bg-[#eceef2]"><i className="block h-full rounded-full bg-[#1f9d78]" style={{ width: `${r.total ? Math.min(100, Math.max(0, ((paidAmt ?? 0) / r.total) * 100)) : 0}%` }} /></div>
                 </div>
 
                 {/* Guest */}
                 <div className={card}>
-                  <p className={lbl}>Guest</p>
+                  <p className={lblC}>Guest</p>
                   {r.guestPhone && (
                     <div className={rowL}><span className={lblL}>Phone</span>
                       <span><button onClick={() => openQuick('whatsapp')} title="Send a WhatsApp message" className={chipSm}>message</button>
-                        <button onClick={() => openQuick('whatsapp')} title="Send a WhatsApp message" className="font-medium text-[#8fb4ff] hover:underline">{r.guestPhone}</button></span>
+                        <button onClick={() => openQuick('whatsapp')} title="Send a WhatsApp message" className="font-medium text-[#1d4ed8] hover:underline">{r.guestPhone}</button></span>
                     </div>
                   )}
                   {r.guestEmail && (
                     <div className={rowL}><span className={lblL}>Email</span>
                       <span className="min-w-0 break-all"><button onClick={() => openQuick('email')} title="Send an email" className={chipSm}>email</button>
-                        <button onClick={() => openQuick('email')} title="Send an email" className="break-all font-medium text-[#8fb4ff] hover:underline">{r.guestEmail}</button></span>
+                        <button onClick={() => openQuick('email')} title="Send an email" className="break-all font-medium text-[#1d4ed8] hover:underline">{r.guestEmail}</button></span>
                     </div>
                   )}
                   {r.guestCountry && <div className={rowL}><span className={lblL}>Country</span><span>{countryName(r.guestCountry)}</span></div>}
-                  {!r.guestPhone && !r.guestEmail && <p className="py-1 text-sm text-[#9fb3dc]">No contact details</p>}
+                  {!r.guestPhone && !r.guestEmail && <p className="py-1 text-sm text-[#667085]">No contact details</p>}
                 </div>
 
                 {/* Requests & notes */}
                 <div className={card}>
-                  <p className={lbl}>Requests &amp; notes</p>
+                  <p className={lblC}>Requests &amp; notes</p>
                   {r.specialRequests ? (
-                    <div className="rounded-[10px] border border-[#f0b548]/40 bg-[#f0b548]/15 px-3 py-2.5 text-[13px] leading-snug">
-                      <p className="text-[10.5px] font-bold uppercase tracking-[.07em] text-[#f0b548]">Special request</p>
+                    <div className="rounded-[10px] border border-[#f0d9a0] bg-[#fff3d6] px-3 py-2.5 text-[13px] leading-snug">
+                      <p className="text-[10.5px] font-bold uppercase tracking-[.07em] text-[#a8741c]">Special request</p>
                       <p className="whitespace-pre-wrap">{r.specialRequests}</p>
                     </div>
-                  ) : notes.length === 0 ? <p className="text-[13px] text-[#8ea3cf]">No special requests</p> : null}
+                  ) : notes.length === 0 ? <p className="text-[13px] text-[#8a93a3]">No special requests</p> : null}
                   {notes.length > 0 ? (
                     <div className={`${r.specialRequests ? "mt-2" : ""} max-h-32 space-y-1.5 overflow-y-auto`}>
                       {notes.map((n, i) => (
-                        <div key={i} className="rounded-[10px] bg-white/[0.06] px-3 py-2 text-[13px]">
+                        <div key={i} className="rounded-[10px] bg-[#f3f1ea] px-3 py-2 text-[13px]">
                           <p className="whitespace-pre-wrap">{n.text}</p>
-                          <p className="mt-0.5 text-[11px] text-[#9fb3dc]">{[n.author, n.date.slice(0, 16)].filter(Boolean).join(' · ')}</p>
+                          <p className="mt-0.5 text-[11px] text-[#667085]">{[n.author, n.date.slice(0, 16)].filter(Boolean).join(' · ')}</p>
                         </div>
                       ))}
                     </div>
-                  ) : r.specialRequests ? <p className="mt-2 text-xs text-[#8ea3cf]">No internal notes yet</p> : null}
+                  ) : r.specialRequests ? <p className="mt-2 text-xs text-[#8a93a3]">No internal notes yet</p> : null}
                 </div>
               </div>
             )}
