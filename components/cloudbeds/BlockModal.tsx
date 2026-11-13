@@ -49,28 +49,28 @@ export default function BlockModal({ block, roomName, roomTypeName, otherRooms, 
     }
   }
 
-  const row = 'flex justify-between gap-4 border-b border-[#eef0f4] py-2 text-sm last:border-0'
+  const row = 'flex justify-between gap-4 border-b border-[#8fb4ff]/20 py-2 text-sm last:border-0'
 
   return (
     <ModalShell tone="slate" title={roomName} subtitle={<>{roomTypeName} · <span className="font-semibold">{service ? 'Out of service' : 'Blocked'}</span></>} onClose={onClose} widthClass="max-w-md">
       <div>
-        <div className={row}><span className="text-gray-500">From</span><span className="font-medium">{nice(block.start)}</span></div>
-        <div className={row}><span className="text-gray-500">Free again from</span><span className="font-medium">{nice(free)}</span></div>
-        <div className={row}><span className="text-gray-500">Nights</span><span className="font-medium">{nights}</span></div>
-        <div className={row}><span className="text-gray-500">Reason</span><span className="font-medium">{block.reason || '—'}</span></div>
+        <div className={row}><span className="text-[#9fb3dc]">From</span><span className="font-medium">{nice(block.start)}</span></div>
+        <div className={row}><span className="text-[#9fb3dc]">Free again from</span><span className="font-medium">{nice(free)}</span></div>
+        <div className={row}><span className="text-[#9fb3dc]">Nights</span><span className="font-medium">{nights}</span></div>
+        <div className={row}><span className="text-[#9fb3dc]">Reason</span><span className="font-medium">{block.reason || '—'}</span></div>
       </div>
       {otherRooms.length > 0 && (
-        <p className="rounded-xl border border-[#f4e3a8] bg-[#fff9e8] px-3 py-2 text-[12.5px] text-[#6b4a0a]">
+        <p className="rounded-xl border border-[#f0b548]/40 bg-[#f0b548]/15 px-3 py-2 text-[12.5px] text-[#f5d58a]">
           This block also covers {otherRooms.join(', ')}. In Cloudbeds they share one block, so removing it frees them all.
         </p>
       )}
-      {!block.roomBlockID && <p className="rounded-xl bg-red-50 px-3 py-2 text-[12.5px] text-red-700">Cloudbeds didn&apos;t give this block an id, so it can only be removed in Cloudbeds.</p>}
-      {error && <p className="rounded-xl bg-red-50 px-3 py-2 text-[12.5px] text-red-700">{error}</p>}
+      {!block.roomBlockID && <p className="rounded-xl border border-[#ff6b75]/40 bg-[#ff6b75]/15 px-3 py-2 text-[12.5px] text-[#ffb3b8]">Cloudbeds didn&apos;t give this block an id, so it can only be removed in Cloudbeds.</p>}
+      {error && <p className="rounded-xl border border-[#ff6b75]/40 bg-[#ff6b75]/15 px-3 py-2 text-[12.5px] text-[#ffb3b8]">{error}</p>}
 
       {confirm === 'remove' && (
-        <div className="rounded-2xl border border-[#f1c9c4] bg-[#fff4f2] p-3.5">
-          <p className="text-sm font-bold text-[#8a2a22]">Remove this block?</p>
-          <p className="mt-1 text-sm text-[#8a2a22]">{roomName} becomes bookable again for these dates.</p>
+        <div className="rounded-2xl border border-[#ff6b75]/40 bg-[#ff6b75]/15 p-3.5">
+          <p className="text-sm font-bold text-[#ffb3b8]">Remove this block?</p>
+          <p className="mt-1 text-sm text-[#ffb3b8]">{roomName} becomes bookable again for these dates.</p>
           <div className="mt-3 flex justify-end gap-2.5">
             <button disabled={busy} onClick={() => setConfirm(null)} className={btnLg}>Keep it</button>
             <button disabled={busy} onClick={() => remove(onRemoved)} className={priRed}>{busy ? 'Removing…' : 'Yes, remove block'}</button>

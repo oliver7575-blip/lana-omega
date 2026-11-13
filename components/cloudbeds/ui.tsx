@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 /** Shared look for every Cloudbeds window: gradient headers, soft fields, pill buttons. */
 
 export const btn =
-  'inline-flex h-[34px] items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-[#dde2ea] bg-white px-3 text-[12.5px] font-medium text-[#1b2a3d] shadow-[0_1px_2px_rgba(16,24,40,.05)] transition hover:bg-gray-50 disabled:opacity-60'
+  'inline-flex h-[34px] items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-[#8fb4ff]/25 bg-white/[0.06] px-3 text-[12.5px] font-medium text-[#eaf0fb] transition hover:bg-white/[0.12] disabled:opacity-60'
 
 export const btnLg = btn.replace('h-[34px]', 'h-[38px]').replace('px-3', 'px-[18px]')
 
@@ -19,24 +19,24 @@ export const priTeal = `${priBase} bg-gradient-to-b from-[#1ba08f] to-[#128c7e] 
 export const priSlate = `${priBase} bg-gradient-to-b from-[#4a5568] to-[#2d3748] shadow-[0_4px_10px_rgba(45,55,72,.35),inset_0_1px_0_rgba(255,255,255,.2)]`
 
 export const field =
-  'h-9 w-full rounded-xl border border-[#dde2ea] bg-white px-3 text-[12.5px] font-normal text-[#14213d] shadow-[inset_0_1px_2px_rgba(16,24,40,.04)] outline-none focus:border-[#1f9d78] focus:ring-2 focus:ring-[#1f9d78]/15'
+  'h-9 w-full rounded-xl border border-[#8fb4ff]/25 bg-[#0f1c42]/60 px-3 text-[12.5px] font-normal text-[#eaf0fb] outline-none [color-scheme:dark] placeholder:text-[#8ea3cf] focus:border-[#3ccf8a] focus:ring-2 focus:ring-[#3ccf8a]/20'
 
 export const area =
-  'w-full resize-none rounded-[14px] border border-[#dde2ea] bg-white px-3.5 py-2.5 text-[13.5px] leading-relaxed text-[#14213d] shadow-[inset_0_1px_2px_rgba(16,24,40,.04)] outline-none focus:border-[#1f9d78] focus:ring-2 focus:ring-[#1f9d78]/15'
+  'w-full resize-none rounded-[14px] border border-[#8fb4ff]/25 bg-[#0f1c42]/60 px-3.5 py-2.5 text-[13.5px] leading-relaxed text-[#eaf0fb] outline-none [color-scheme:dark] placeholder:text-[#8ea3cf] focus:border-[#3ccf8a] focus:ring-2 focus:ring-[#3ccf8a]/20'
 
-export const lbl = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[.06em] text-[#7a8394]'
+export const lbl = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[.12em] text-[#9fb3dc]'
 
 export const chip = (on: boolean) =>
-  `rounded-full border px-3 py-1 text-xs transition ${on ? 'border-[#c3e5db] bg-[#e6f5f0] font-semibold text-[#0e5f47]' : 'border-[#dde2ea] bg-white text-[#475467] hover:bg-gray-50'}`
+  `rounded-full border px-3 py-1 text-xs transition ${on ? 'border-[#3ccf8a]/50 bg-[#3ccf8a]/20 font-semibold text-[#7be8b4]' : 'border-[#8fb4ff]/25 bg-white/[0.06] text-[#cfdcff] hover:bg-white/[0.12]'}`
 
 export type Tone = 'blue' | 'teal' | 'red' | 'amber' | 'slate'
 
 const HEADER: Record<Tone, string> = {
-  blue: 'from-[#0f2742] via-[#1b4d6b] to-[#1f7a6a]',
-  teal: 'from-[#0b3d36] via-[#0f6a5e] to-[#128c7e]',
-  red: 'from-[#4a1620] to-[#8a2a35]',
-  amber: 'from-[#5a3a0c] to-[#a8741c]',
-  slate: 'from-[#2a2f3a] to-[#4a5163]',
+  blue: 'from-[#1d3a78]/80 to-[#16305f]/50',
+  teal: 'from-[#14585a]/70 to-[#16305f]/50',
+  red: 'from-[#7a2a3a]/70 to-[#16305f]/50',
+  amber: 'from-[#7a5a1c]/70 to-[#16305f]/50',
+  slate: 'from-[#3a4560]/70 to-[#16305f]/50',
 }
 
 export const headerGradient = (tone: Tone = 'blue') => `bg-gradient-to-r ${HEADER[tone]}`
@@ -46,8 +46,8 @@ export function ModalShell({
   tone = 'blue', title, subtitle, onClose, children, widthClass = 'max-w-xl',
 }: { tone?: Tone; title: string; subtitle?: ReactNode; onClose: () => void; children: ReactNode; widthClass?: string }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#14213d]/45 p-4" onClick={onClose}>
-      <div className={`max-h-[calc(100vh-2rem)] w-full ${widthClass} overflow-y-auto rounded-[22px] bg-white text-[#14213d] shadow-[0_24px_64px_rgba(20,33,61,.32)]`} onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#050b1f]/60 p-4" onClick={onClose}>
+      <div style={{ background: HOLO_BG }} className={`max-h-[calc(100vh-2rem)] w-full ${widthClass} overflow-y-auto rounded-[22px] border border-[#8fb4ff]/25 text-[#eaf0fb] shadow-[0_24px_64px_rgba(0,0,0,.5)]`} onClick={(e) => e.stopPropagation()}>
         <div className={`flex items-center gap-3 px-6 py-4 text-white ${headerGradient(tone)}`}>
           <div className="min-w-0">
             <p className="truncate text-base font-bold tracking-tight">{title}</p>
@@ -62,11 +62,11 @@ export function ModalShell({
 }
 
 const PANEL: Record<'green' | 'teal' | 'red' | 'amber' | 'blue', string> = {
-  green: 'border-[#c3e5db] from-[#f0faf6] shadow-[0_10px_30px_rgba(31,157,120,.12)]',
-  teal: 'border-[#c9e6df] from-[#f2faf8] shadow-[0_10px_30px_rgba(18,140,126,.12)]',
-  red: 'border-[#f1c9c4] from-[#fff4f2] shadow-[0_10px_30px_rgba(180,35,24,.10)]',
-  amber: 'border-[#f0d9a0] from-[#fff8e6] shadow-[0_10px_30px_rgba(168,116,28,.12)]',
-  blue: 'border-[#cddcf7] from-[#f3f7ff] shadow-[0_10px_30px_rgba(47,102,208,.10)]',
+  green: 'border-[#3ccf8a]/40 from-[#3ccf8a]/15',
+  teal: 'border-[#5fe0cf]/40 from-[#5fe0cf]/15',
+  red: 'border-[#ff6b75]/40 from-[#ff6b75]/15',
+  amber: 'border-[#f0b548]/40 from-[#f0b548]/15',
+  blue: 'border-[#8fb4ff]/40 from-[#5b95f5]/15',
 }
 
 /** The tinted panel that opens inline under the action row of the reservation window. */
@@ -74,14 +74,14 @@ export function InlinePanel({
   tone, title, subtitle, onClose, children,
 }: { tone: keyof typeof PANEL; title: ReactNode; subtitle?: ReactNode; onClose?: () => void; children: ReactNode }) {
   return (
-    <div className={`space-y-2 rounded-xl border bg-gradient-to-b to-white to-40% p-3 ${PANEL[tone]}`}>
+    <div className={`space-y-2 rounded-xl border bg-gradient-to-b to-transparent to-60% p-3 ${PANEL[tone]}`}>
       <div className="flex items-center gap-3">
         <div className="min-w-0">
-          <p className="text-[13px] font-bold tracking-tight">{title}</p>
-          {subtitle && <p className="mt-px text-[12.5px] text-[#667085]">{subtitle}</p>}
+          <p className="text-[13px] font-bold tracking-tight text-white">{title}</p>
+          {subtitle && <p className="mt-px text-[12.5px] text-[#9fb3dc]">{subtitle}</p>}
         </div>
         {onClose && (
-          <button onClick={onClose} aria-label="Close panel" className="ml-auto flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full border border-black/10 bg-white text-base leading-none text-[#667085] hover:bg-gray-50">×</button>
+          <button onClick={onClose} aria-label="Close panel" className="ml-auto flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full border border-[#8fb4ff]/30 bg-white/[0.06] text-base leading-none text-[#cfdcff] hover:bg-white/[0.12]">×</button>
         )}
       </div>
       {children}
