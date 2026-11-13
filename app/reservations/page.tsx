@@ -20,7 +20,7 @@ export default async function ReservationsPage() {
     }
   }
   return (
-    <main className="px-5 py-6 md:px-8">
+    <main>
       <ReservationsList />
     </main>
   )

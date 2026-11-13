@@ -74,7 +74,7 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
   // Full-screen calendar: the side menu slides out when the pointer touches the left edge of the window
   // and tucks away again once the pointer moves off it. It is a rounded panel inset like the calendar card, covering just the strip the calendar's
   // room column (and the Soirée wordmark above it) occupies, so it covers only that space.
-  const focus = pathname === '/cloudbeds' || pathname.startsWith('/cloudbeds/calendar')
+  const focus = pathname === '/cloudbeds' || pathname.startsWith('/cloudbeds/calendar') || pathname.startsWith('/reservations')
   useEffect(() => {
     if (!focus) { setPeek(false); return }
     const onMove = (e: MouseEvent) => {
