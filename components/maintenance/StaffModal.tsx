@@ -86,7 +86,7 @@ export default function StaffModal({ staff, timezone, onClose, onChanged }: {
           <button onClick={editingId ? () => { setEditingId(null); setForm(EMPTY) } : onClose} className="text-sm text-navy/70 hover:text-navy">
             Cancel
           </button>
-          <button onClick={save} disabled={saving} className="rounded-lg bg-clay px-5 py-2 text-sm font-semibold text-white hover:bg-clay/90 disabled:opacity-60">
+          <button onClick={save} disabled={saving} className="rounded-full bg-gradient-to-b from-[#27ad86] to-[#1a8f6c] px-5 py-2 text-sm font-semibold text-white shadow-[0_4px_10px_rgba(31,157,120,.35)] hover:brightness-95 disabled:opacity-60">
             {saving ? 'Saving…' : editingId ? 'Save changes' : 'Add staff member'}
           </button>
         </>
@@ -94,7 +94,7 @@ export default function StaffModal({ staff, timezone, onClose, onChanged }: {
     >
       <div className="mb-5 space-y-2">
         {staff.map((s) => (
-          <div key={s.id} className="flex items-center gap-3 rounded-xl border border-line bg-paper/40 px-4 py-3">
+          <div key={s.id} className="flex items-center gap-3 rounded-xl border border-[#8fb4ff]/25 bg-[#0f1c42]/40 px-4 py-3">
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-white">{s.name}</p>
               <p className="text-xs text-navy/55">+{s.phone}</p>
@@ -149,7 +149,7 @@ export default function StaffModal({ staff, timezone, onClose, onChanged }: {
                 <button
                   key={d.value}
                   onClick={() => set('weekly_days_off', on ? form.weekly_days_off.filter((x) => x !== d.value) : [...form.weekly_days_off, d.value])}
-                  className={`rounded-lg border px-3 py-1.5 text-sm ${on ? 'border-clay bg-clay/15 text-clay' : 'border-line text-navy/70 hover:border-navy/30'}`}
+                  className={`rounded-lg border px-3 py-1.5 text-sm ${on ? 'border-[#3ccf8a] bg-[#3ccf8a]/20 text-[#8fb4ff]' : 'border-[#8fb4ff]/25 text-navy/70 hover:border-[#8fb4ff]/50'}`}
                 >
                   {d.label}
                 </button>
@@ -176,7 +176,7 @@ export default function StaffModal({ staff, timezone, onClose, onChanged }: {
         </p>
 
         <label className="flex items-center gap-2.5 text-sm text-navy/85">
-          <input type="checkbox" checked={form.active} onChange={(e) => set('active', e.target.checked)} className="h-4 w-4 accent-clay" />
+          <input type="checkbox" checked={form.active} onChange={(e) => set('active', e.target.checked)} className="h-4 w-4 accent-[#3ccf8a]" />
           Available for new tasks and reminders
         </label>
         {error && <p className="text-sm text-red-300">{error}</p>}

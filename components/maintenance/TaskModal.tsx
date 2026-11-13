@@ -65,15 +65,15 @@ export default function TaskModal({ task, staff, timezone, followUps = [], onClo
       footer={
         <>
           <button onClick={onClose} className="text-sm text-navy/70 hover:text-navy">Cancel</button>
-          <button onClick={save} disabled={saving} className="rounded-lg bg-clay px-5 py-2 text-sm font-semibold text-white hover:bg-clay/90 disabled:opacity-60">
+          <button onClick={save} disabled={saving} className="rounded-full bg-gradient-to-b from-[#27ad86] to-[#1a8f6c] px-5 py-2 text-sm font-semibold text-white shadow-[0_4px_10px_rgba(31,157,120,.35)] hover:brightness-95 disabled:opacity-60">
             {saving ? 'Saving…' : task ? 'Save changes' : 'Add task'}
           </button>
         </>
       }
     >
       <div className="space-y-4">
-        <label className="flex items-start gap-2.5 rounded-xl border border-line bg-paper/40 px-3 py-2.5 text-sm text-navy/85">
-          <input type="checkbox" checked={f.on_hold} onChange={(e) => set('on_hold', e.target.checked)} className="mt-0.5 h-4 w-4 accent-clay" />
+        <label className="flex items-start gap-2.5 rounded-xl border border-[#8fb4ff]/25 bg-[#0f1c42]/40 px-3 py-2.5 text-sm text-navy/85">
+          <input type="checkbox" checked={f.on_hold} onChange={(e) => set('on_hold', e.target.checked)} className="mt-0.5 h-4 w-4 accent-[#3ccf8a]" />
           <span>
             <span className="font-semibold text-white">Follow-up task</span>
             <span className="block text-xs text-navy/55">Only starts when another task is finished. Set it up once; it waits on hold and a fresh copy is sent each time it's triggered.</span>
@@ -137,7 +137,7 @@ export default function TaskModal({ task, staff, timezone, followUps = [], onClo
         </div>
 
         {!f.on_hold && f.recurrence_rule === 'interval' && (
-          <div className="grid grid-cols-3 gap-3 rounded-xl border border-line bg-paper/40 p-3">
+          <div className="grid grid-cols-3 gap-3 rounded-xl border border-[#8fb4ff]/25 bg-[#0f1c42]/40 p-3">
             <div>
               <label className={labelCls}>Every (hours)</label>
               <input type="number" min={1} max={24} className={inputCls} value={f.interval_hours} onChange={(e) => set('interval_hours', e.target.value)} />
@@ -154,7 +154,7 @@ export default function TaskModal({ task, staff, timezone, followUps = [], onClo
         )}
 
         {!f.on_hold && f.recurrence_rule === 'seasonal' && (
-          <div className="grid grid-cols-2 gap-3 rounded-xl border border-line bg-paper/40 p-3">
+          <div className="grid grid-cols-2 gap-3 rounded-xl border border-[#8fb4ff]/25 bg-[#0f1c42]/40 p-3">
             <div>
               <label className={labelCls}>Season starts</label>
               <select className={inputCls} value={f.season_start_month} onChange={(e) => set('season_start_month', e.target.value)}>
@@ -184,11 +184,11 @@ export default function TaskModal({ task, staff, timezone, followUps = [], onClo
 
         {f.assigned_to && f.recurrence_rule !== 'none' && (
           <label className="flex items-center gap-2.5 text-sm text-navy/85">
-            <input type="checkbox" checked={f.lock_assignee} onChange={(e) => set('lock_assignee', e.target.checked)} className="h-4 w-4 accent-clay" />
+            <input type="checkbox" checked={f.lock_assignee} onChange={(e) => set('lock_assignee', e.target.checked)} className="h-4 w-4 accent-[#3ccf8a]" />
             Always give this task to the same person
           </label>
         )}
-        <div className="rounded-xl border border-line bg-paper/40 p-3">
+        <div className="rounded-xl border border-[#8fb4ff]/25 bg-[#0f1c42]/40 p-3">
           <label className={labelCls}>When this task is finished, start…</label>
           <select className={inputCls} value={f.next_task_id} onChange={(e) => set('next_task_id', e.target.value)}>
             <option value="">Nothing</option>
@@ -226,13 +226,13 @@ export default function TaskModal({ task, staff, timezone, followUps = [], onClo
         </div>
 
         {!f.on_hold && (
-          <label className="flex items-start gap-2.5 rounded-xl border border-line bg-paper/40 px-3 py-2.5 text-sm text-navy/85">
+          <label className="flex items-start gap-2.5 rounded-xl border border-[#8fb4ff]/25 bg-[#0f1c42]/40 px-3 py-2.5 text-sm text-navy/85">
             <input
               type="checkbox"
               checked={Boolean(f.next_task_id) || f.carry_over}
               disabled={Boolean(f.next_task_id)}
               onChange={(e) => set('carry_over', e.target.checked)}
-              className="mt-0.5 h-4 w-4 accent-clay"
+              className="mt-0.5 h-4 w-4 accent-[#3ccf8a]"
             />
             <span>
               <span className="font-semibold text-white">Carry over until finished</span>

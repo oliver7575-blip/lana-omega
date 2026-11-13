@@ -22,7 +22,7 @@ export default function PreviewModal({ onClose }: { onClose: () => void }) {
       {items?.length === 0 && <p className="text-sm text-navy/50">Nothing scheduled in the next 24 hours.</p>}
       <div className="space-y-2">
         {items?.map((r) => (
-          <div key={r.id} className="rounded-xl border border-line bg-paper/40 px-4 py-3">
+          <div key={r.id} className="rounded-xl border border-[#8fb4ff]/25 bg-[#0f1c42]/40 px-4 py-3">
             <div className="flex justify-between text-xs text-navy/55">
               <span>{fmtDateTime(r.scheduled_for, tz)} · {r.staff}</span>
               {r.priority === 'urgent' && <span className="text-red-300">🚨 Urgent</span>}

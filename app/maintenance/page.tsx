@@ -5,6 +5,7 @@ import StaffModal from '@/components/maintenance/StaffModal'
 import TaskModal from '@/components/maintenance/TaskModal'
 import TaskDrawer from '@/components/maintenance/TaskDrawer'
 import PreviewModal from '@/components/maintenance/PreviewModal'
+import { HOLO_BG, priGreen } from '@/components/cloudbeds/ui'
 import LiveRefresh from '@/components/LiveRefresh'
 import { api, carriesOver, fmtDateTime, localParts, recurrenceLabel, STATUS_LABEL, titleCase, type Staff, type Task } from '@/components/maintenance/shared'
 
@@ -134,10 +135,10 @@ export default function MaintenancePage() {
     )
   }
 
-  const statCard = (label: string, value: number, sub: string, subCls = 'text-navy/50') => (
-    <div className="rounded-2xl border border-line bg-surface px-5 py-5">
-      <p className="text-[11px] font-semibold uppercase tracking-[.13em] text-navy/60">{label}</p>
-      <p className="mt-2 text-4xl font-semibold text-white">{value}</p>
+  const statCard = (label: string, value: number, sub: string, subCls = 'text-[#9fb3dc]', color = '#ffffff') => (
+    <div className="rounded-2xl border border-[#8fb4ff]/25 bg-[#16285c]/50 px-5 py-4">
+      <p className="text-[10.5px] font-semibold uppercase tracking-[.12em] text-[#9fb3dc]">{label}</p>
+      <p className="mt-2 text-[30px] font-semibold leading-none" style={{ color }}>{value}</p>
       <p className={`mt-1 text-sm ${subCls}`}>{sub}</p>
     </div>
   )
@@ -146,61 +147,62 @@ export default function MaintenancePage() {
   const cols = 'grid grid-cols-[24px_minmax(0,2.4fr)_minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,1.5fr)] items-center gap-4'
 
   return (
-    <main className="min-w-0 overflow-x-hidden px-3 py-5 sm:px-5 md:px-8">
+    <main className="min-w-0 overflow-x-hidden p-2 md:p-3">
+      <div className="min-h-[calc(100vh-1.5rem)] min-w-0 rounded-2xl p-3 text-[#eaf0fb] antialiased sm:p-4" style={{ background: HOLO_BG }}>
       <LiveRefresh tables={['maintenance_tasks', 'maintenance_task_events']} onChange={load} pollMs={30000} />
-      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="font-display text-3xl italic text-white">Maintenance</h1>
+            <h1 className="text-[20px] font-semibold leading-tight tracking-tight text-white">Maintenance</h1>
             <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[.18em] text-emerald-300">
               WhatsApp automation
             </span>
           </div>
-          <p className="mt-1 text-sm text-navy/60">Assign maintenance tasks, send reminders, and track WhatsApp replies.</p>
+          <p className="mt-1 text-[12px] text-[#9fb3dc]">Assign maintenance tasks, send reminders, and track WhatsApp replies.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => setShowPreview(true)} className="rounded-lg border border-amber-400/20 bg-amber-400/10 px-3.5 py-2 text-sm font-semibold text-amber-200 hover:bg-amber-400/15">
+          <button onClick={() => setShowPreview(true)} className="h-8 rounded-full border border-[#f0b548]/40 bg-[#f0b548]/15 px-3.5 text-[12.5px] font-semibold text-[#f5d58a] hover:bg-[#f0b548]/25">
             Preview reminders
           </button>
-          <button onClick={() => setShowStaff(true)} className="rounded-lg border border-line bg-surface px-3.5 py-2 text-sm text-navy hover:bg-line/40">
+          <button onClick={() => setShowStaff(true)} className="h-8 rounded-full border border-[#8fb4ff]/25 bg-white/[0.06] px-3.5 text-[12.5px] font-semibold text-[#eaf0fb] hover:bg-white/[0.12]">
             + Add staff
           </button>
-          <button onClick={() => setEditTask('new')} className="rounded-lg bg-clay px-3.5 py-2 text-sm font-semibold text-white hover:bg-clay/90">
+          <button onClick={() => setEditTask('new')} className={`${priGreen} !h-8 !px-4 !text-[12.5px]`}>
             + Add task
           </button>
         </div>
       </div>
 
       {flash && (
-        <div className="mb-4 flex items-center justify-between rounded-xl border border-line bg-surface px-4 py-2.5 text-sm text-navy/85">
+        <div className="mb-4 flex items-center justify-between rounded-xl border border-[#8fb4ff]/25 bg-[#16285c]/60 px-4 py-2.5 text-sm text-navy/85">
           <span>{flash}</span>
-          <button onClick={() => setFlash(null)} className="text-navy/50 hover:text-navy">×</button>
+          <button onClick={() => setFlash(null)} className="text-[#9fb3dc] hover:text-navy">×</button>
         </div>
       )}
 
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {statCard('Open tasks', stats.open, 'Active queue')}
-        {statCard('In progress', stats.inProgress, 'Staff are working')}
-        {statCard('Need attention', stats.needAttention, 'Escalation required', 'text-clay')}
-        {statCard('Completed', stats.completed, 'All time')}
+        {statCard('Open tasks', stats.open, 'Active queue', undefined, '#5b95f5')}
+        {statCard('In progress', stats.inProgress, 'Staff are working', undefined, '#3ccf8a')}
+        {statCard('Need attention', stats.needAttention, 'Escalation required', 'text-[#f0b548]', '#f0b548')}
+        {statCard('Completed', stats.completed, 'All time', undefined, '#8793a6')}
       </div>
 
-      <section className="mb-6 rounded-2xl border border-line bg-surface">
+      <section className="mb-6 rounded-2xl border border-[#8fb4ff]/25 bg-[#16285c]/60">
         <div className="flex flex-col gap-4 px-5 pt-5 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-white">Task list</h2>
-            <p className="text-sm text-navy/50">{visible.length} shown</p>
+            <p className="text-sm text-[#9fb3dc]">{visible.length} shown</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <select value={staffFilter} onChange={(e) => setStaffFilter(e.target.value)} className="rounded-md border border-line bg-paper px-2.5 py-1.5 text-sm text-navy outline-none">
+            <select value={staffFilter} onChange={(e) => setStaffFilter(e.target.value)} className="rounded-full border border-[#8fb4ff]/25 bg-[#0f1c42]/60 px-3 py-1.5 text-sm text-[#eaf0fb] outline-none [color-scheme:dark]">
               <option value="">All staff</option>
               {staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
-            <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="rounded-md border border-line bg-paper px-2.5 py-1.5 text-sm text-navy outline-none" />
-            <button onClick={() => setDateFilter('')} title="Show all dates" className="rounded-md border border-line bg-paper px-2.5 py-1.5 text-sm text-navy/60 hover:text-navy">×</button>
-            <div className="flex rounded-lg bg-paper p-1">
+            <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="rounded-full border border-[#8fb4ff]/25 bg-[#0f1c42]/60 px-3 py-1.5 text-sm text-[#eaf0fb] outline-none [color-scheme:dark]" />
+            <button onClick={() => setDateFilter('')} title="Show all dates" className="rounded-md border border-[#8fb4ff]/25 bg-[#0f1c42]/60 px-2.5 py-1.5 text-sm text-[#9fb3dc] hover:text-navy">×</button>
+            <div className="flex rounded-full border border-[#8fb4ff]/25 bg-white/[0.06] p-[3px]">
               {(['active', 'completed', 'followups'] as const).map((m) => (
-                <button key={m} onClick={() => { setMode(m); setSelected(new Set()) }} className={`rounded-md px-3 py-1 text-sm capitalize ${mode === m ? 'bg-surface text-white' : 'text-navy/50 hover:text-navy'}`}>
+                <button key={m} onClick={() => { setMode(m); setSelected(new Set()) }} className={`rounded-full px-3.5 py-1 text-[12.5px] font-semibold capitalize ${mode === m ? 'bg-white/90 text-[#14264f]' : 'text-[#cfdcff] hover:text-white'}`}>
                   {m === 'followups' ? `Follow-ups (${tasks.filter((t) => t.status === 'on_hold').length})` : m}
                 </button>
               ))}
@@ -210,7 +212,7 @@ export default function MaintenancePage() {
 
         <div className="flex flex-wrap gap-2 px-5 pt-4">
           {CATEGORIES.map((c) => (
-            <button key={c.key} onClick={() => setCategory(c.key)} className={`rounded-full border px-3 py-1 text-sm ${category === c.key ? 'border-clay text-clay' : 'border-line text-navy/70 hover:border-navy/30'}`}>
+            <button key={c.key} onClick={() => setCategory(c.key)} className={`rounded-full border px-3 py-1 text-sm ${category === c.key ? 'border-[#3ccf8a]/60 bg-[#3ccf8a]/20 font-semibold text-[#7be8b4]' : 'border-[#8fb4ff]/25 bg-white/[0.06] text-[#cfdcff] hover:border-[#8fb4ff]/50'}`}>
               {c.label}
             </button>
           ))}
@@ -218,7 +220,7 @@ export default function MaintenancePage() {
         {mode === 'active' && (
           <div className="flex flex-wrap gap-1 px-5 pt-3">
             {STATUS_TABS.map((s) => (
-              <button key={s.key} onClick={() => setStatusTab(s.key)} className={`rounded-md px-3 py-1.5 text-sm ${statusTab === s.key ? 'bg-paper text-white' : 'text-navy/50 hover:text-navy'}`}>
+              <button key={s.key} onClick={() => setStatusTab(s.key)} className={`rounded-md px-3 py-1.5 text-sm ${statusTab === s.key ? 'bg-white/10 font-semibold text-white' : 'text-[#9fb3dc] hover:text-white'}`}>
                 {s.label}
               </button>
             ))}
@@ -226,7 +228,7 @@ export default function MaintenancePage() {
         )}
 
         {selected.size > 0 && (
-          <div className="mx-5 mt-3 flex items-center gap-4 rounded-lg bg-paper px-4 py-2 text-sm">
+          <div className="mx-5 mt-3 flex items-center gap-4 rounded-lg bg-[#0f1c42]/60 px-4 py-2 text-sm">
             <span className="text-navy/70">{selected.size} selected</span>
             {mode === 'active' && <button onClick={() => bulk('mark_done')} className="text-emerald-300 hover:underline">Mark done</button>}
             <button onClick={() => bulk('delete')} className="text-red-300 hover:underline">Delete</button>
@@ -234,12 +236,12 @@ export default function MaintenancePage() {
         )}
 
         {/* Phones: one card per task */}
-        <div className="mt-4 divide-y divide-line border-t border-line md:hidden">
+        <div className="mt-4 divide-y divide-[#8fb4ff]/15 border-t border-[#8fb4ff]/25 md:hidden">
           {loaded && visible.length === 0 && (
-            <p className="px-4 py-8 text-center text-sm text-navy/50">No tasks here{dateFilter ? ' for this date' : ''}.</p>
+            <p className="px-4 py-8 text-center text-sm text-[#9fb3dc]">No tasks here{dateFilter ? ' for this date' : ''}.</p>
           )}
           {visible.map((t) => (
-            <div key={t.id} className={`px-4 py-3 ${t.paused ? 'opacity-60' : ''} ${t.status === 'in_progress' ? 'border-l-2 border-l-emerald-400 bg-emerald-500/[0.08]' : t.escalation_status === 'required' ? 'bg-clay/[0.06]' : ''}`}>
+            <div key={t.id} className={`px-4 py-3 ${t.paused ? 'opacity-60' : ''} ${t.status === 'in_progress' ? 'border-l-2 border-l-emerald-400 bg-emerald-500/[0.08]' : t.escalation_status === 'required' ? 'bg-[#f0b548]/[0.08]' : ''}`}>
               <div className="flex items-start gap-3">
                 <input
                   type="checkbox"
@@ -250,17 +252,17 @@ export default function MaintenancePage() {
                     else n.add(t.id)
                     setSelected(n)
                   }}
-                  className="mt-1 h-4 w-4 shrink-0 accent-clay"
+                  className="mt-1 h-4 w-4 shrink-0 accent-[#3ccf8a]"
                 />
                 <button onClick={() => setDrawerId(t.id)} className="min-w-0 flex-1 text-left">
                   <p className="text-[14px] leading-snug text-white">
-                    <span className="mr-1.5 rounded bg-clay/10 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-clay">#{t.task_code}</span>
+                    <span className="mr-1.5 rounded bg-[#5b95f5]/20 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-[#8fb4ff]">#{t.task_code}</span>
                     {t.title}
                     {t.priority === 'urgent' && <span className="ml-1.5 text-xs text-red-300">🚨</span>}
                   </p>
-                  <p className="mt-0.5 break-words text-xs text-navy/50">
+                  <p className="mt-0.5 break-words text-xs text-[#9fb3dc]">
                     {[t.location ? `⌖ ${t.location}` : null, t.status === 'on_hold' ? 'Follow-up' : recurrenceLabel(t), t.status === 'on_hold' ? null : `${t.reminder_count} reminder${t.reminder_count === 1 ? '' : 's'}`, followUpLabel(t), t.paused ? '⏸ Paused' : null, t.status !== 'on_hold' && carriesOver(t) ? 'Carries over' : null].filter(Boolean).join(' · ')}
-                    {t.escalation_status === 'required' && <span className="text-clay"> · Needs attention</span>}
+                    {t.escalation_status === 'required' && <span className="text-[#8fb4ff]"> · Needs attention</span>}
                   </p>
                   <p className="mt-1 text-xs text-navy/70">
                     {t.assigned_to ? staffName(t.assigned_to) : 'Auto'} · {fmtDateTime(mode === 'completed' ? t.completed_at ?? t.updated_at : t.due_at, tz)}
@@ -279,7 +281,7 @@ export default function MaintenancePage() {
                       ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200'
                       : t.status === 'waiting'
                         ? 'border-amber-400/30 bg-amber-500/10 text-amber-200'
-                        : 'border-line bg-paper text-navy'
+                        : 'border-[#8fb4ff]/25 bg-[#0f1c42]/60 text-navy'
                   }`}
                 >
                   {Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -300,14 +302,14 @@ export default function MaintenancePage() {
         </div>
 
         {/* Tablets and computers: the table */}
-        <div className="mt-4 hidden overflow-x-auto border-t border-line md:block">
+        <div className="mt-4 hidden overflow-x-auto border-t border-[#8fb4ff]/25 md:block">
           <div className="min-w-[860px]">
-            <div className={`${cols} border-b border-line px-5 py-3 text-[11px] font-semibold uppercase tracking-[.13em] text-navy/45`}>
+            <div className={`${cols} border-b border-[#8fb4ff]/25 px-5 py-3 text-[11px] font-semibold uppercase tracking-[.13em] text-[#9fb3dc]`}>
               <input
                 type="checkbox"
                 checked={allVisibleSelected}
                 onChange={() => setSelected(allVisibleSelected ? new Set() : new Set(visible.map((t) => t.id)))}
-                className="h-4 w-4 accent-clay"
+                className="h-4 w-4 accent-[#3ccf8a]"
               />
               <span>Task</span>
               <span>Assigned to</span>
@@ -316,12 +318,12 @@ export default function MaintenancePage() {
               <span>Action</span>
             </div>
             {loaded && visible.length === 0 && (
-              <p className="px-5 py-10 text-center text-sm text-navy/50">
+              <p className="px-5 py-10 text-center text-sm text-[#9fb3dc]">
                 No tasks here{dateFilter ? ' for this date — clear the date (×) to see all' : ''}.
               </p>
             )}
             {visible.map((t) => (
-              <div key={t.id} className={`${cols} border-b border-line px-5 py-3 last:border-b-0 ${t.paused ? 'opacity-60' : ''} ${t.status === 'in_progress' ? 'border-l-2 border-l-emerald-400 bg-emerald-500/[0.08] hover:bg-emerald-500/[0.12]' : t.escalation_status === 'required' ? 'bg-clay/[0.06] hover:bg-clay/[0.1]' : 'hover:bg-white/[0.02]'}`}>
+              <div key={t.id} className={`${cols} border-b border-[#8fb4ff]/25 px-5 py-3 last:border-b-0 ${t.paused ? 'opacity-60' : ''} ${t.status === 'in_progress' ? 'border-l-2 border-l-emerald-400 bg-emerald-500/[0.08] hover:bg-emerald-500/[0.12]' : t.escalation_status === 'required' ? 'bg-[#f0b548]/[0.08] hover:bg-[#f0b548]/[0.12]' : 'hover:bg-white/[0.02]'}`}>
                 <input
                   type="checkbox"
                   checked={selected.has(t.id)}
@@ -331,21 +333,21 @@ export default function MaintenancePage() {
                     else n.add(t.id)
                     setSelected(n)
                   }}
-                  className="h-4 w-4 accent-clay"
+                  className="h-4 w-4 accent-[#3ccf8a]"
                 />
                 <button onClick={() => setDrawerId(t.id)} className="min-w-0 text-left">
                   <p className="truncate">
-                    <span className="mr-2 rounded bg-clay/10 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-clay">#{t.task_code}</span>
+                    <span className="mr-2 rounded bg-[#5b95f5]/20 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-[#8fb4ff]">#{t.task_code}</span>
                     <span className="text-[14px] text-white">{t.title}</span>
                     {t.priority === 'urgent' && <span className="ml-2 text-xs text-red-300">🚨 Urgent</span>}
                   </p>
-                  <p className="truncate text-xs text-navy/50">
+                  <p className="truncate text-xs text-[#9fb3dc]">
                     {[t.location ? `⌖ ${t.location}` : null, t.priority, t.status === 'on_hold' ? 'Follow-up' : recurrenceLabel(t), t.status === 'on_hold' ? null : `${t.reminder_count} reminder${t.reminder_count === 1 ? '' : 's'}`, followUpLabel(t), t.paused ? '⏸ Paused' : null, t.status !== 'on_hold' && carriesOver(t) ? 'Carries over' : null].filter(Boolean).join(' · ')}
-                    {t.escalation_status === 'required' && <span className="ml-2 text-clay">· Needs attention</span>}
+                    {t.escalation_status === 'required' && <span className="ml-2 text-[#8fb4ff]">· Needs attention</span>}
                   </p>
                 </button>
                 <div className="flex min-w-0 items-center gap-2">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ink text-[10px] font-semibold text-navy/80">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-[10px] font-semibold text-navy/80">
                     {t.assigned_to ? staffName(t.assigned_to)[0]?.toUpperCase() : '—'}
                   </span>
                   <span className="truncate text-sm text-navy/85">{t.assigned_to ? staffName(t.assigned_to) : 'Auto'}</span>
@@ -362,7 +364,7 @@ export default function MaintenancePage() {
                       ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200'
                       : t.status === 'waiting'
                         ? 'border-amber-400/30 bg-amber-500/10 text-amber-200'
-                        : 'border-line bg-paper text-navy'
+                        : 'border-[#8fb4ff]/25 bg-[#0f1c42]/60 text-navy'
                   }`}
                 >
                   {Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -385,23 +387,23 @@ export default function MaintenancePage() {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-line bg-surface px-5 py-5">
+      <section className="rounded-2xl border border-[#8fb4ff]/25 bg-[#16285c]/60 px-5 py-5">
         <div className="mb-4 flex items-start justify-between">
           <div>
             <h2 className="text-lg font-semibold text-white">Activity</h2>
-            <p className="text-sm text-navy/50">Live audit trail for maintenance work</p>
+            <p className="text-sm text-[#9fb3dc]">Live audit trail for maintenance work</p>
           </div>
           <span className="mt-2 h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_10px_#34d399]" />
         </div>
-        {activity.length === 0 && <p className="text-sm text-navy/50">No activity yet.</p>}
+        {activity.length === 0 && <p className="text-sm text-[#9fb3dc]">No activity yet.</p>}
         <div className="grid min-w-0 gap-3 lg:grid-cols-2">
           {activity.map((e) => (
-            <button key={e.id} onClick={() => setDrawerId(e.task_id)} className="flex w-full min-w-0 gap-3 rounded-xl border border-line bg-paper/40 px-4 py-3 text-left hover:bg-paper/60">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-clay/10 text-sm text-clay">{eventIcon(e.event_type)}</span>
+            <button key={e.id} onClick={() => setDrawerId(e.task_id)} className="flex w-full min-w-0 gap-3 rounded-xl border border-[#8fb4ff]/25 bg-[#0f1c42]/40 px-4 py-3 text-left hover:bg-[#0f1c42]/60">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#5b95f5]/20 text-sm text-[#8fb4ff]">{eventIcon(e.event_type)}</span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold text-white">{e.task_title}</span>
-                <span className="block text-xs text-navy/60 [overflow-wrap:anywhere]">{titleCase(e.detail).replace(/\b[0-9a-f]{8}-[0-9a-f-]{27}\b/gi, '').replace(/\s{2,}/g, ' ').replace(/ ([;,.])/g, '$1')}</span>
-                <span className="block text-xs text-navy/40">{fmtDateTime(e.created_at, tz)}</span>
+                <span className="block text-xs text-[#9fb3dc] [overflow-wrap:anywhere]">{titleCase(e.detail).replace(/\b[0-9a-f]{8}-[0-9a-f-]{27}\b/gi, '').replace(/\s{2,}/g, ' ').replace(/ ([;,.])/g, '$1')}</span>
+                <span className="block text-xs text-[#8ea3cf]">{fmtDateTime(e.created_at, tz)}</span>
               </span>
             </button>
           ))}
@@ -421,6 +423,7 @@ export default function MaintenancePage() {
         />
       )}
       {drawerId && <TaskDrawer taskId={drawerId} staff={staff} timezone={tz} onClose={() => setDrawerId(null)} onChanged={load} />}
+      </div>
     </main>
   )
 }

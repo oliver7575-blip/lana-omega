@@ -1,5 +1,7 @@
 'use client'
 
+import { HOLO_BG } from '@/components/cloudbeds/ui'
+
 import { useEffect, useState } from 'react'
 import { api, fmtDateTime, recurrenceLabel, STATUS_LABEL, titleCase, type Staff, type Task } from './shared'
 
@@ -40,14 +42,14 @@ export default function TaskDrawer({ taskId, staff, timezone, onClose, onChanged
   const t = d?.task
   const assignee = t?.assigned_to ? staff.find((s) => s.id === t.assigned_to)?.name ?? '—' : 'Auto-assign'
   const excluded = t?.excluded_staff_id ? staff.find((s) => s.id === t.excluded_staff_id)?.name ?? null : null
-  const box = 'rounded-xl border border-line bg-paper/40 px-4 py-3'
+  const box = 'rounded-xl border border-[#8fb4ff]/25 bg-[#0f1c42]/40 px-4 py-3'
   const boxLabel = 'text-[10px] font-semibold uppercase tracking-[.13em] text-navy/50'
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/60" onClick={onClose}>
-      <aside className="h-full w-full max-w-lg overflow-y-auto border-l border-line bg-surface px-6 py-6" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex justify-end bg-[#050b1f]/60" onClick={onClose}>
+      <aside style={{ background: HOLO_BG }} className="h-full w-full max-w-lg overflow-y-auto border-l border-[#8fb4ff]/25 px-6 py-6 text-[#eaf0fb]" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between">
-          <p className="font-mono text-xs text-clay">#{t?.task_code ?? ''}</p>
+          <p className="font-mono text-xs text-[#8fb4ff]">#{t?.task_code ?? ''}</p>
           <button onClick={onClose} className="text-xl text-navy/50 hover:text-navy" aria-label="Close">×</button>
         </div>
         {error && <p className="mt-4 text-sm text-red-300">{error}</p>}
@@ -96,7 +98,7 @@ export default function TaskDrawer({ taskId, staff, timezone, onClose, onChanged
             ) : (
               <div className="flex flex-wrap gap-2">
                 {d.reminders.map((r) => (
-                  <span key={r.id} title={r.error_message ?? ''} className={`rounded-lg border border-line px-3 py-1.5 text-xs ${r.status === 'failed' ? 'text-red-300' : r.status === 'cancelled' ? 'text-navy/35 line-through' : 'text-navy/75'}`}>
+                  <span key={r.id} title={r.error_message ?? ''} className={`rounded-lg border border-[#8fb4ff]/25 px-3 py-1.5 text-xs ${r.status === 'failed' ? 'text-red-300' : r.status === 'cancelled' ? 'text-navy/35 line-through' : 'text-navy/75'}`}>
                     {titleCase(r.status)} · {fmtDateTime(r.sent_at ?? r.scheduled_for, timezone)}
                   </span>
                 ))}
@@ -109,7 +111,7 @@ export default function TaskDrawer({ taskId, staff, timezone, onClose, onChanged
             ) : (
               <div className="space-y-2">
                 {d.messages.map((m) => (
-                  <div key={m.id} className={`rounded-xl px-4 py-3 ${m.direction === 'outbound' ? 'ml-8 bg-clay/5' : 'mr-8 bg-paper/60'}`}>
+                  <div key={m.id} className={`rounded-xl px-4 py-3 ${m.direction === 'outbound' ? 'ml-8 bg-[#5b95f5]/10' : 'mr-8 bg-[#0f1c42]/60'}`}>
                     <div className="flex justify-between text-[10px] font-semibold uppercase tracking-[.1em] text-navy/45">
                       <span>{m.direction} · WhatsApp</span>
                       <span>{m.delivery_status}</span>
@@ -122,7 +124,7 @@ export default function TaskDrawer({ taskId, staff, timezone, onClose, onChanged
             )}
 
             <h3 className="mb-2 mt-6 text-sm font-semibold text-white">Audit trail</h3>
-            <div className="space-y-3 border-l border-line pl-4">
+            <div className="space-y-3 border-l border-[#8fb4ff]/25 pl-4">
               {d.events.map((e) => (
                 <div key={e.id}>
                   <p className="text-sm font-semibold text-white">{titleCase(e.event_type.replace(/_/g, ' '))}</p>
