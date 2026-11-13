@@ -702,7 +702,7 @@ export default function CalendarPage() {
                           <div className={`sticky left-0 z-10 flex items-center gap-2 border-r border-white/10 pl-2.5 pr-2 text-[11px] font-semibold ${isUnassigned ? 'italic text-amber-300' : ''}`}
                             style={{ width: LEFT_W, minWidth: LEFT_W, height: ROW_H, backgroundColor: ROOM_BG }}>
                             {!isUnassigned && <i className="h-5 w-[3px] shrink-0 rounded-full" style={{ background: c, opacity: 0.6 }} />}
-                            <span className={`truncate rounded-md ${isUnassigned ? '' : 'border px-1.5 py-px'}`} style={isUnassigned ? undefined : { borderColor: `${c}88`, color: c, background: `${c}18`, boxShadow: `0 0 8px ${c}33` }}>{room.name}</span>
+                            <span className={`truncate ${isUnassigned ? '' : 'text-[#dbe5f1]'}`}>{room.name}</span>
                           </div>
                           <div className="relative flex" style={{ height: ROW_H }}>
                             {data.days.map((d) => {
