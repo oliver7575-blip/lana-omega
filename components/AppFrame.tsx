@@ -72,14 +72,14 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
   useEffect(() => setOpen(false), [pathname])
 
   // Full-screen calendar: the side menu slides out when the pointer touches the left edge of the window
-  // and tucks away again once the pointer moves off it. It is 169px wide: exactly the strip the calendar's
+  // and tucks away again once the pointer moves off it. It is a rounded panel inset like the calendar card, covering just the strip the calendar's
   // room column (and the Soirée wordmark above it) occupies, so it covers only that space.
   const focus = pathname.startsWith('/cloudbeds/calendar')
   useEffect(() => {
     if (!focus) { setPeek(false); return }
     const onMove = (e: MouseEvent) => {
       if (e.clientX <= 10) setPeek(true)
-      else if (e.clientX > 175) setPeek(false)
+      else if (e.clientX > 180) setPeek(false)
     }
     const onLeave = () => setPeek(false)
     window.addEventListener('mousemove', onMove)
@@ -176,10 +176,10 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
   )
 
   const sidebar = (
-    <nav className={`flex h-full flex-col px-3 ${focus ? 'pb-6 pt-[24px]' : 'py-6'}`}>
+    <nav className={`flex h-full flex-col ${focus ? 'pb-5 pl-[11px] pr-3 pt-[15px]' : 'px-3 py-6'}`}>
       {focus ? (
         // Same Soirée wordmark, in the same spot, as the calendar header underneath (centred over its 149px room column).
-        <div className="-mx-3 mb-4 flex h-10 shrink-0 items-center justify-center" style={{ width: 149, marginLeft: 8 }}>
+        <div className="mb-4 flex h-10 shrink-0 items-center justify-center" style={{ width: 149 }}>
           <Link href="/cloudbeds" className="font-display text-[40px] font-semibold italic leading-none tracking-tight text-white">Soirée</Link>
         </div>
       ) : null}
@@ -262,12 +262,16 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
         <span className={`pointer-events-none fixed left-0 top-1/2 z-50 h-16 w-[3px] -translate-y-1/2 rounded-r-full bg-white/30 transition-opacity ${peek ? 'opacity-0' : 'opacity-100'}`} aria-hidden="true" />
       )}
       <aside
-        style={focus ? { background: HOLO_BG, borderColor: 'rgba(143,180,255,.25)' } : undefined}
+        style={focus ? { background: HOLO_BG } : undefined}
         className={`fixed inset-y-0 left-0 z-40 w-72 border-r border-line bg-surface transition-transform duration-200 ${
           focus
-            ? `!z-50 ${peek ? '!translate-x-0 shadow-[8px_0_32px_rgba(0,0,0,.45)]' : ''} !w-[169px] ${peek ? '' : 'md:-translate-x-full'}`
-            : 'md:sticky md:top-0 md:h-screen md:w-52 md:shrink-0 md:translate-x-0'
-        } ${open ? 'translate-x-0' : '-translate-x-full'}`}
+            ? // On the calendar the menu is a floating panel with the same rounded shape as the calendar card:
+              // inset 12px from the window edge, 161px wide (just the room-column strip), sliding in over it.
+              `md:inset-y-3 md:left-3 md:z-50 md:w-[161px] md:overflow-hidden md:rounded-2xl md:border md:border-[#8fb4ff]/25 ${
+                peek ? 'md:translate-x-0 md:shadow-[0_18px_50px_rgba(0,0,0,.5)]' : 'md:-translate-x-[calc(100%+24px)]'
+              } ${open ? 'translate-x-0' : '-translate-x-full'}`
+            : `md:sticky md:top-0 md:h-screen md:w-52 md:shrink-0 md:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`
+        }`}
       >
         {sidebar}
       </aside>
