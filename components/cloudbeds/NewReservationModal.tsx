@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { cbApi } from './shared'
-import { btn, btnLg, field, headerGradient, lbl, priGreen, priSlate, HOLO_BG } from './ui'
+import { btn, btnLg, field, headerGradient, lbl, priGreen, priSlate } from './ui'
 
 interface RoomType {
   roomTypeID: string
@@ -182,15 +182,15 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
 
   const input = field
   const label = lbl
-  const section = 'mb-2.5 mt-5 border-t border-[#8fb4ff]/20 pt-4 text-[11px] font-semibold uppercase tracking-[.08em] text-[#9fb3dc]'
+  const section = 'mb-2.5 mt-5 border-t border-[#eef0f4] pt-4 text-[11px] font-semibold uppercase tracking-[.08em] text-[#7a8394]'
   const n = nights(start, end)
   const blocking = mode === 'block'
   const canBlock = Boolean(roomID && end > start && !saving)
   const canCreate = Boolean(chosen && firstName.trim() && lastName.trim() && email.trim() && country && paymentMethod && nightlyValid && !saving)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#050b1f]/60 p-4 pt-10" onClick={onClose}>
-      <div className="w-full max-w-xl overflow-hidden rounded-[22px] border border-[#8fb4ff]/25 text-[#eaf0fb] shadow-[0_24px_64px_rgba(0,0,0,.5)]" style={{ background: HOLO_BG }} onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#14213d]/40 p-4 pt-10" onClick={onClose}>
+      <div className="w-full max-w-xl overflow-hidden rounded-[22px] bg-white text-[#14213d] shadow-[0_24px_64px_rgba(20,33,61,.32)]" onClick={(e) => e.stopPropagation()}>
         <div className={`flex items-center justify-between gap-4 px-6 py-4 text-white ${headerGradient(blocking ? 'slate' : 'blue')}`}>
           <div>
             <p className="text-base font-bold tracking-tight">{blocking ? 'Block dates' : 'New reservation'}</p>
@@ -201,8 +201,8 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
 
         <div className="max-h-[calc(100vh-9rem)] overflow-y-auto px-6 pb-5">
           <div className="mt-4 inline-flex rounded-full bg-[#e8eef0] p-[3px] text-[12.5px] font-semibold">
-            <button onClick={() => setMode('reservation')} className={`h-[30px] rounded-full px-4 ${!blocking ? 'bg-white/90 text-[#14264f] shadow' : 'text-[#9fb3dc]'}`}>Reservation</button>
-            <button onClick={() => setMode('block')} className={`h-[30px] rounded-full px-4 ${blocking ? 'bg-white/90 text-[#14264f] shadow' : 'text-[#9fb3dc]'}`}>Block dates / Out of service</button>
+            <button onClick={() => setMode('reservation')} className={`h-[30px] rounded-full px-4 ${!blocking ? 'bg-white text-[#0e5f47] shadow-[0_1px_3px_rgba(16,24,40,.12)]' : 'text-gray-600'}`}>Reservation</button>
+            <button onClick={() => setMode('block')} className={`h-[30px] rounded-full px-4 ${blocking ? 'bg-white text-[#0e5f47] shadow-[0_1px_3px_rgba(16,24,40,.12)]' : 'text-gray-600'}`}>Block dates / Out of service</button>
           </div>
           <p className={section}>Stay</p>
           <div className="grid grid-cols-4 gap-2">
@@ -220,7 +220,7 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
             </label>}
           </div>
           <div className="mt-2 flex items-center justify-between">
-            <span className="text-[12px] text-[#9fb3dc]">{n} night{n === 1 ? '' : 's'}</span>
+            <span className="text-[12px] text-gray-600">{n} night{n === 1 ? '' : 's'}</span>
             {!blocking && <button onClick={check} disabled={checking || n < 1}
               className={`${btn} !border-[#c9d9f7] !text-[#2456b8] disabled:opacity-50`}>
               {checking ? 'Checking…' : rooms ? 'Check again' : 'Check availability'}
@@ -232,12 +232,12 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
               {rooms.length === 0 && <p className="rounded-xl bg-amber-50 px-3 py-2 text-[12px] text-amber-800">Nothing available for these dates and guests.</p>}
               {rooms.map((r) => (
                 <label key={r.roomTypeID}
-                  className={`flex cursor-pointer items-center justify-between gap-3 rounded-2xl border px-3.5 py-3 text-[13px] ${roomTypeID === r.roomTypeID ? 'border-[#3ccf8a] bg-[#3ccf8a]/15' : 'border-[#8fb4ff]/25 hover:bg-white/[0.06]'}`}>
+                  className={`flex cursor-pointer items-center justify-between gap-3 rounded-2xl border px-3.5 py-3 text-[13px] ${roomTypeID === r.roomTypeID ? 'border-[#1f9d78] bg-[#eefaf5] shadow-[0_0_0_3px_rgba(31,157,120,.12)]' : 'border-[#e6e9f0] hover:bg-gray-50'}`}>
                   <span className="flex items-center gap-2">
                     <input type="radio" name="roomType" checked={roomTypeID === r.roomTypeID} onChange={() => { setRoomTypeID(r.roomTypeID); setRoomID('') }} />
                     <span>
                       <span className="font-semibold">{r.name}</span>
-                      <span className="block text-[11px] text-[#9fb3dc]">{r.roomsAvailable} available · up to {r.maxGuests} guests{r.ratePlan ? ` · ${r.ratePlan}` : ''}</span>
+                      <span className="block text-[11px] text-gray-500">{r.roomsAvailable} available · up to {r.maxGuests} guests{r.ratePlan ? ` · ${r.ratePlan}` : ''}</span>
                     </span>
                   </span>
                   <span className="whitespace-nowrap font-semibold">{r.total !== null ? `MXN ${Math.round(r.total).toLocaleString('en-US')}` : '—'}</span>
@@ -257,8 +257,8 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
           {blocking && (
             <div className="mt-3 space-y-2">
               {initial?.roomID && roomID ? (
-                <p className="text-[12.5px] text-[#9fb3dc]">
-                  Room <b className="text-white">{blockGroups?.find((g) => g.rooms.some((r) => r.id === roomID))?.typeName}{blockGroups ? ' · ' : ''}{blockGroups?.flatMap((g) => g.rooms).find((r) => r.id === roomID)?.name}</b>
+                <p className="text-[12.5px] text-gray-600">
+                  Room <b className="text-[#14213d]">{blockGroups?.find((g) => g.rooms.some((r) => r.id === roomID))?.typeName}{blockGroups ? ' · ' : ''}{blockGroups?.flatMap((g) => g.rooms).find((r) => r.id === roomID)?.name}</b>
                 </p>
               ) : (
               <label className="block"><span className={label}>Room to block *</span>
@@ -283,7 +283,7 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
                   <input value={blockReason} onChange={(e) => setBlockReason(e.target.value)} placeholder="Optional" className={input} />
                 </label>
               </div>
-              <p className="text-[11px] text-[#9fb3dc]">Check-out day is the first night that is free again. If the room has a reservation on these dates, Cloudbeds will refuse the block.</p>
+              <p className="text-[11px] text-gray-500">Check-out day is the first night that is free again. If the room has a reservation on these dates, Cloudbeds will refuse the block.</p>
             </div>
           )}
           {!blocking && <>
@@ -325,7 +325,7 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
             <label className="mt-3 block"><span className={label}>Price per night (MXN)</span>
               <input type="number" min="0" step="1" inputMode="decimal" value={nightly} onChange={(e) => setNightly(e.target.value)}
                 placeholder={setPerNight !== null ? `Set price: ${Math.round(setPerNight).toLocaleString('en-US')}` : 'Set price'} className={input} />
-              <span className="mt-0.5 block text-[11px] text-[#9fb3dc]">Leave empty to use the set price.</span>
+              <span className="mt-0.5 block text-[11px] text-gray-500">Leave empty to use the set price.</span>
             </label>
           )}
           <label className="mt-2 flex items-center gap-2 text-[12.5px]">
@@ -334,12 +334,12 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
           </label>
           </>}
 
-          {error && <p className="mt-3 rounded-xl border border-[#ff6b75]/40 bg-[#ff6b75]/15 px-3 py-2 text-[12.5px] text-[#ffb3b8]">{error}</p>}
+          {error && <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-[12.5px] text-red-700">{error}</p>}
         </div>
 
-        <div className="flex items-center justify-between gap-3 border-t border-[#8fb4ff]/20 bg-[#0f1c42]/50 px-6 py-3.5">
-          <span className="min-w-0 flex-1 text-[12.5px] text-[#9fb3dc]">
-            {blocking ? 'No guest or charge — the room just becomes unavailable' : chosen ? <>Total <b className="text-white">{effectiveTotal !== null ? `MXN ${Math.round(effectiveTotal).toLocaleString('en-US')}` : '—'}</b> · {n} night{n === 1 ? '' : 's'}</> : 'Check availability and choose a room'}
+        <div className="flex items-center justify-between gap-3 border-t border-[#eef0f4] bg-[#fbfbfc] px-6 py-3.5">
+          <span className="min-w-0 flex-1 text-[12.5px] text-gray-600">
+            {blocking ? 'No guest or charge — the room just becomes unavailable' : chosen ? <>Total <b className="text-[#14213d]">{effectiveTotal !== null ? `MXN ${Math.round(effectiveTotal).toLocaleString('en-US')}` : '—'}</b> · {n} night{n === 1 ? '' : 's'}</> : 'Check availability and choose a room'}
           </span>
           <div className="flex shrink-0 gap-2">
             <button onClick={onClose} className={btnLg}>Cancel</button>

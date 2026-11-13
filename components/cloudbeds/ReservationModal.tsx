@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { cbApi, statusLabel } from './shared'
 import { HELLO_TEXT } from '@/lib/hello-text'
 import { openHistoryPopup } from './MessageHistoryPopup'
-import { HOLO_BG, InlinePanel, area, btn, btnLg, chip, field, lbl, priBlue, priGreen, priRed, priTeal } from './ui'
+import { InlinePanel, area, btn, btnLg, chip, field, lbl, priBlue, priGreen, priRed, priTeal } from './ui'
 
 type Json = Record<string, unknown>
 
@@ -42,13 +42,13 @@ function GuestProfileFields({ profile }: { profile: Json }) {
   const rows = Object.entries(profile)
     .map(([k, v]) => [humanize(k), valueText(v)] as const)
     .filter(([, v]) => v !== null)
-  if (rows.length === 0) return <p className="text-sm text-[#9fb3dc]">No further guest details on file.</p>
+  if (rows.length === 0) return <p className="text-sm text-gray-500">No further guest details on file.</p>
   return (
     <div className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
       {rows.map(([label, value]) => (
         <div key={label}>
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#9fb3dc]">{label}</p>
-          <p className="text-sm text-[#eaf0fb]">{value}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</p>
+          <p className="text-sm text-[#14213d]">{value}</p>
         </div>
       ))}
     </div>
@@ -419,19 +419,18 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
   const roomDigit = r?.rooms[0]?.roomName ? (r.rooms[0].roomName.match(/\d+/)?.[0] ?? r.rooms[0].roomName.slice(0, 3)) : '–'
   const bd = r?.breakdown
   const paidAmt = r ? (bd?.paid ?? (r.total !== null && r.balance !== null ? r.total - r.balance : null)) : null
-  const card = 'rounded-xl border border-[#e4e0d4] bg-[#faf7f0] px-3 py-2.5 text-[#14213d] shadow-[0_2px_8px_rgba(0,0,0,.18)]'
-  const lblC = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[.12em] text-[#7a8394]'
+  const card = 'rounded-xl border border-[#e6e9f0] bg-white px-3 py-2.5'
   const row = 'flex justify-between gap-3 py-[2px] text-[12px]'
   const rowL = 'flex items-baseline gap-3 py-[2px] text-[12px]'
   const lblL = 'w-[52px] shrink-0 text-[#667085]'
-  const mini = 'rounded-lg border border-[#e4e0d4] bg-[#faf7f0] px-2.5 py-2 text-[#14213d]'
-  const chipSm = 'mr-2 inline-block rounded-full border border-[#d0d5dd] px-1.5 align-middle text-[8px] font-medium uppercase leading-[14px] tracking-wide text-[#667085] hover:border-[#128c7e] hover:text-[#5fe0cf]'
+  const mini = 'rounded-lg border border-[#e6e9f0] px-2.5 py-2'
+  const chipSm = 'mr-2 inline-block rounded-full border border-[#d0d5dd] px-1.5 align-middle text-[8px] font-medium uppercase leading-[14px] tracking-wide text-[#667085] hover:border-[#128c7e] hover:text-[#128c7e]'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#050b1f]/60 p-4" onClick={onClose}>
-      <div style={{ zoom: 0.9, background: HOLO_BG }} className="flex max-h-[calc((100vh-2rem)/0.9)] w-full max-w-[700px] flex-col overflow-y-auto rounded-3xl border border-[#8fb4ff]/25 text-[#eaf0fb] shadow-[0_30px_80px_rgba(0,0,0,.55)]" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#14213d]/45 p-4" onClick={onClose}>
+      <div style={{ zoom: 0.9 }} className="flex max-h-[calc((100vh-2rem)/0.9)] w-full max-w-[700px] flex-col overflow-y-auto rounded-3xl bg-white text-[#14213d] shadow-[0_30px_80px_rgba(8,12,24,.45)]" onClick={(e) => e.stopPropagation()}>
         {/* Banner */}
-        <div className="relative shrink-0 border-b border-[#8fb4ff]/20 bg-gradient-to-br from-[#2a4f9c]/55 via-[#1d3a78]/45 to-[#16305f]/30 px-5 pb-3 pt-3.5 text-white">
+        <div className="relative shrink-0 bg-gradient-to-br from-[#2a4f9c] via-[#1d3a78] to-[#16305f] px-5 pb-3 pt-3.5 text-white">
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               {r && <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold capitalize">{statusLabel(r.status)}</span>}
@@ -455,7 +454,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                     }}
                     className="h-[22px] w-[60px] rounded-md border border-white/30 bg-white/10 px-1 text-center text-[12px] font-bold text-white outline-none placeholder:text-white/50 focus:border-white/60" />
                   {time !== (r.estimatedArrivalTime ?? '') && /^([01]\d|2[0-3]):[0-5]\d$/.test(time) && (
-                    <button disabled={busy} onClick={() => act({ action: 'arrival_time', time }, 'Arrival time updated.')} className="rounded-full bg-white/90 px-2 py-px text-[10.5px] font-bold text-[#14264f] hover:bg-white disabled:opacity-60">Save</button>
+                    <button disabled={busy} onClick={() => act({ action: 'arrival_time', time }, 'Arrival time updated.')} className="rounded-full bg-white/90 px-2 py-px text-[10.5px] font-bold text-[#0e5f47] hover:bg-white disabled:opacity-60">Save</button>
                   )}
                 </span>
               </p>
@@ -472,10 +471,10 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
               </div>
               </div>
               {/* Balance */}
-              <div className="flex shrink-0 items-center justify-between gap-4 rounded-2xl border border-[#8fb4ff]/30 bg-[#0f1c42]/70 px-3 py-1.5 text-white shadow-[0_10px_26px_rgba(0,0,0,.3)] sm:justify-start">
+              <div className="flex shrink-0 items-center justify-between gap-4 rounded-2xl bg-white px-3 py-1.5 text-[#14213d] shadow-[0_10px_26px_rgba(8,12,24,.25)] sm:justify-start">
                 <div>
-                  <p className={`text-[9.5px] font-bold tracking-[.06em] ${owes ? 'text-[#ff6b75]' : 'text-[#3ccf8a]'}`}>{owes ? 'BALANCE DUE' : 'PAID IN FULL'}</p>
-                  <p className={`text-[16px] font-bold tracking-tight ${owes ? 'text-[#ff6b75]' : 'text-[#3ccf8a]'}`}>MXN {(r.balance ?? 0).toLocaleString('en-US')}</p>
+                  <p className={`text-[9.5px] font-bold tracking-[.06em] ${owes ? 'text-[#b42318]' : 'text-[#0e6b4a]'}`}>{owes ? 'BALANCE DUE' : 'PAID IN FULL'}</p>
+                  <p className={`text-[16px] font-bold tracking-tight ${owes ? 'text-[#b42318]' : 'text-[#0e6b4a]'}`}>MXN {(r.balance ?? 0).toLocaleString('en-US')}</p>
                 </div>
                 <button onClick={() => openMoney('payment')}
                   className={`h-[28px] whitespace-nowrap rounded-full px-3 text-[11.5px] font-semibold text-white transition ${mpKind === 'payment' ? 'bg-[#0e5f47] ring-4 ring-[#1f9d78]/25' : 'bg-gradient-to-b from-[#27ad86] to-[#1a8f6c] shadow-[0_4px_10px_rgba(31,157,120,.35),inset_0_1px_0_rgba(255,255,255,.25)] hover:brightness-95'}`}>
@@ -488,10 +487,10 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
         </div>
 
         {error && (
-          <div className="mx-5 mt-2.5 rounded-xl border border-[#ff6b75]/40 bg-[#ff6b75]/15 px-3 py-2 text-sm text-[#ffb3b8]">
+          <div className="mx-5 mt-2.5 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
             <p>{error}</p>
             {/balance/i.test(error) && (
-              <p className="mt-1 text-[13px] text-[#ffd0d4]">
+              <p className="mt-1 text-[13px] text-red-800">
                 Cloudbeds won&apos;t let an outside app check out a guest with an open balance (only its own screen has the &ldquo;check out anyway&rdquo; step).
                 Either clear the balance first, or{' '}
                 {link ? <a href={link} target="_blank" rel="noreferrer" className="font-semibold underline">open this reservation in Cloudbeds</a> : 'open it in Cloudbeds'} and check out there.
@@ -499,45 +498,45 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
             )}
           </div>
         )}
-        {msg && <p className="mx-5 mt-2.5 rounded-xl border border-[#3ccf8a]/40 bg-[#3ccf8a]/15 px-3 py-2 text-sm text-[#7be8b4]">{msg}</p>}
+        {msg && <p className="mx-5 mt-2.5 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{msg}</p>}
 
         {r && (
           <div className="flex flex-col gap-3 px-5 pb-4 pt-4">
             {/* Action row */}
             <div className="flex flex-wrap gap-1 pt-0.5">
               {canCheckIn && (
-                <button disabled={busy} onClick={() => act({ action: 'check_in' }, 'Checked in.')} className={`${btn} ${bt} !border-[#8fb4ff]/40 !bg-[#5b95f5]/20 !text-[#8fb4ff]`}>✓ Check in</button>
+                <button disabled={busy} onClick={() => act({ action: 'check_in' }, 'Checked in.')} className={`${btn} ${bt} !border-[#c9d9f7] !bg-[#f3f7ff] !text-[#2456b8]`}>✓ Check in</button>
               )}
               {canCheckOut && (
-                <button disabled={busy} onClick={() => (r.balance && r.balance > 0 ? setConfirmCheckOut(true) : act({ action: 'check_out' }, 'Checked out.'))} className={`${btn} ${bt} !border-[#ff6b75]/45 !text-[#ff6b75]`}>Check out</button>
+                <button disabled={busy} onClick={() => (r.balance && r.balance > 0 ? setConfirmCheckOut(true) : act({ action: 'check_out' }, 'Checked out.'))} className={`${btn} ${bt} !border-[#f3cfcb] !text-[#b42318]`}>Check out</button>
               )}
-              <button disabled={payBusy} onClick={() => { setMpKind(null); setQuick(null); setPay(null); setPayError(null); setConfirmPayLink((v) => !v) }} className={`${btn} ${bt} ${pay || confirmPayLink ? '!border-[#3ccf8a]/70 !bg-[#3ccf8a]/35' : '!border-[#3ccf8a]/45 !bg-[#3ccf8a]/20'} !text-[#7be8b4]`}>
+              <button disabled={payBusy} onClick={() => { setMpKind(null); setQuick(null); setPay(null); setPayError(null); setConfirmPayLink((v) => !v) }} className={`${btn} ${bt} ${pay || confirmPayLink ? '!border-[#9fd4c5] !bg-[#d9f0ea]' : '!border-[#c3e5db] !bg-[#e6f5f0]'} !text-[#0e5f47]`}>
                 🔗 {payBusy ? 'Creating…' : 'Payment link'}
               </button>
-              <button onClick={() => openMoney('refund')} className={`${btn} ${bt} !text-[#ff9aa0] ${mpKind === 'refund' ? '!border-[#ff6b75]/70 !bg-[#ff6b75]/20' : ''}`}>↩ Refund</button>
+              <button onClick={() => openMoney('refund')} className={`${btn} ${bt} !text-[#a3362b] ${mpKind === 'refund' ? '!border-[#e8aaa3] !bg-[#fff0ee]' : ''}`}>↩ Refund</button>
               {r.guestPhone && (
                 <button onClick={() => (quick === 'whatsapp' ? setQuick(null) : openQuick('whatsapp'))}
-                  className={quick === 'whatsapp' ? `${btn} ${bt} !border-[#128c7e] !bg-[#128c7e] !text-white shadow-[0_3px_8px_rgba(18,140,126,.35)]` : `${btn} ${bt} !border-[#8fb4ff]/40 !text-[#8fb4ff]`}>
+                  className={quick === 'whatsapp' ? `${btn} ${bt} !border-[#128c7e] !bg-[#128c7e] !text-white shadow-[0_3px_8px_rgba(18,140,126,.35)]` : `${btn} ${bt} !border-[#c9d9f7] !text-[#2456b8]`}>
                   💬 Message
                 </button>
               )}
               {r.guestEmail && (
                 <button onClick={() => (quick === 'email' ? setQuick(null) : openQuick('email'))}
-                  className={quick === 'email' ? `${btn} ${bt} !border-[#2456b8] !bg-[#2456b8] !text-white shadow-[0_3px_8px_rgba(36,86,184,.35)]` : `${btn} ${bt} !border-[#8fb4ff]/40 !text-[#8fb4ff]`}>
+                  className={quick === 'email' ? `${btn} ${bt} !border-[#2456b8] !bg-[#2456b8] !text-white shadow-[0_3px_8px_rgba(36,86,184,.35)]` : `${btn} ${bt} !border-[#c9d9f7] !text-[#2456b8]`}>
                   ✉ Email
                 </button>
               )}
-              <button onClick={() => openHistoryPopup({ reservationId: id, guestName: r.guestName })} className={`${btn} ${bt} !border-[#8fb4ff]/40 !text-[#8fb4ff]`}>Message history</button>
+              <button onClick={() => openHistoryPopup({ reservationId: id, guestName: r.guestName })} className={`${btn} ${bt} !border-[#c9d9f7] !text-[#2456b8]`}>Message history</button>
               <span className="flex-1" />
               {canCancel && (
-                <button disabled={busy} onClick={() => setConfirmCancel(true)} className={`${btn} ${bt} !border-[#ff6b75]/45 !bg-[#ff6b75]/10 !text-[#ff6b75]`}>Cancel reservation</button>
+                <button disabled={busy} onClick={() => setConfirmCancel(true)} className={`${btn} ${bt} !border-[#f3cfcb] !bg-[#fffafa] !text-[#b42318]`}>Cancel reservation</button>
               )}
             </div>
 
             {/* Add payment / refund */}
             {mpKind && (
               <InlinePanel tone={mpKind === 'refund' ? 'red' : 'green'} title={mpKind === 'refund' ? 'Refund a payment' : 'Add a payment'}
-                subtitle={mpKind === 'refund' ? <>Paid <b>{money(paidAmt)}</b></> : <>Balance due <b className="text-[#ff6b75]">{money(r.balance)}</b></>}
+                subtitle={mpKind === 'refund' ? <>Paid <b>{money(paidAmt)}</b></> : <>Balance due <b className="text-[#b42318]">{money(r.balance)}</b></>}
                 onClose={() => setMpKind(null)}>
                 <div className="grid grid-cols-2 gap-3">
                   <label className={lbl}>Amount (MXN)
@@ -557,14 +556,14 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                     <button className={chip(Number(mpAmount) === r.balance)} onClick={() => setMpAmount(String(r.balance))}>Full balance</button>
                     <button className={chip(false)} onClick={() => setMpAmount(String(Math.round(((r.balance ?? 0) / 2) * 100) / 100))}>50%</button>
                     {r.total !== null && nights > 0 && <button className={chip(false)} onClick={() => setMpAmount(String(Math.round(((r.total ?? 0) / nights) * 100) / 100))}>1 night</button>}
-                    <span className="ml-auto text-[12.5px] text-[#9fb3dc]">Remaining after: <b className="text-[#3ccf8a]">{money(Math.max(0, (r.balance ?? 0) - (Number(mpAmount) || 0)))}</b></span>
+                    <span className="ml-auto text-[12.5px] text-[#667085]">Remaining after: <b className="text-[#0e6b4a]">{money(Math.max(0, (r.balance ?? 0) - (Number(mpAmount) || 0)))}</b></span>
                   </div>
                 )}
                 <label className={lbl}>{mpKind === 'refund' ? 'Reason (optional)' : 'Note (optional)'}
                   <input value={mpNote} onChange={(e) => setMpNote(e.target.value)} placeholder={mpKind === 'refund' ? 'Reason for the refund' : 'e.g. paid at the front desk'} className={`${field} mt-1.5 normal-case tracking-normal`} />
                 </label>
-                {mpKind === 'refund' && <p className="rounded-xl border border-[#ff6b75]/40 bg-[#ff6b75]/15 px-3 py-2 text-[12.5px] leading-snug text-[#ffb3b8]">This records the refund in Cloudbeds only. It does not send money back to the guest, so return it yourself (card, transfer or cash).</p>}
-                {mpErr && <p className="text-sm text-[#ff9aa0]">{mpErr}</p>}
+                {mpKind === 'refund' && <p className="rounded-xl border border-[#f6d3cd] bg-[#fff4f2] px-3 py-2 text-[12.5px] leading-snug text-[#8a2a22]">This records the refund in Cloudbeds only. It does not send money back to the guest, so return it yourself (card, transfer or cash).</p>}
+                {mpErr && <p className="text-sm text-red-700">{mpErr}</p>}
                 <div className="flex justify-end gap-2.5">
                   <button onClick={() => setMpKind(null)} className={btnLg}>Cancel</button>
                   <button disabled={mpBusy || !mpMethod || !(Number(mpAmount) > 0)} onClick={submitMoney} className={mpKind === 'refund' ? priRed : priGreen}>
@@ -577,7 +576,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
             {/* Check out with balance */}
             {confirmCheckOut && owes && (
               <InlinePanel tone="amber" title="This guest still has a balance due" subtitle={<>{money(r.balance)} outstanding</>} onClose={() => setConfirmCheckOut(false)}>
-                <p className="rounded-xl border border-[#f0b548]/40 bg-[#f0b548]/15 px-3 py-2 text-[13px] leading-snug text-[#f5d58a]">
+                <p className="rounded-xl border border-[#f4e3a8] bg-[#fff9e8] px-3 py-2 text-[13px] leading-snug text-[#6b4a0a]">
                   {r.guestName} owes <b>MXN {r.balance!.toLocaleString('en-US')}</b>. Check out anyway? The balance stays open on the reservation in Cloudbeds.
                 </p>
                 <div className="flex flex-wrap justify-end gap-2.5">
@@ -591,7 +590,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
             {/* Cancel */}
             {confirmCancel && (
               <InlinePanel tone="red" title="Cancel this reservation?" subtitle={`${r.guestName} · ${r.startDate} – ${r.endDate} · #${id}`} onClose={() => setConfirmCancel(false)}>
-                <p className={`rounded-xl px-3 py-2 text-[13px] leading-snug ${isThirdParty ? 'border border-[#f0b548]/40 bg-[#f0b548]/15 font-semibold text-[#f5d58a]' : 'border border-[#ff6b75]/40 bg-[#0f1c42]/40 text-[#ffb3b8]'}`}>
+                <p className={`rounded-xl px-3 py-2 text-[13px] leading-snug ${isThirdParty ? 'border border-[#f4e3a8] bg-[#fff9e8] font-semibold text-[#6b4a0a]' : 'border border-[#f6d3cd] bg-white text-[#8a2a22]'}`}>
                   {isThirdParty ? 'This is an OTA / third-party booking' + (r.source ? ` (${r.source})` : '') + '. ' : ''}
                   Reservations made through an OTA or other third party (Airbnb, Booking.com, Expedia…) must also be cancelled directly with them. Cancelling here does not cancel it on their platform.
                 </p>
@@ -605,7 +604,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
             {/* Confirm payment link */}
             {confirmPayLink && (
               <InlinePanel tone="blue" title="Generate a payment link?" subtitle={<>For the balance of <b>{money(r.balance)}</b></>} onClose={() => setConfirmPayLink(false)}>
-                <p className="rounded-xl border border-[#8fb4ff]/30 bg-[#0f1c42]/40 px-3 py-2 text-[12.5px] leading-snug text-[#cfdcff]">
+                <p className="rounded-xl border border-[#d6e2f8] bg-white px-3 py-2 text-[12.5px] leading-snug text-[#475467]">
                   This creates a payment link for {r.guestName} and sends it to the guest by email and WhatsApp where contact details are on file.
                 </p>
                 <div className="flex justify-end gap-2.5">
@@ -618,21 +617,21 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
             {/* Payment link */}
             {(pay || payError) && (
               <InlinePanel tone="blue" title={pay ? `Payment link · MXN ${pay.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Payment link'} onClose={() => { setPay(null); setPayError(null) }}>
-                {payError && <p className="text-sm text-[#ff9aa0]">{payError}</p>}
+                {payError && <p className="text-sm text-red-600">{payError}</p>}
                 {pay && (
                   <>
                     <div className="flex gap-2">
-                      <input id="pay-link-input" readOnly value={pay.url} onFocus={(e) => e.currentTarget.select()} className={`${field} min-w-0 flex-1 !bg-[#0f1c42]/60 !text-xs !text-[#8fb4ff]`} />
+                      <input id="pay-link-input" readOnly value={pay.url} onFocus={(e) => e.currentTarget.select()} className={`${field} min-w-0 flex-1 !bg-[#f6f8fb] !text-xs !text-[#2456b8]`} />
                       <button onClick={copyPaymentLink} className={priGreen}>{copied ? 'Copied ✓' : 'Copy link'}</button>
                     </div>
                     <ul className="space-y-0.5 text-xs">
                       {([['Email', pay.email], ['WhatsApp', pay.whatsapp]] as const).map(([k, s]) => (
-                        <li key={k} className={s.status === 'sent' ? 'text-[#7be8b4]' : s.status === 'failed' ? 'text-[#ff9aa0]' : 'text-[#9fb3dc]'}>
+                        <li key={k} className={s.status === 'sent' ? 'text-emerald-700' : s.status === 'failed' ? 'text-red-600' : 'text-gray-500'}>
                           <b>{k}:</b> {s.status === 'sent' ? '✓ ' : s.status === 'failed' ? '✗ ' : '– '}{s.detail}
                         </li>
                       ))}
                     </ul>
-                    {pay.reused && <p className="rounded-xl bg-[#0f1c42]/60 px-3 py-2 text-[12.5px] text-[#9fb3dc]">A link for this balance already existed, so it was sent again.</p>}
+                    {pay.reused && <p className="rounded-xl bg-[#f6f8fb] px-3 py-2 text-[12.5px] text-[#667085]">A link for this balance already existed, so it was sent again.</p>}
                   </>
                 )}
               </InlinePanel>
@@ -641,20 +640,20 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
             {/* Message */}
             {quick && (
               <InlinePanel tone="teal" title={
-                <span className="inline-flex rounded-full bg-white/10 p-[3px]">
-                  {r.guestPhone && <button onClick={() => quick !== 'whatsapp' && openQuick('whatsapp')} className={`rounded-full px-4 py-1.5 text-[12.5px] ${quick === 'whatsapp' ? 'bg-white/90 font-semibold text-[#14264f] shadow' : 'font-medium text-[#9fb3dc]'}`}>WhatsApp</button>}
-                  {r.guestEmail && <button onClick={() => quick !== 'email' && openQuick('email')} className={`rounded-full px-4 py-1.5 text-[12.5px] ${quick === 'email' ? 'bg-white/90 font-semibold text-[#14264f] shadow' : 'font-medium text-[#9fb3dc]'}`}>Email</button>}
+                <span className="inline-flex rounded-full bg-[#e8eef0] p-[3px]">
+                  {r.guestPhone && <button onClick={() => quick !== 'whatsapp' && openQuick('whatsapp')} className={`rounded-full px-4 py-1.5 text-[12.5px] ${quick === 'whatsapp' ? 'bg-white font-semibold text-[#0e5f47] shadow-[0_1px_3px_rgba(16,24,40,.12)]' : 'font-medium text-[#667085]'}`}>WhatsApp</button>}
+                  {r.guestEmail && <button onClick={() => quick !== 'email' && openQuick('email')} className={`rounded-full px-4 py-1.5 text-[12.5px] ${quick === 'email' ? 'bg-white font-semibold text-[#0e5f47] shadow-[0_1px_3px_rgba(16,24,40,.12)]' : 'font-medium text-[#667085]'}`}>Email</button>}
                 </span>
-              } subtitle={<>to <b className="font-semibold text-[#eaf0fb]">{quick === 'whatsapp' ? r.guestPhone : r.guestEmail}</b> · {firstName}</>} onClose={() => setQuick(null)}>
+              } subtitle={<>to <b className="font-semibold text-[#14213d]">{quick === 'whatsapp' ? r.guestPhone : r.guestEmail}</b> · {firstName}</>} onClose={() => setQuick(null)}>
                 {quick === 'whatsapp' && waInfo && !waInfo.windowOpen && (
                   <>
-                    <p className="text-[12.5px] text-[#9fb3dc]">This guest hasn&apos;t written in the last 24 hours, so this goes out as Soirée&apos;s approved hello message. Write the reason in one sentence.</p>
+                    <p className="text-[12.5px] text-[#667085]">This guest hasn&apos;t written in the last 24 hours, so this goes out as Soirée&apos;s approved hello message. Write the reason in one sentence.</p>
                     <div className="flex flex-wrap items-center gap-2">
                       {(['es', 'en'] as const).map((l) => (
                         <button key={l} onClick={() => setHelloLang(l)} className={chip(helloLang === l)}>{l === 'es' ? 'Español' : 'English'}</button>
                       ))}
-                      <span className="mx-1 h-4 w-px bg-white/20" />
-                      <span className="text-xs text-[#9fb3dc]">Reason</span>
+                      <span className="mx-1 h-4 w-px bg-[#dfe5e3]" />
+                      <span className="text-xs text-[#7a8394]">Reason</span>
                       {HELLO_REASONS[helloLang].map((x) => (
                         <button key={x.label} onClick={() => setQuickText(x.text)} className={chip(quickText === x.text)}>{x.label}</button>
                       ))}
@@ -669,43 +668,43 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                   placeholder={quick === 'whatsapp' ? (waInfo && !waInfo.windowOpen ? 'Why are you writing? One short sentence.' : 'Write a message… (sent as staff, like on the Messages page)') : 'Write the email…'}
                   className={area} />
                 {quick === 'whatsapp' && waInfo && !waInfo.windowOpen && (
-                  <div className="rounded-[14px] border border-[#3ccf8a]/40 bg-[#3ccf8a]/15 px-3.5 py-3">
-                    <p className="mb-1 text-[10.5px] font-bold uppercase tracking-[.07em] text-[#7be8b4]">This is exactly what the guest will receive</p>
-                    <p className="whitespace-pre-wrap text-[13.5px] leading-relaxed text-[#d5f5e6]">
+                  <div className="rounded-[14px] border border-[#cfe8dc] bg-[#e9f5ef] px-3.5 py-3">
+                    <p className="mb-1 text-[10.5px] font-bold uppercase tracking-[.07em] text-[#5b8f7c]">This is exactly what the guest will receive</p>
+                    <p className="whitespace-pre-wrap text-[13.5px] leading-relaxed text-[#1f3a31]">
                       {HELLO_TEXT[helloLang](firstName, quickText.replace(/[\n\t]+/g, ' ').trim() || (helloLang === 'es' ? '[tu motivo aquí]' : '[your reason here]'))}
                     </p>
                   </div>
                 )}
                 {quick === 'email' && (
-                  <div className="rounded-[14px] border border-dashed border-[#8fb4ff]/35 bg-[#0f1c42]/40 px-3 py-2">
+                  <div className="rounded-[14px] border border-dashed border-[#d0d5dd] bg-white px-3 py-2">
                     <div className="flex items-center justify-between gap-2">
-                      <label className="flex items-center gap-2 text-xs font-semibold text-[#9fb3dc]">
+                      <label className="flex items-center gap-2 text-xs font-semibold text-gray-600">
                         <input type="checkbox" checked={sigOn} onChange={(e) => setSigOn(e.target.checked)} /> Signature
                       </label>
-                      <button onClick={() => setSigEdit((v) => !v)} className="text-xs font-semibold text-[#5fe0cf] hover:underline">{sigEdit ? 'Done' : sig ? 'Edit' : 'Add'}</button>
+                      <button onClick={() => setSigEdit((v) => !v)} className="text-xs font-semibold text-[#128c7e] hover:underline">{sigEdit ? 'Done' : sig ? 'Edit' : 'Add'}</button>
                     </div>
                     {sigEdit ? (
                       <>
                         <textarea value={sig} onChange={(e) => setSig(e.target.value)} rows={4} placeholder={SIGNATURE_SUGGESTION} className={`${area} mt-1.5`} />
                         {!sig.trim() && (
-                          <button onClick={() => setSig(SIGNATURE_SUGGESTION)} className="mt-1 text-xs font-semibold text-[#5fe0cf] hover:underline">Use this suggestion</button>
+                          <button onClick={() => setSig(SIGNATURE_SUGGESTION)} className="mt-1 text-xs font-semibold text-[#128c7e] hover:underline">Use this suggestion</button>
                         )}
                         <div className="mt-1 flex items-center gap-3 text-xs">
                           {sigCanEdit && sig.trim() !== sigDefault && (
-                            <button disabled={quickBusy} onClick={saveSignatureDefault} className="font-semibold text-[#5fe0cf] hover:underline">Save as default for everyone</button>
+                            <button disabled={quickBusy} onClick={saveSignatureDefault} className="font-semibold text-[#128c7e] hover:underline">Save as default for everyone</button>
                           )}
-                          <span className="text-[#9fb3dc]">Changes here apply to this email only unless you save them.</span>
+                          <span className="text-gray-500">Changes here apply to this email only unless you save them.</span>
                         </div>
                       </>
                     ) : sigOn && sig ? (
-                      <p className="mt-1 whitespace-pre-wrap text-xs text-[#9fb3dc]">{sig}</p>
+                      <p className="mt-1 whitespace-pre-wrap text-xs text-gray-600">{sig}</p>
                     ) : !sig ? (
-                      <p className="mt-1 text-xs text-[#8ea3cf]">No signature yet.</p>
+                      <p className="mt-1 text-xs text-gray-400">No signature yet.</p>
                     ) : null}
                   </div>
                 )}
                 <div className="flex items-center justify-end gap-3">
-                  {quickMsg && <p className={`mr-auto text-sm ${quickMsg.ok ? 'text-[#7be8b4]' : 'text-[#ff9aa0]'}`}>{quickMsg.text}</p>}
+                  {quickMsg && <p className={`mr-auto text-sm ${quickMsg.ok ? 'text-emerald-700' : 'text-red-600'}`}>{quickMsg.text}</p>}
                   <button disabled={quickBusy || !quickText.trim() || (quick === 'email' && !quickSubject.trim())} onClick={sendQuick} className={quick === 'whatsapp' ? priTeal : priBlue}>
                     {quickBusy ? 'Sending…' : quick === 'whatsapp' ? 'Send WhatsApp ➤' : 'Send email ➤'}
                   </button>
@@ -716,16 +715,16 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
             {panelOpen ? (
               /* Collapsed summary while a panel is open */
               <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-                <div className={mini}><p className="text-[11px] font-semibold uppercase tracking-[.06em] text-[#667085]">Room</p><p className="mt-0.5 text-[13.5px] font-semibold">{roomNames}</p></div>
-                <div className={mini}><p className="text-[11px] font-semibold uppercase tracking-[.06em] text-[#667085]">Total</p><p className="mt-0.5 text-[13.5px] font-semibold">{money(r.total)}</p></div>
-                <div className={mini}><p className="text-[11px] font-semibold uppercase tracking-[.06em] text-[#667085]">Paid</p><p className="mt-0.5 text-[13.5px] font-semibold text-[#0e6b4a]">{money(paidAmt)}</p></div>
-                <div className={mini}><p className="text-[11px] font-semibold uppercase tracking-[.06em] text-[#667085]">Arrival</p><p className="mt-0.5 text-[13.5px] font-semibold">{r.estimatedArrivalTime || '—'}</p></div>
+                <div className={mini}><p className="text-[11px] font-semibold uppercase tracking-[.06em] text-[#7a8394]">Room</p><p className="mt-0.5 text-[13.5px] font-semibold">{roomNames}</p></div>
+                <div className={mini}><p className="text-[11px] font-semibold uppercase tracking-[.06em] text-[#7a8394]">Total</p><p className="mt-0.5 text-[13.5px] font-semibold">{money(r.total)}</p></div>
+                <div className={mini}><p className="text-[11px] font-semibold uppercase tracking-[.06em] text-[#7a8394]">Paid</p><p className="mt-0.5 text-[13.5px] font-semibold text-[#0e6b4a]">{money(paidAmt)}</p></div>
+                <div className={mini}><p className="text-[11px] font-semibold uppercase tracking-[.06em] text-[#7a8394]">Arrival</p><p className="mt-0.5 text-[13.5px] font-semibold">{r.estimatedArrivalTime || '—'}</p></div>
               </div>
             ) : (
               <div className="grid gap-2.5 sm:grid-cols-2">
                 {/* Room */}
                 <div className={card}>
-                  <p className={lblC}>{r.rooms.length > 1 ? `Rooms (${r.rooms.length})` : 'Room'}</p>
+                  <p className={lbl}>{r.rooms.length > 1 ? `Rooms (${r.rooms.length})` : 'Room'}</p>
                   <div className="space-y-2">
                     {(r.rooms.length ? r.rooms : [{ roomName: null, roomTypeName: '—' } as Detail['rooms'][number]]).map((x, i) => (
                       <div key={i} className="flex items-center gap-3">
@@ -737,7 +736,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                           <p className="truncate text-[11px] text-[#667085]">{x.roomTypeName}</p>
                         </div>
                         {r.rooms.length > 1 && (
-                          <p className="ml-auto shrink-0 whitespace-nowrap rounded-full bg-[#eceef2] px-2 py-0.5 text-[11px] font-semibold text-[#475467]">
+                          <p className="ml-auto shrink-0 whitespace-nowrap rounded-full bg-[#f3f5f8] px-2 py-0.5 text-[11px] font-semibold text-[#475467]">
                             {(x.adults ?? 0) + (x.children ?? 0)} guest{(x.adults ?? 0) + (x.children ?? 0) === 1 ? '' : 's'}
                             {(x.children ?? 0) > 0 ? ` · ${x.adults ?? 0}A ${x.children}C` : ''}
                           </p>
@@ -745,25 +744,25 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                       </div>
                     ))}
                   </div>
-                  <div className="mt-2 border-t border-[#e4e0d4] pt-2">
+                  <div className="mt-2 border-t border-[#eef0f4] pt-2">
                     <div className={row}><span className="text-[#667085]">Guests</span><span>{r.adults} adult{r.adults === 1 ? '' : 's'} · {r.children} child{r.children === 1 ? '' : 'ren'}</span></div>
                   </div>
                 </div>
 
                 {/* Price */}
                 <div className={card}>
-                  <div className="flex justify-between"><p className={lblC}>Price breakdown</p><span className={`text-xs font-semibold ${owes ? 'text-[#b42318]' : 'text-[#0e6b4a]'}`}>{owes ? 'Unpaid' : 'Paid'}</span></div>
+                  <div className="flex justify-between"><p className={lbl}>Price breakdown</p><span className={`text-xs font-semibold ${owes ? 'text-[#b42318]' : 'text-[#0e6b4a]'}`}>{owes ? 'Unpaid' : 'Paid'}</span></div>
                   {bd?.subTotal != null && <div className={row}><span className="text-[#667085]">Room · {nights} night{nights === 1 ? '' : 's'}</span><span>{money(bd.subTotal)}</span></div>}
                   {bd?.additionalItems != null && bd.additionalItems !== 0 && <div className={row}><span className="text-[#667085]">Extras</span><span>{money(bd.additionalItems)}</span></div>}
                   {bd?.taxesFees != null && <div className={row}><span className="text-[#667085]">Taxes &amp; fees</span><span>{money(bd.taxesFees)}</span></div>}
-                  <div className={`${row} mt-1 border-t border-[#e4e0d4] pt-2.5 font-bold`}><span>Grand total</span><span>{money(r.total)}</span></div>
+                  <div className={`${row} mt-1 border-t border-[#e6e9f0] pt-2.5 font-bold`}><span>Grand total</span><span>{money(r.total)}</span></div>
                   <div className={row}><span className="text-[#667085]">Paid</span><span className="font-semibold text-[#0e6b4a]">{money(paidAmt)}</span></div>
-                  <div className="mt-1.5 h-1.5 rounded-full bg-[#eceef2]"><i className="block h-full rounded-full bg-[#1f9d78]" style={{ width: `${r.total ? Math.min(100, Math.max(0, ((paidAmt ?? 0) / r.total) * 100)) : 0}%` }} /></div>
+                  <div className="mt-1.5 h-1.5 rounded-full bg-[#f3d9d5]"><i className="block h-full rounded-full bg-[#1f9d78]" style={{ width: `${r.total ? Math.min(100, Math.max(0, ((paidAmt ?? 0) / r.total) * 100)) : 0}%` }} /></div>
                 </div>
 
                 {/* Guest */}
                 <div className={card}>
-                  <p className={lblC}>Guest</p>
+                  <p className={lbl}>Guest</p>
                   {r.guestPhone && (
                     <div className={rowL}><span className={lblL}>Phone</span>
                       <span><button onClick={() => openQuick('whatsapp')} title="Send a WhatsApp message" className={chipSm}>message</button>
@@ -777,14 +776,14 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                     </div>
                   )}
                   {r.guestCountry && <div className={rowL}><span className={lblL}>Country</span><span>{countryName(r.guestCountry)}</span></div>}
-                  {!r.guestPhone && !r.guestEmail && <p className="py-1 text-sm text-[#667085]">No contact details</p>}
+                  {!r.guestPhone && !r.guestEmail && <p className="py-1 text-sm text-gray-500">No contact details</p>}
                 </div>
 
                 {/* Requests & notes */}
                 <div className={card}>
-                  <p className={lblC}>Requests &amp; notes</p>
+                  <p className={lbl}>Requests &amp; notes</p>
                   {r.specialRequests ? (
-                    <div className="rounded-[10px] border border-[#f0d9a0] bg-[#fff3d6] px-3 py-2.5 text-[13px] leading-snug">
+                    <div className="rounded-[10px] border border-[#f4e3a8] bg-[#fff9e8] px-3 py-2.5 text-[13px] leading-snug">
                       <p className="text-[10.5px] font-bold uppercase tracking-[.07em] text-[#a8741c]">Special request</p>
                       <p className="whitespace-pre-wrap">{r.specialRequests}</p>
                     </div>
@@ -792,9 +791,9 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                   {notes.length > 0 ? (
                     <div className={`${r.specialRequests ? "mt-2" : ""} max-h-32 space-y-1.5 overflow-y-auto`}>
                       {notes.map((n, i) => (
-                        <div key={i} className="rounded-[10px] bg-[#f3f1ea] px-3 py-2 text-[13px]">
+                        <div key={i} className="rounded-[10px] bg-gray-50 px-3 py-2 text-[13px]">
                           <p className="whitespace-pre-wrap">{n.text}</p>
-                          <p className="mt-0.5 text-[11px] text-[#667085]">{[n.author, n.date.slice(0, 16)].filter(Boolean).join(' · ')}</p>
+                          <p className="mt-0.5 text-[11px] text-gray-500">{[n.author, n.date.slice(0, 16)].filter(Boolean).join(' · ')}</p>
                         </div>
                       ))}
                     </div>
@@ -803,8 +802,8 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
               </div>
             )}
 
-            <details className="rounded-xl border border-[#8fb4ff]/25 px-3 py-2">
-              <summary className="cursor-pointer text-[12px] font-semibold text-[#cfdcff]">Quick edit · stay dates</summary>
+            <details className="rounded-xl border border-[#e6e9f0] px-3 py-2">
+              <summary className="cursor-pointer text-[12px] font-semibold text-[#475467]">Quick edit · stay dates</summary>
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <label className={lbl}>Arrival
                   <input type="date" value={checkin} onChange={(e) => setCheckin(e.target.value)} className={`${field} mt-1.5 normal-case tracking-normal`} />
@@ -821,8 +820,8 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
             </details>
 
             {link && (
-              <div className="flex justify-end border-t border-[#8fb4ff]/15 pt-3">
-                <a href={link} target="_blank" rel="noreferrer" className="text-[13px] font-medium text-[#8ea3cf] hover:text-[#eaf0fb]">Open in Cloudbeds ↗</a>
+              <div className="flex justify-end border-t border-[#eef0f4] pt-3">
+                <a href={link} target="_blank" rel="noreferrer" className="text-[13px] font-medium text-[#98a2b3] hover:text-[#475467]">Open in Cloudbeds ↗</a>
               </div>
             )}
           </div>
