@@ -25,7 +25,7 @@ interface Chunk {
 }
 
 const LEFT_W = 148
-const ROW_H = 36
+const ROW_H = 32
 const SPANS = [{ days: 7, label: '1w' }, { days: 14, label: '2w' }, { days: 21, label: '3w' }, { days: 30, label: '1m' }] as const
 const DEFAULT_SPAN = 21 // days that fit on screen by default
 const MIN_DAY_W = 30
@@ -51,12 +51,12 @@ const BAR_FILL: Record<string, [string, string]> = {
   [EDGE.checked_in]: ['#3ccf8a', '#1c9a66'],
   [EDGE.checked_out]: ['#8f9aab', '#667084'],
 }
-const HEAD_BG = '#17293b'
-const ROOM_BG = '#162a3c'
+const HEAD_BG = '#16254f'
+const ROOM_BG = '#142350'
 const HOLO_BG =
-  'repeating-radial-gradient(circle at 92% 8%,transparent 0,transparent 58px,rgba(111,227,227,.05) 58px,rgba(111,227,227,.05) 59px),' +
-  'linear-gradient(rgba(111,227,227,.07) 1px,transparent 1px) 0 0/44px 44px,linear-gradient(90deg,rgba(111,227,227,.07) 1px,transparent 1px) 0 0/44px 44px,' +
-  'radial-gradient(900px 520px at 0% 0%,rgba(50,160,180,.38),transparent 62%),radial-gradient(900px 520px at 100% 100%,rgba(70,90,190,.28),transparent 62%),linear-gradient(180deg,#1a3347,#122436)'
+  'repeating-radial-gradient(circle at 92% 8%,transparent 0,transparent 58px,rgba(143,180,255,.05) 58px,rgba(143,180,255,.05) 59px),' +
+  'linear-gradient(rgba(143,180,255,.07) 1px,transparent 1px) 0 0/44px 44px,linear-gradient(90deg,rgba(143,180,255,.07) 1px,transparent 1px) 0 0/44px 44px,' +
+  'radial-gradient(900px 520px at 0% 0%,rgba(70,120,240,.40),transparent 62%),radial-gradient(900px 520px at 100% 100%,rgba(100,80,220,.26),transparent 62%),linear-gradient(180deg,#1b3470,#12224a)'
 
 function addDays(d: string, n: number) {
   const x = new Date(`${d}T12:00:00Z`)
@@ -88,14 +88,14 @@ function mergeChunk(prev: Chunk | null, next: Chunk, from: string, to: string): 
   }
 }
 
-/** Where the booking came from, as a short text chip (Booking.com, Airbnb, Walk-in, Website). */
-function sourceName(src?: string): string | null {
+/** Where the booking came from, as a small letter badge: B. Booking.com, A Airbnb, W walk-in, @ website. */
+function sourceBadge(src?: string): { t: string; color: string; name: string } | null {
   const s = (src ?? '').toLowerCase()
   if (!s) return null
-  if (s.includes('booking.com')) return 'Booking.com'
-  if (s.includes('airbnb')) return 'Airbnb'
-  if (s.includes('walk')) return 'Walk-in'
-  if (s.includes('website') || s.includes('direct') || s.includes('engine') || s.includes('soiree') || s.includes('soirée')) return 'Website'
+  if (s.includes('booking.com')) return { t: 'B.', color: '#0b4aa8', name: 'Booking.com' }
+  if (s.includes('airbnb')) return { t: 'A', color: '#ff385c', name: 'Airbnb' }
+  if (s.includes('walk')) return { t: 'W', color: '#1c9a66', name: 'Walk-in' }
+  if (s.includes('website') || s.includes('direct') || s.includes('engine') || s.includes('soiree') || s.includes('soirée')) return { t: '@', color: '#7a54d6', name: 'Website' }
   return null
 }
 
@@ -119,23 +119,23 @@ function Bar({ start, end, viewStart, totalDays, label, sub, bg, border, text, e
       </button>
     )
   }
-  const chip = sourceName(src)
-  const barH = ROW_H - 8
+  const badge = sourceBadge(src)
+  const barH = ROW_H - 10
   const [top, bottom] = BAR_FILL[edge] ?? BAR_FILL[EDGE.confirmed]
   return (
     <button
       onClick={onClick}
       onContextMenu={onContextMenu}
       title={title ?? label}
-      className="absolute flex items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-[8px] border pl-2.5 pr-1.5 text-left hover:brightness-110"
-      style={{ left: left + 1, width: w, top: (ROW_H - barH) / 2, height: barH, color: text, borderColor: 'rgba(255,255,255,.18)', background: `linear-gradient(180deg,${top},${bottom})`, boxShadow: '0 3px 8px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.22)' }}
+      className="absolute flex items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-[7px] border pl-2.5 pr-1.5 text-left hover:brightness-110"
+      style={{ left: left + 1, width: w, top: (ROW_H - barH) / 2, height: barH, color: text, borderColor: 'rgba(255,255,255,.18)', background: `linear-gradient(180deg,${top},${bottom})`, boxShadow: '0 2px 6px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.22)' }}
     >
-      <span className="min-w-0 flex-1 leading-tight">
-        <span className="block truncate text-[11px] font-bold">{label}</span>
-        {sub && w >= 70 && <span className="block truncate text-[9px] opacity-85">{sub}</span>}
+      {due && <i aria-label="Balance due" title="Balance due" className="absolute left-[3px] top-[3px] h-[6px] w-[6px] rounded-full bg-[#ff4d5a] ring-1 ring-white/70" />}
+      <span className="min-w-0 flex-1 truncate text-[11px] font-bold">
+        {label}
+        {sub && w >= 80 && <span className="ml-1.5 font-medium opacity-80">· {sub}</span>}
       </span>
-      {chip && w >= 150 && <span className="shrink-0 rounded-full border border-white/30 bg-white/[.18] px-1.5 py-[1px] text-[9px] font-semibold">{chip}</span>}
-      {due && <b aria-label="Balance due" title="Balance due" className="shrink-0 rounded-full bg-white px-1.5 py-[1px] text-[9px] font-bold text-[#d12a3a]">Due</b>}
+      {badge && w >= 60 && <i title={badge.name} className="inline-flex h-[15px] min-w-[15px] shrink-0 items-center justify-center rounded-[4px] bg-white px-0.5 text-[9px] font-extrabold not-italic leading-none" style={{ color: badge.color }}>{badge.t}</i>}
     </button>
   )
 }
@@ -513,16 +513,6 @@ export default function CalendarPage() {
     return bands
   }, [data, dayW])
 
-  const stats = (() => {
-    if (!data) return { arrivals: 0, departures: 0, inHouse: 0, due: 0 }
-    const all = [...data.bookings, ...data.unassigned].filter((b) => !/cancel|no_show/i.test(b.status))
-    return {
-      arrivals: all.filter((b) => b.start === data.today).length,
-      departures: all.filter((b) => b.end === data.today).length,
-      inHouse: all.filter((b) => b.start <= data.today && data.today < b.end).length,
-      due: all.filter((b) => dueOf(b.reservationID, b.due)).length,
-    }
-  })()
   const pill = `h-8 rounded-full border border-white/10 bg-white/[.06] px-3 text-[12px] font-medium text-[#eaf0fb] transition hover:bg-white/10`
 
   return (
@@ -542,29 +532,24 @@ export default function CalendarPage() {
           </div>
           <div className="flex items-center gap-1.5">
             <button onClick={() => scrollBy(-7)} className={`${pill} w-8 !px-0 text-base`} aria-label="Back a week">‹</button>
-            <button onClick={() => { if (data) { jumpTo(data.today); setMarkDay(data.today) } }} className={`${pill} font-bold !text-[#6fe3e3]`}>Today</button>
+            <button onClick={() => { if (data) { jumpTo(data.today); setMarkDay(data.today) } }} className={`${pill} font-bold !text-[#8fb4ff]`}>Today</button>
             <button onClick={() => scrollBy(7)} className={`${pill} w-8 !px-0 text-base`} aria-label="Forward a week">›</button>
             <div className="ml-1 flex rounded-full border border-white/10 bg-white/[.06] p-[3px]" role="group" aria-label="Days shown">
               {SPANS.map((o) => (
                 <button key={o.days} onClick={() => changeSpan(o.days)} aria-pressed={span === o.days}
-                  className={`h-[26px] rounded-full border px-2.5 text-[12px] font-semibold ${span === o.days ? 'border-[#6fe3e3]/50 bg-white/15 text-white' : 'border-transparent text-[#9aa8bb] hover:text-white'}`}>{o.label}</button>
+                  className={`h-[26px] rounded-full border px-2.5 text-[12px] font-semibold ${span === o.days ? 'border-[#8fb4ff]/50 bg-white/15 text-white' : 'border-transparent text-[#9aa8bb] hover:text-white'}`}>{o.label}</button>
               ))}
             </div>
           </div>
           <div className="flex items-center gap-1.5 text-[13px]">
             <input type="date" value={goTo} onChange={(e) => setGoTo(e.target.value)} aria-label="Go to date"
-              className="h-8 rounded-full border border-white/10 bg-white/[.06] px-3 text-[12px] text-[#eaf0fb] outline-none [color-scheme:dark] focus:border-[#6fe3e3]/60" />
+              className="h-8 rounded-full border border-white/10 bg-white/[.06] px-3 text-[12px] text-[#eaf0fb] outline-none [color-scheme:dark] focus:border-[#8fb4ff]/60" />
             <button onClick={() => goTo && jumpTo(goTo)} className={pill}>Go</button>
           </div>
-          <div className="min-w-[200px] flex-1"><SearchBar onOpen={setOpen} dark /></div>
+          <div className="min-w-0 flex-1" />
+          <div className="w-[300px] max-w-full"><SearchBar onOpen={setOpen} dark /></div>
           {data && (
             <div className="flex items-center gap-2">
-              {([['arrivals', stats.arrivals, '#6fe0a4'], ['departures', stats.departures, '#b9c3d6'], ['in house', stats.inHouse, '#ffffff']] as const).map(([l, v, c]) => (
-                <div key={l} className="flex h-9 flex-col justify-center rounded-xl border border-white/10 bg-white/[.06] px-3">
-                  <b className="text-[13.5px] leading-[1.1]" style={{ color: c }}>{v}</b>
-                  <span className="text-[9.5px] text-[#8a9bb0]">{l}</span>
-                </div>
-              ))}
               <button onClick={() => setCreating('block')} className={pill}>Block dates</button>
               <button onClick={() => setCreating('blank')} className={`${priGreen} !h-8 !text-[12px] shadow-[0_4px_18px_rgba(39,173,134,.5),inset_0_1px_0_rgba(255,255,255,.28)]`}>+ New reservation</button>
             </div>
@@ -584,10 +569,10 @@ export default function CalendarPage() {
         {!data && !error && <p className="py-10 text-center text-sm text-[#8a9bb0]">Loading the calendar…</p>}
 
         {data && (
-          <div ref={scroller} onScroll={onScroll} onMouseLeave={() => setHoverDay(null)} className="relative overflow-x-auto rounded-3xl border border-[#6fe3e3]/25 shadow-[0_0_40px_rgba(111,227,227,.08),0_24px_60px_rgba(0,0,0,.45)]" style={{ background: 'rgba(22,46,64,.5)' }}>
+          <div ref={scroller} onScroll={onScroll} onMouseLeave={() => setHoverDay(null)} className="relative overflow-x-auto rounded-3xl border border-[#8fb4ff]/25 shadow-[0_0_40px_rgba(143,180,255,.08),0_24px_60px_rgba(0,0,0,.45)]" style={{ background: 'rgba(22,40,92,.5)' }}>
             {loading && (
               <div className="pointer-events-none sticky top-0 left-0 z-30 h-0">
-                <span className="absolute left-2 top-1 rounded bg-[#162a3c] px-2 py-0.5 text-[10px] text-[#9aa8bb] shadow">Loading {loading === 'past' ? 'earlier' : 'later'} days…</span>
+                <span className="absolute left-2 top-1 rounded bg-[#16254f] px-2 py-0.5 text-[10px] text-[#9aa8bb] shadow">Loading {loading === 'past' ? 'earlier' : 'later'} days…</span>
               </div>
             )}
             <div className="relative" style={{ width: gridW }}>
@@ -600,14 +585,14 @@ export default function CalendarPage() {
               {data.days.includes(data.today) && (
                 <div className="pointer-events-none absolute bottom-0 z-[5] w-px" style={{
                   left: LEFT_W + data.days.indexOf(data.today) * dayW + dayW / 2 - 0.5, top: MONTH_ROW_H + PCT_ROW_H + DAY_ROW_H,
-                  background: 'linear-gradient(180deg,rgba(111,227,227,.38),rgba(111,227,227,.03))',
+                  background: 'linear-gradient(180deg,rgba(143,180,255,.38),rgba(143,180,255,.03))',
                 }} />
               )}
               <div className="sticky top-0 z-20 flex border-b border-white/10 text-[9px] font-semibold text-[#6f7f94]" style={{ background: HEAD_BG }}>
                 <div className="sticky left-0 z-10 border-r border-white/10" style={{ width: LEFT_W, minWidth: LEFT_W, height: MONTH_ROW_H, background: HEAD_BG }} />
                 <div className="relative" style={{ width: totalDays * dayW, height: MONTH_ROW_H }}>
                   {monthBands.map((m) => (
-                    <div key={m.left} className="absolute top-0 flex h-full items-center border-l-2 border-[#6fe3e3]/30 pl-1.5 tracking-[.12em]" style={{ left: m.left, width: m.width }}>{m.label}</div>
+                    <div key={m.left} className="absolute top-0 flex h-full items-center border-l-2 border-[#8fb4ff]/30 pl-1.5 tracking-[.12em]" style={{ left: m.left, width: m.width }}>{m.label}</div>
                   ))}
                 </div>
               </div>
@@ -618,9 +603,9 @@ export default function CalendarPage() {
                   const pct = roomCount ? ((dayStats?.occupiedByDay[d] ?? 0) / roomCount) * 100 : 0
                   const isToday = d === data.today
                   return (
-                    <div key={d} className={`relative flex items-center justify-center border-r border-white/[.06] ${isToday ? 'text-[#6fe3e3]' : ''}`} style={{ width: dayW, minWidth: dayW, height: PCT_ROW_H }}>
+                    <div key={d} className={`relative flex items-center justify-center border-r border-white/[.06] ${isToday ? 'text-[#8fb4ff]' : ''}`} style={{ width: dayW, minWidth: dayW, height: PCT_ROW_H }}>
                       {pct.toFixed(0)}%
-                      <i className="absolute bottom-0 left-1/2 h-[2px] -translate-x-1/2 rounded-full" style={{ width: dayW * 0.55, background: `linear-gradient(90deg,#6fe3e3 ${pct}%,rgba(255,255,255,.1) ${pct}%)` }} />
+                      <i className="absolute bottom-0 left-1/2 h-[2px] -translate-x-1/2 rounded-full" style={{ width: dayW * 0.55, background: `linear-gradient(90deg,#8fb4ff ${pct}%,rgba(255,255,255,.1) ${pct}%)` }} />
                     </div>
                   )
                 })}
@@ -635,10 +620,10 @@ export default function CalendarPage() {
                     <div key={d}
                       onClick={() => setMarkDay((m) => (m === d ? null : d))}
                       title={markDay === d ? 'Click to unmark this day' : 'Click to mark this whole day'}
-                      className={`flex cursor-pointer flex-col items-center justify-center border-r border-white/[.06] text-center leading-tight ${dt.getUTCDate() === 1 ? 'border-l-2 border-l-[#6fe3e3]/30' : ''} ${d === hoverDay ? 'bg-white/[.06]' : ''}`}
-                      style={{ width: dayW, minWidth: dayW, height: DAY_ROW_H, backgroundImage: isToday ? 'linear-gradient(180deg,rgba(111,227,227,.10),rgba(111,227,227,0))' : undefined }}>
+                      className={`flex cursor-pointer flex-col items-center justify-center border-r border-white/[.06] text-center leading-tight ${dt.getUTCDate() === 1 ? 'border-l-2 border-l-[#8fb4ff]/30' : ''} ${d === hoverDay ? 'bg-white/[.06]' : ''}`}
+                      style={{ width: dayW, minWidth: dayW, height: DAY_ROW_H, backgroundImage: isToday ? 'linear-gradient(180deg,rgba(143,180,255,.10),rgba(143,180,255,0))' : undefined }}>
                       <span className="text-[9.5px] font-medium text-[#8a9bb0]">{dt.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })}</span>
-                      <span className={`mt-px flex h-5 min-w-5 items-center justify-center rounded-full text-[11.5px] font-bold ${isToday ? 'border border-[#6fe3e3]/50 bg-[#6fe3e3]/15 text-[#6fe3e3]' : markDay === d ? 'bg-[#e08a00] text-white' : 'text-white'}`}>{dt.getUTCDate()}</span>
+                      <span className={`mt-px flex h-5 min-w-5 items-center justify-center rounded-full text-[11.5px] font-bold ${isToday ? 'border border-[#8fb4ff]/50 bg-[#8fb4ff]/15 text-[#8fb4ff]' : markDay === d ? 'bg-[#e08a00] text-white' : 'text-white'}`}>{dt.getUTCDate()}</span>
                     </div>
                   )
                 })}
@@ -656,7 +641,7 @@ export default function CalendarPage() {
                         onDragOver={(e) => { if (dragType && dragType !== t.id) e.preventDefault() }}
                         onDrop={() => { if (dragType) moveType(dragType, t.id); setDragType(null) }}
                         onDragEnd={() => setDragType(null)}
-                        className={`sticky left-0 z-10 flex items-center border-r border-white/10 pr-1 ${dragType === t.id ? 'opacity-50' : ''} ${dragType && dragType !== t.id ? 'outline-dashed outline-1 -outline-offset-2 outline-[#6fe3e3]/50' : ''}`}
+                        className={`sticky left-0 z-10 flex items-center border-r border-white/10 pr-1 ${dragType === t.id ? 'opacity-50' : ''} ${dragType && dragType !== t.id ? 'outline-dashed outline-1 -outline-offset-2 outline-[#8fb4ff]/50' : ''}`}
                         style={{ width: LEFT_W, minWidth: LEFT_W, height: TYPE_ROW_H, backgroundColor: HEAD_BG, backgroundImage: 'linear-gradient(rgba(255,255,255,.07),rgba(255,255,255,.07))' }}
                       >
                                                 <span title="Drag to re-order" className="cursor-grab select-none px-0.5 text-[11px] leading-none text-white/30 hover:text-white/70" aria-hidden="true">⋮⋮</span>
@@ -677,7 +662,7 @@ export default function CalendarPage() {
                         const rate = t.rates[d]
                         return (
                           <div key={d}
-                            className={`flex flex-col items-center justify-center border-r border-white/[.05] leading-tight ${new Date(`${d}T12:00:00Z`).getUTCDate() === 1 ? 'border-l-2 border-l-[#6fe3e3]/30' : ''}`}
+                            className={`flex flex-col items-center justify-center border-r border-white/[.05] leading-tight ${new Date(`${d}T12:00:00Z`).getUTCDate() === 1 ? 'border-l-2 border-l-[#8fb4ff]/30' : ''}`}
                             style={{ width: dayW, minWidth: dayW, height: TYPE_ROW_H, color: '#8a93a3' }}>
                             {rate ? (
                               <>
@@ -713,7 +698,7 @@ export default function CalendarPage() {
                                 ? d >= (pick.hover < pick.start ? pick.hover : pick.start) && d <= (pick.hover < pick.start ? pick.start : pick.hover)
                                 : pick?.roomID === room.id && d === pick.start
                               const dow = new Date(`${d}T12:00:00Z`).getUTCDay()
-                              const bg = inRange ? 'bg-[#3ccf8a]/30' : d === hoverDay ? 'bg-white/[.06]' : d === data.today ? 'bg-[#6fe3e3]/[.035]' : dow === 0 || dow === 6 ? 'bg-white/[.025]' : ''
+                              const bg = inRange ? 'bg-[#3ccf8a]/30' : d === hoverDay ? 'bg-white/[.06]' : d === data.today ? 'bg-[#8fb4ff]/[.035]' : dow === 0 || dow === 6 ? 'bg-white/[.025]' : ''
                               return (
                                 <div key={d}
                                   onClick={canPick ? () => clickDay(room, t.id, d) : undefined}
@@ -726,7 +711,7 @@ export default function CalendarPage() {
                               )
                             })}
                             <div className="pointer-events-none absolute inset-0" style={{
-                              backgroundImage: 'linear-gradient(to left, rgba(111,227,227,.09) 1px, transparent 1px)',
+                              backgroundImage: 'linear-gradient(to left, rgba(143,180,255,.09) 1px, transparent 1px)',
                               backgroundSize: `${dayW}px 100%`,
                             }} />
                             {blocks.map((b, i) => {
@@ -739,7 +724,7 @@ export default function CalendarPage() {
                             })}
                             {stays.map((s) => (
                               <Bar key={`${s.reservationID}-${s.start}`} start={s.start} end={s.end} viewStart={data.start} totalDays={totalDays}
-                                label={s.guestName} sub={`${diff(s.start, s.end)} night${diff(s.start, s.end) === 1 ? '' : 's'}`} due={dueOf(s.reservationID, s.due)} src={s.src}
+                                label={s.guestName} sub={`${diff(s.start, s.end)}n`} due={dueOf(s.reservationID, s.due)} src={s.src}
                                 edge={statusEdge(s.status)} bg="" border="" text="#fff" onClick={() => setOpen(s.reservationID)} dayW={dayW}
                                 onContextMenu={(e) => {
                                   e.preventDefault()
