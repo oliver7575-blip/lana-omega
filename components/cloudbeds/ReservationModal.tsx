@@ -731,10 +731,11 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                         <div className="flex h-8 min-w-[32px] shrink-0 items-center justify-center rounded-lg bg-[#e3edff] px-1.5 text-[14px] font-bold text-[#1d4ed8]">
                           {x.roomName ? (x.roomName.match(/\d+/)?.[0] ?? x.roomName.slice(0, 3)) : '–'}
                         </div>
-                        <div className="min-w-0">
-                          <p className="truncate text-[13px] font-bold">{x.roomName ?? 'Not assigned'}</p>
-                          <p className="truncate text-[11px] text-[#667085]">{x.roomTypeName}</p>
-                        </div>
+                        <p className="min-w-0 truncate text-[13px]">
+                          {!x.roomName && <span className="font-bold">Not assigned · </span>}
+                          {x.roomName && (x.roomName.match(/\d+/)?.[0] ?? x.roomName.slice(0, 3)) !== x.roomName && <span className="font-bold">{x.roomName} · </span>}
+                          <span className="text-[#667085]">{x.roomTypeName}</span>
+                        </p>
                         {r.rooms.length > 1 && (
                           <p className="ml-auto shrink-0 whitespace-nowrap rounded-full bg-[#f3f5f8] px-2 py-0.5 text-[11px] font-semibold text-[#475467]">
                             {(x.adults ?? 0) + (x.children ?? 0)} guest{(x.adults ?? 0) + (x.children ?? 0) === 1 ? '' : 's'}
