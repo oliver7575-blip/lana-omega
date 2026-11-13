@@ -281,7 +281,7 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
         {sidebar}
       </aside>
 
-      <div className={`min-w-0 flex-1 ${pinned ? 'md:pl-[202px]' : ''}`}>
+      <div className={`min-w-0 flex-1 ${pinned ? 'md:pl-[192px]' : ''}`}>
         {selfStyled ? (
           children
         ) : (
