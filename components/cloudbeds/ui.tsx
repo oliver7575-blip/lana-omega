@@ -88,3 +88,9 @@ export function InlinePanel({
     </div>
   )
 }
+
+/** The deep Soirée-blue grid background shared by the calendar and the side menu that slides over it. */
+export const HOLO_BG =
+  'repeating-radial-gradient(circle at 92% 8%,transparent 0,transparent 58px,rgba(143,180,255,.05) 58px,rgba(143,180,255,.05) 59px),' +
+  'linear-gradient(rgba(143,180,255,.07) 1px,transparent 1px) 0 0/44px 44px,linear-gradient(90deg,rgba(143,180,255,.07) 1px,transparent 1px) 0 0/44px 44px,' +
+  'radial-gradient(900px 520px at 0% 0%,rgba(70,120,240,.40),transparent 62%),radial-gradient(900px 520px at 100% 100%,rgba(100,80,220,.26),transparent 62%),linear-gradient(180deg,#1b3470,#12224a)'

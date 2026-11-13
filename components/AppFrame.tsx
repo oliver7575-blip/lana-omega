@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import LiveRefresh from './LiveRefresh'
+import { HOLO_BG } from '@/components/cloudbeds/ui'
 import {
   AlertIcon,
   DollarIcon,
@@ -175,12 +176,20 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
   )
 
   const sidebar = (
-    <nav className="flex h-full flex-col px-3 py-6">
-      <div className="mb-8 text-center">
-        <p className="font-display text-base italic text-clay">Lana · admin</p>
-        <p className="font-display text-[23px] uppercase italic tracking-tight text-white">
-          {info?.tenantName ?? '\u00a0'}
-        </p>
+    <nav className={`flex h-full flex-col px-3 ${focus ? 'pb-6 pt-[24px]' : 'py-6'}`}>
+      {focus ? (
+        // Same Soirée wordmark, in the same spot, as the calendar header underneath (centred over its 149px room column).
+        <div className="-mx-3 mb-4 flex h-10 shrink-0 items-center justify-center" style={{ width: 149, marginLeft: 8 }}>
+          <Link href="/cloudbeds" className="font-display text-[40px] font-semibold italic leading-none tracking-tight text-white">Soirée</Link>
+        </div>
+      ) : null}
+      <div className={`${focus ? 'mb-4' : 'mb-8'} text-center`}>
+        {!focus && <p className="font-display text-base italic text-clay">Lana · admin</p>}
+        {!focus && (
+          <p className="font-display text-[23px] uppercase italic tracking-tight text-white">
+            {info?.tenantName ?? '\u00a0'}
+          </p>
+        )}
         {info?.tenants && info.tenants.length > 1 && (
           <select
             aria-label="Switch hotel"
@@ -253,6 +262,7 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
         <span className={`pointer-events-none fixed left-0 top-1/2 z-50 h-16 w-[3px] -translate-y-1/2 rounded-r-full bg-white/30 transition-opacity ${peek ? 'opacity-0' : 'opacity-100'}`} aria-hidden="true" />
       )}
       <aside
+        style={focus ? { background: HOLO_BG, borderColor: 'rgba(143,180,255,.25)' } : undefined}
         className={`fixed inset-y-0 left-0 z-40 w-72 border-r border-line bg-surface transition-transform duration-200 ${
           focus
             ? `!z-50 ${peek ? '!translate-x-0 shadow-[8px_0_32px_rgba(0,0,0,.45)]' : ''} !w-[169px] ${peek ? '' : 'md:-translate-x-full'}`

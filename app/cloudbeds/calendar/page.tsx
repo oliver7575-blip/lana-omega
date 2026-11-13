@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import ReservationModal from '@/components/cloudbeds/ReservationModal'
-import { btn, field, headerGradient, lbl, priGreen } from '@/components/cloudbeds/ui'
+import { btn, field, headerGradient, HOLO_BG, lbl, priGreen } from '@/components/cloudbeds/ui'
 import NewReservationModal from '@/components/cloudbeds/NewReservationModal'
 import BlockModal from '@/components/cloudbeds/BlockModal'
 import SearchBar from '@/components/cloudbeds/SearchBar'
@@ -53,10 +53,6 @@ const BAR_FILL: Record<string, [string, string]> = {
 }
 const HEAD_BG = '#16254f'
 const ROOM_BG = '#142350'
-const HOLO_BG =
-  'repeating-radial-gradient(circle at 92% 8%,transparent 0,transparent 58px,rgba(143,180,255,.05) 58px,rgba(143,180,255,.05) 59px),' +
-  'linear-gradient(rgba(143,180,255,.07) 1px,transparent 1px) 0 0/44px 44px,linear-gradient(90deg,rgba(143,180,255,.07) 1px,transparent 1px) 0 0/44px 44px,' +
-  'radial-gradient(900px 520px at 0% 0%,rgba(70,120,240,.40),transparent 62%),radial-gradient(900px 520px at 100% 100%,rgba(100,80,220,.26),transparent 62%),linear-gradient(180deg,#1b3470,#12224a)'
 
 function addDays(d: string, n: number) {
   const x = new Date(`${d}T12:00:00Z`)
