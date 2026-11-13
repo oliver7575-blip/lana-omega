@@ -208,7 +208,6 @@ export default function DashviewPage() {
     { n: summary?.stayovers, label: 'Stay overs', color: '#a58cff' },
     { n: summary?.roomsOccupied, label: 'Accommodations booked', color: BLUE, pct: summary?.percentageOccupied },
     { n: ins?.freeTonight, label: 'Free tonight', color: '#7fd6ff' },
-    { n: ins ? ins.dueList.length : undefined, label: 'Payments due', color: '#ff6b75' },
   ]
 
   return (
@@ -234,7 +233,7 @@ export default function DashviewPage() {
         {summaryError && <p className="mb-3 rounded-xl border border-[#ff6b75]/40 bg-[#ff6b75]/15 px-4 py-2 text-sm text-[#ffd0d4]">{summaryError}</p>}
 
         {/* Top tiles */}
-        <div className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <div className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
           {stats.map((c) => (
             <div key={c.label} className={`flex items-center justify-between gap-2 rounded-2xl border ${LINE} px-4 py-3`} style={{ background: CARD_BG }}>
               <div className="min-w-0">
