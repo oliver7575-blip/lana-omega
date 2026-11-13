@@ -57,11 +57,9 @@ export async function claudeDaily(
 
 /**
  * Meta: WhatsApp Business Account pricing analytics (conversation/message charges).
- * Meta reports `cost` in whichever currency the WABA actually bills in — not
- * necessarily USD. The `currency` embedded in each pricing_analytics data point is
- * NOT reliable (seen reporting "USD" while the account's real balance and payment
- * history, in Meta Business Suite, are in MXN) — the WABA node's own top-level
- * `currency` field is the account's real billing currency, so that's what's used.
+ * The cost figures are in USD, whatever the WABA node's own `currency` field says
+ * (that field showed MXN and made the Costs page label USD amounts as pesos), so
+ * Meta is always treated and shown as USD.
  */
 export async function metaDaily(
   wabaId: string,
@@ -148,7 +146,7 @@ export async function monthCosts(tenantId: string, month: string): Promise<Month
       const { access_token } = decryptCredentials<{ access_token: string }>(wa.credentials as EncryptedPayload)
       const { daily, currency } = await metaDaily(wabaId, access_token, startIso, endIso)
       result.meta.daily = daily
-      if (currency) result.meta.currency = currency
+      void currency // the WABA's reported currency is not the currency of the cost figures
       result.meta.available = true
     } catch (err) {
       result.meta.error = err instanceof Error ? err.message : 'Meta costs unavailable'
@@ -164,7 +162,7 @@ export async function monthCosts(tenantId: string, month: string): Promise<Month
       ? Object.entries(result.claude.daily).map(([d, v]) => ({ provider: 'claude', d, v, currency: result.claude.currency }))
       : []),
     ...(result.meta.available
-      ? Object.entries(result.meta.daily).map(([d, v]) => ({ provider: 'meta', d, v, currency: result.meta.currency }))
+      ? Object.entries(result.meta.daily).map(([d, v]) => ({ provider: 'meta', d, v, currency: 'USD' }))
       : []),
   ]
   if (rows.length) {
@@ -191,7 +189,7 @@ export async function monthCosts(tenantId: string, month: string): Promise<Month
       const target = s.provider === 'claude' ? result.claude : result.meta
       if (!target.available) {
         target.daily[s.snapshot_date as string] = Number(s.daily_cost_usd)
-        if (s.currency) target.currency = s.currency as string
+        if (s.currency && s.provider === 'claude') target.currency = s.currency as string
       }
     }
   }
