@@ -519,16 +519,16 @@ export default function CalendarPage() {
     <div className="p-2 md:p-3">
       <div className="min-h-[calc(100vh-1.5rem)] rounded-2xl p-3 text-[#eaf0fb] antialiased" style={{ background: HOLO_BG }}>
         <div className="mb-2.5 flex flex-wrap items-center gap-2 pb-0.5 pt-1">
-          <div className="mr-4">
-            <Link href="/cloudbeds" title="Back to the dashboard" className="flex items-baseline gap-3.5 hover:opacity-90">
-              <span className="font-display text-[30px] font-semibold italic leading-none tracking-tight text-white">Soirée</span>
-              <span className="h-5 w-px self-center bg-white/25" />
-              <span className="text-[18px] font-semibold leading-none tracking-tight text-[#c9d3e0]">Calendar</span>
-            </Link>
-            <p className="mt-1 flex items-center gap-1.5 text-[10.5px] text-[#8a9bb0]">
-              {roomCount} rooms
-              <span className="h-1.5 w-1.5 rounded-full bg-[#3ccf8a]" /> Updates automatically
-            </p>
+          <div className="mr-6 flex items-center gap-5">
+            <Link href="/cloudbeds" title="Back to the dashboard" className="font-display text-[40px] font-semibold italic leading-none tracking-tight text-white hover:opacity-90">Soirée</Link>
+            <span className="h-9 w-px bg-white/25" />
+            <div className="leading-none">
+              <h1 className="text-[19px] font-semibold tracking-tight text-[#c9d3e0]">Calendar</h1>
+              <p className="mt-1.5 flex items-center gap-1.5 whitespace-nowrap text-[10.5px] text-[#8a9bb0]">
+                {roomCount} rooms
+                <span className="h-1.5 w-1.5 rounded-full bg-[#3ccf8a]" /> Updates automatically
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-1.5">
             <button onClick={() => scrollBy(-7)} className={`${pill} w-8 !px-0 text-base`} aria-label="Back a week">‹</button>

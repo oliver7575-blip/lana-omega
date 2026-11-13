@@ -70,6 +70,21 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
 
   useEffect(() => setOpen(false), [pathname])
 
+  // Full-screen calendar: the side menu slides out when the pointer touches the left edge of the window
+  // and tucks away again once the pointer moves off it.
+  const focus = pathname.startsWith('/cloudbeds/calendar')
+  useEffect(() => {
+    if (!focus) { setPeek(false); return }
+    const onMove = (e: MouseEvent) => {
+      if (e.clientX <= 10) setPeek(true)
+      else if (e.clientX > 232) setPeek(false)
+    }
+    const onLeave = () => setPeek(false)
+    window.addEventListener('mousemove', onMove)
+    document.documentElement.addEventListener('mouseleave', onLeave)
+    return () => { window.removeEventListener('mousemove', onMove); document.documentElement.removeEventListener('mouseleave', onLeave) }
+  }, [focus])
+
   if (pathname.startsWith('/login')) return <>{children}</>
 
   if (bare) {
@@ -89,8 +104,6 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
   const isInbox = pathname.startsWith('/inbox') || pathname.startsWith('/conversations')
   const isReservations = pathname.startsWith('/reservations')
   const legacy = LEGACY.some((p) => pathname.startsWith(p))
-  // The calendar takes the whole screen; the side menu tucks away until the pointer touches the left edge.
-  const focus = pathname.startsWith('/cloudbeds/calendar')
 
   // Multi-hotel logins: switch hotel, then reload so every page and the live
   // updates follow the newly selected hotel.
@@ -236,15 +249,12 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
       </div>
       {open && <div className="fixed inset-0 z-30 bg-black/60 md:hidden" onClick={() => setOpen(false)} />}
       {focus && (
-        <div onMouseEnter={() => setPeek(true)} className="fixed inset-y-0 left-0 z-50 hidden w-3 md:block" aria-hidden="true">
-          <span className={`absolute left-0 top-1/2 h-16 w-[3px] -translate-y-1/2 rounded-r-full bg-white/25 transition-opacity ${peek ? 'opacity-0' : 'opacity-100'}`} />
-        </div>
+        <span className={`pointer-events-none fixed left-0 top-1/2 z-50 h-16 w-[3px] -translate-y-1/2 rounded-r-full bg-white/30 transition-opacity ${peek ? 'opacity-0' : 'opacity-100'}`} aria-hidden="true" />
       )}
       <aside
-        onMouseLeave={() => focus && setPeek(false)}
         className={`fixed inset-y-0 left-0 z-40 w-72 border-r border-line bg-surface transition-transform duration-200 ${
           focus
-            ? `md:z-50 md:w-52 ${peek ? 'md:translate-x-0 md:shadow-[8px_0_32px_rgba(0,0,0,.45)]' : 'md:-translate-x-full'}`
+            ? `!z-50 ${peek ? '!translate-x-0 shadow-[8px_0_32px_rgba(0,0,0,.45)]' : ''} !w-52 ${peek ? '' : 'md:-translate-x-full'}`
             : 'md:sticky md:top-0 md:h-screen md:w-52 md:shrink-0 md:translate-x-0'
         } ${open ? 'translate-x-0' : '-translate-x-full'}`}
       >
