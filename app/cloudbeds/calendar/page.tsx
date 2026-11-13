@@ -25,7 +25,7 @@ interface Chunk {
 }
 
 const LEFT_W = 160
-const ROW_H = 38
+const ROW_H = 44
 const SPANS = [{ days: 7, label: '1w' }, { days: 14, label: '2w' }, { days: 21, label: '3w' }, { days: 30, label: '1m' }] as const
 const DEFAULT_SPAN = 21 // days that fit on screen by default
 const MIN_DAY_W = 30
@@ -44,8 +44,13 @@ function statusEdge(status: string) {
 }
 const HATCH_BLOCK = 'repeating-linear-gradient(135deg,#3a4a5c 0 5px,#2a3846 5px 10px)'
 const HATCH_SERVICE = 'repeating-linear-gradient(135deg,#6b4a14 0 5px,#4a3410 5px 10px)'
-// One colour per room category (assigned by the category's position in Cloudbeds' list).
-const CAT_COLORS = ['#ffb454', '#b392ff', '#ff7aa2', '#e39a6b', '#cfe08f', '#f0abfc', '#7fe0d0']
+// Solid, opaque fills for reservation bars (top, bottom), keyed by the status colour.
+const BAR_FILL: Record<string, [string, string]> = {
+  [EDGE.confirmed]: ['#5b95f5', '#3b6fdc'],
+  [EDGE.not_confirmed]: ['#f0b548', '#c98a14'],
+  [EDGE.checked_in]: ['#3ccf8a', '#1c9a66'],
+  [EDGE.checked_out]: ['#8f9aab', '#667084'],
+}
 const HEAD_BG = '#17293b'
 const ROOM_BG = '#162a3c'
 const HOLO_BG =
@@ -116,19 +121,20 @@ function Bar({ start, end, viewStart, totalDays, label, sub, bg, border, text, e
   }
   const chip = sourceName(src)
   const barH = ROW_H - 10
+  const [top, bottom] = BAR_FILL[edge] ?? BAR_FILL[EDGE.confirmed]
   return (
     <button
       onClick={onClick}
       onContextMenu={onContextMenu}
       title={title ?? label}
-      className="absolute flex items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-full border pl-3.5 pr-2 text-left hover:brightness-110"
-      style={{ left: left + 1, width: w, top: (ROW_H - barH) / 2, height: barH, color: text, borderColor: edge, background: `linear-gradient(100deg,${edge}66,${edge}30)`, boxShadow: `0 0 14px ${edge}44, inset 0 0 12px ${edge}22` }}
+      className="absolute flex items-center gap-2 overflow-hidden whitespace-nowrap rounded-[10px] border pl-3 pr-2 text-left hover:brightness-110"
+      style={{ left: left + 1, width: w, top: (ROW_H - barH) / 2, height: barH, color: text, borderColor: 'rgba(255,255,255,.18)', background: `linear-gradient(180deg,${top},${bottom})`, boxShadow: '0 3px 8px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.22)' }}
     >
-      <span className="min-w-0 flex-1 truncate text-[11.5px] font-bold">
-        {label}
-        {sub && w >= 90 && <span className="ml-1.5 font-medium opacity-75">· {sub}</span>}
+      <span className="min-w-0 flex-1 leading-tight">
+        <span className="block truncate text-[11.5px] font-bold">{label}</span>
+        {sub && w >= 70 && <span className="block truncate text-[9.5px] opacity-85">{sub}</span>}
       </span>
-      {chip && w >= 170 && <span className="shrink-0 rounded-full border border-white/30 bg-white/[.18] px-1.5 py-[1px] text-[9px] font-semibold">{chip}</span>}
+      {chip && w >= 150 && <span className="shrink-0 rounded-full border border-white/30 bg-white/[.18] px-1.5 py-[1px] text-[9px] font-semibold">{chip}</span>}
       {due && <b aria-label="Balance due" title="Balance due" className="shrink-0 rounded-full bg-white px-1.5 py-[1px] text-[9px] font-bold text-[#d12a3a]">Due</b>}
     </button>
   )
@@ -517,51 +523,50 @@ export default function CalendarPage() {
       due: all.filter((b) => dueOf(b.reservationID, b.due)).length,
     }
   })()
-  const catColor = (typeID: string) => {
-    const i = Math.max(0, (data?.roomTypes ?? []).findIndex((x) => x.id === typeID))
-    return CAT_COLORS[i % CAT_COLORS.length]
-  }
-  const pill = `h-8 rounded-full border border-white/10 bg-white/[.06] px-3 text-[12px] font-medium text-[#eaf0fb] transition hover:bg-white/10`
+  const pill = `h-9 rounded-full border border-white/10 bg-white/[.06] px-3.5 text-[12.5px] font-medium text-[#eaf0fb] transition hover:bg-white/10`
 
   return (
     <div className="p-2 md:p-3">
       <div className="min-h-[calc(100vh-1.5rem)] rounded-2xl p-4 text-[#eaf0fb]" style={{ background: HOLO_BG }}>
-        <div className="mb-2.5 flex flex-wrap items-center gap-2">
-          <div className="mr-3">
-            <Link href="/cloudbeds" className="text-[11px] font-bold uppercase tracking-[.3em] text-[#6fe3e3] hover:underline">Soirée</Link>
-            <h1 className="text-[22px] font-bold leading-[1.1] tracking-tight">Calendar</h1>
-            <p className="flex items-center gap-1.5 text-[11.5px] text-[#8a9bb0]">
+        <div className="mb-4 flex flex-wrap items-center gap-2.5 pb-1 pt-1.5">
+          <div className="mr-4">
+            <Link href="/cloudbeds" title="Back to the dashboard" className="flex items-baseline gap-3.5 hover:opacity-90">
+              <span className="font-display text-[36px] font-semibold italic leading-none tracking-tight text-white">Soirée</span>
+              <span className="h-6 w-px self-center bg-white/25" />
+              <span className="text-[21px] font-semibold leading-none tracking-tight text-[#c9d3e0]">Calendar</span>
+            </Link>
+            <p className="mt-1.5 flex items-center gap-1.5 text-[11.5px] text-[#8a9bb0]">
               {roomCount} rooms
               <span className="h-1.5 w-1.5 rounded-full bg-[#3ccf8a]" /> Updates automatically
             </p>
           </div>
           <div className="flex items-center gap-1.5">
-            <button onClick={() => scrollBy(-7)} className={`${pill} w-8 !px-0 text-base`} aria-label="Back a week">‹</button>
+            <button onClick={() => scrollBy(-7)} className={`${pill} w-9 !px-0 text-base`} aria-label="Back a week">‹</button>
             <button onClick={() => { if (data) { jumpTo(data.today); setMarkDay(data.today) } }} className={`${pill} font-bold !text-[#6fe3e3]`}>Today</button>
-            <button onClick={() => scrollBy(7)} className={`${pill} w-8 !px-0 text-base`} aria-label="Forward a week">›</button>
+            <button onClick={() => scrollBy(7)} className={`${pill} w-9 !px-0 text-base`} aria-label="Forward a week">›</button>
             <div className="ml-1 flex rounded-full border border-white/10 bg-white/[.06] p-[3px]" role="group" aria-label="Days shown">
               {SPANS.map((o) => (
                 <button key={o.days} onClick={() => changeSpan(o.days)} aria-pressed={span === o.days}
-                  className={`h-[26px] rounded-full border px-2.5 text-[12px] font-semibold ${span === o.days ? 'border-[#6fe3e3]/50 bg-white/15 text-white' : 'border-transparent text-[#9aa8bb] hover:text-white'}`}>{o.label}</button>
+                  className={`h-[28px] rounded-full border px-3 text-[12.5px] font-semibold ${span === o.days ? 'border-[#6fe3e3]/50 bg-white/15 text-white' : 'border-transparent text-[#9aa8bb] hover:text-white'}`}>{o.label}</button>
               ))}
             </div>
           </div>
           <div className="flex items-center gap-1.5 text-[13px]">
             <input type="date" value={goTo} onChange={(e) => setGoTo(e.target.value)} aria-label="Go to date"
-              className="h-8 rounded-full border border-white/10 bg-white/[.06] px-3 text-[12px] text-[#eaf0fb] outline-none [color-scheme:dark] focus:border-[#6fe3e3]/60" />
+              className="h-9 rounded-full border border-white/10 bg-white/[.06] px-3 text-[12.5px] text-[#eaf0fb] outline-none [color-scheme:dark] focus:border-[#6fe3e3]/60" />
             <button onClick={() => goTo && jumpTo(goTo)} className={pill}>Go</button>
           </div>
           <div className="min-w-[200px] flex-1"><SearchBar onOpen={setOpen} dark /></div>
           {data && (
             <div className="flex items-center gap-2">
-              {([['arrivals', stats.arrivals, '#6fe0a4'], ['departures', stats.departures, '#b9c3d6'], ['in house', stats.inHouse, '#ffffff'], ['balances due', stats.due, '#ffd479']] as const).map(([l, v, c]) => (
-                <div key={l} className="flex h-9 flex-col justify-center rounded-xl border border-white/10 bg-white/[.06] px-3">
+              {([['arrivals', stats.arrivals, '#6fe0a4'], ['departures', stats.departures, '#b9c3d6'], ['in house', stats.inHouse, '#ffffff']] as const).map(([l, v, c]) => (
+                <div key={l} className="flex h-10 flex-col justify-center rounded-xl border border-white/10 bg-white/[.06] px-3.5">
                   <b className="text-[13.5px] leading-[1.1]" style={{ color: c }}>{v}</b>
                   <span className="text-[9.5px] text-[#8a9bb0]">{l}</span>
                 </div>
               ))}
               <button onClick={() => setCreating('block')} className={pill}>Block dates</button>
-              <button onClick={() => setCreating('blank')} className={`${priGreen} !h-8 !text-[12px] shadow-[0_4px_18px_rgba(39,173,134,.5),inset_0_1px_0_rgba(255,255,255,.28)]`}>+ New reservation</button>
+              <button onClick={() => setCreating('blank')} className={`${priGreen} !h-9 !text-[12.5px] shadow-[0_4px_18px_rgba(39,173,134,.5),inset_0_1px_0_rgba(255,255,255,.28)]`}>+ New reservation</button>
             </div>
           )}
         </div>
@@ -642,10 +647,9 @@ export default function CalendarPage() {
               {orderedTypes.map((t, ti) => {
                 const isCollapsed = collapsed.has(t.id)
                 const unassigned = data.unassigned.filter((u) => u.roomTypeID === t.id)
-                const c = catColor(t.id)
-                return (
-                  <div key={t.id} className="border-b" style={{ borderColor: `${c}33` }}>
-                    <div className="flex text-[9px]" style={{ backgroundImage: `linear-gradient(90deg,${c}2e,${c}08)`, borderTop: `1px solid ${c}66` }}>
+                                return (
+                  <div key={t.id} className="border-b border-white/10">
+                    <div className="flex border-t border-white/[.12] text-[9px]" style={{ backgroundImage: 'linear-gradient(90deg,rgba(255,255,255,.09),rgba(255,255,255,.02))' }}>
                       <div
                         draggable
                         onDragStart={() => setDragType(t.id)}
@@ -653,17 +657,16 @@ export default function CalendarPage() {
                         onDrop={() => { if (dragType) moveType(dragType, t.id); setDragType(null) }}
                         onDragEnd={() => setDragType(null)}
                         className={`sticky left-0 z-10 flex items-center border-r border-white/10 pr-1 ${dragType === t.id ? 'opacity-50' : ''} ${dragType && dragType !== t.id ? 'outline-dashed outline-1 -outline-offset-2 outline-[#6fe3e3]/50' : ''}`}
-                        style={{ width: LEFT_W, minWidth: LEFT_W, height: TYPE_ROW_H, backgroundColor: HEAD_BG, backgroundImage: `linear-gradient(${c}33,${c}33)` }}
+                        style={{ width: LEFT_W, minWidth: LEFT_W, height: TYPE_ROW_H, backgroundColor: HEAD_BG, backgroundImage: 'linear-gradient(rgba(255,255,255,.07),rgba(255,255,255,.07))' }}
                       >
-                        <i className="mr-1.5 h-full w-[6px] shrink-0" style={{ background: c, boxShadow: `0 0 12px ${c}aa` }} />
-                        <span title="Drag to re-order" className="cursor-grab select-none px-0.5 text-[11px] leading-none text-white/30 hover:text-white/70" aria-hidden="true">⋮⋮</span>
+                                                <span title="Drag to re-order" className="cursor-grab select-none px-0.5 text-[11px] leading-none text-white/30 hover:text-white/70" aria-hidden="true">⋮⋮</span>
                         <button
                           onClick={() => { const n = new Set(collapsed); if (n.has(t.id)) n.delete(t.id); else n.add(t.id); setCollapsed(n) }}
-                          className="flex min-w-0 flex-1 items-center truncate px-1 text-left text-[12px] font-bold" style={{ color: c }}
+                          className="flex min-w-0 flex-1 items-center truncate pl-3 pr-1 text-left text-[11.5px] font-bold uppercase tracking-[.12em] text-[#f1f4f9]"
                         >
                           <span className="mr-1 inline-block shrink-0 text-[10px] opacity-70">{isCollapsed ? '›' : '⌄'}</span><span className="truncate">{t.name}</span>
                         </button>
-                        <span className="mr-1 shrink-0 rounded-full border px-1.5 text-[10px] font-semibold" style={{ borderColor: `${c}66`, color: c }}>{t.rooms.length}</span>
+                        <span className="mr-1 shrink-0 text-[10.5px] text-[#7b8494]">{t.rooms.length}</span>
                         <span className="flex shrink-0 flex-col">
                           <button onClick={() => shiftType(t.id, -1)} disabled={ti === 0} title="Move up" aria-label={`Move ${t.name} up`} className="px-1 text-[8px] leading-[10px] text-white/30 hover:text-white disabled:opacity-20">▲</button>
                           <button onClick={() => shiftType(t.id, 1)} disabled={ti === orderedTypes.length - 1} title="Move down" aria-label={`Move ${t.name} down`} className="px-1 text-[8px] leading-[10px] text-white/30 hover:text-white disabled:opacity-20">▼</button>
@@ -675,7 +678,7 @@ export default function CalendarPage() {
                         return (
                           <div key={d}
                             className={`flex flex-col items-center justify-center border-r border-white/[.05] leading-tight ${new Date(`${d}T12:00:00Z`).getUTCDate() === 1 ? 'border-l-2 border-l-[#6fe3e3]/30' : ''}`}
-                            style={{ width: dayW, minWidth: dayW, height: TYPE_ROW_H, color: c, background: d === data.today ? `${c}12` : undefined }}>
+                            style={{ width: dayW, minWidth: dayW, height: TYPE_ROW_H, color: '#8a93a3' }}>
                             {rate ? (
                               <>
                                 <span className="opacity-70">{avail ?? ''}</span>
@@ -701,7 +704,6 @@ export default function CalendarPage() {
                         <div key={room.id} className="group flex border-t border-white/[.06]">
                           <div className={`sticky left-0 z-10 flex items-center gap-2 border-r border-white/10 pl-2.5 pr-2 text-[11px] font-semibold ${isUnassigned ? 'italic text-amber-300' : ''}`}
                             style={{ width: LEFT_W, minWidth: LEFT_W, height: ROW_H, backgroundColor: ROOM_BG }}>
-                            {!isUnassigned && <i className="h-5 w-[3px] shrink-0 rounded-full" style={{ background: c, opacity: 0.6 }} />}
                             <span className={`truncate ${isUnassigned ? '' : 'text-[#dbe5f1]'}`}>{room.name}</span>
                           </div>
                           <div className="relative flex" style={{ height: ROW_H }}>
@@ -737,7 +739,7 @@ export default function CalendarPage() {
                             })}
                             {stays.map((s) => (
                               <Bar key={`${s.reservationID}-${s.start}`} start={s.start} end={s.end} viewStart={data.start} totalDays={totalDays}
-                                label={s.guestName} sub={`${diff(s.start, s.end)}n`} due={dueOf(s.reservationID, s.due)} src={s.src}
+                                label={s.guestName} sub={`${diff(s.start, s.end)} night${diff(s.start, s.end) === 1 ? '' : 's'}`} due={dueOf(s.reservationID, s.due)} src={s.src}
                                 edge={statusEdge(s.status)} bg="" border="" text="#fff" onClick={() => setOpen(s.reservationID)} dayW={dayW}
                                 onContextMenu={(e) => {
                                   e.preventDefault()
