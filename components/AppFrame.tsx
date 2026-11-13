@@ -71,13 +71,14 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
   useEffect(() => setOpen(false), [pathname])
 
   // Full-screen calendar: the side menu slides out when the pointer touches the left edge of the window
-  // and tucks away again once the pointer moves off it.
+  // and tucks away again once the pointer moves off it. It is 169px wide: exactly the strip the calendar's
+  // room column (and the Soirée wordmark above it) occupies, so it covers only that space.
   const focus = pathname.startsWith('/cloudbeds/calendar')
   useEffect(() => {
     if (!focus) { setPeek(false); return }
     const onMove = (e: MouseEvent) => {
       if (e.clientX <= 10) setPeek(true)
-      else if (e.clientX > 232) setPeek(false)
+      else if (e.clientX > 175) setPeek(false)
     }
     const onLeave = () => setPeek(false)
     window.addEventListener('mousemove', onMove)
@@ -254,7 +255,7 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
       <aside
         className={`fixed inset-y-0 left-0 z-40 w-72 border-r border-line bg-surface transition-transform duration-200 ${
           focus
-            ? `!z-50 ${peek ? '!translate-x-0 shadow-[8px_0_32px_rgba(0,0,0,.45)]' : ''} !w-52 ${peek ? '' : 'md:-translate-x-full'}`
+            ? `!z-50 ${peek ? '!translate-x-0 shadow-[8px_0_32px_rgba(0,0,0,.45)]' : ''} !w-[169px] ${peek ? '' : 'md:-translate-x-full'}`
             : 'md:sticky md:top-0 md:h-screen md:w-52 md:shrink-0 md:translate-x-0'
         } ${open ? 'translate-x-0' : '-translate-x-full'}`}
       >

@@ -519,9 +519,12 @@ export default function CalendarPage() {
     <div className="p-2 md:p-3">
       <div className="min-h-[calc(100vh-1.5rem)] rounded-2xl p-3 text-[#eaf0fb] antialiased" style={{ background: HOLO_BG }}>
         <div className="mb-2.5 flex flex-wrap items-center gap-2 pb-0.5 pt-1">
-          <div className="mr-6 flex items-center gap-5">
-            <Link href="/cloudbeds" title="Back to the dashboard" className="font-display text-[40px] font-semibold italic leading-none tracking-tight text-white hover:opacity-90">Soirée</Link>
-            <span className="h-9 w-px bg-white/25" />
+          <div className="mr-6 flex items-center">
+            {/* The wordmark is centred over the room column below it (same width), and the title starts after it. */}
+            <div className="flex shrink-0 items-center justify-center" style={{ width: LEFT_W + 1 }}>
+              <Link href="/cloudbeds" title="Back to the dashboard" className="font-display text-[40px] font-semibold italic leading-none tracking-tight text-white hover:opacity-90">Soirée</Link>
+            </div>
+            <span className="mx-4 h-9 w-px bg-white/25" />
             <div className="leading-none">
               <h1 className="text-[19px] font-semibold tracking-tight text-[#c9d3e0]">Calendar</h1>
               <p className="mt-1.5 flex items-center gap-1.5 whitespace-nowrap text-[10.5px] text-[#8a9bb0]">
