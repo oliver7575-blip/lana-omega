@@ -214,12 +214,8 @@ export default function DashviewPage() {
   return (
     <div className="p-2 md:p-3">
       <div className="min-h-[calc(100vh-1.5rem)] min-w-0 rounded-2xl p-3 text-[#eaf0fb] antialiased" style={{ background: HOLO_BG }}>
-        {/* Header — same wordmark box as the calendar and the side panel */}
+        {/* Header — the pinned side panel carries the wordmark */}
         <div className="mb-3 flex flex-wrap items-center gap-3">
-          <div className="flex h-10 shrink-0 items-center justify-center" style={{ width: 149 }}>
-            <Link href="/cloudbeds" className="font-display text-[40px] font-semibold italic leading-none tracking-tight text-white">Soirée</Link>
-          </div>
-          <div className="h-9 w-px bg-[#8fb4ff]/25" />
           <div className="mr-2 min-w-0">
             <h1 className="text-[20px] font-semibold leading-tight tracking-tight text-white">Dashboard</h1>
             <p className="text-[11.5px] text-[#9fb3dc]">{todayLabel || 'Today'} • Updates automatically</p>

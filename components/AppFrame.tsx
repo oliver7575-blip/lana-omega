@@ -75,8 +75,8 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
   // and tucks away again once the pointer moves off it. It is a rounded panel inset like the calendar card, covering just the strip the calendar's
   // room column (and the Soirée wordmark above it) occupies, so it covers only that space.
   const focus = pathname === '/cloudbeds' || pathname.startsWith('/cloudbeds/calendar') || pathname.startsWith('/reservations')
-  // The reservations list keeps the panel pinned open and moves the page content over instead.
-  const pinned = pathname.startsWith('/reservations')
+  // The reservations list and the dashboard keep the panel pinned open and moves the page content over instead.
+  const pinned = pathname.startsWith('/reservations') || pathname === '/cloudbeds'
   useEffect(() => {
     if (!focus || pinned) { setPeek(false); return }
     const onMove = (e: MouseEvent) => {
