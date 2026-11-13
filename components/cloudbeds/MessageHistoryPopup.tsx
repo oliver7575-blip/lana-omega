@@ -3,7 +3,7 @@
 import { createRoot, type Root } from 'react-dom/client'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { cbApi } from './shared'
-import { chip, headerGradient, priTeal } from './ui'
+import { btn, chip, headerGradient, priTeal } from './ui'
 
 interface Msg { id: string; sender_type: string; content: string; created_at: string }
 interface Conv { conversationId: string; windowOpen: boolean; language: string | null }
@@ -19,6 +19,9 @@ function Popup({ reservationId, guestName, onClose }: Props & { onClose: () => v
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  const [status, setStatus] = useState('active')
+  const [channel, setChannel] = useState('whatsapp')
+  const [ctlBusy, setCtlBusy] = useState<null | 'take' | 'hand' | 'answer'>(null)
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
   const drag = useRef<{ dx: number; dy: number } | null>(null)
@@ -29,6 +32,8 @@ function Popup({ reservationId, guestName, onClose }: Props & { onClose: () => v
       const j = await res.json()
       if (!res.ok) throw new Error(j.error ?? 'Could not load messages')
       setMsgs(j.messages as Msg[])
+      if (typeof j.status === 'string') setStatus(j.status)
+      if (typeof j.channel === 'string') setChannel(j.channel)
       setErr(null)
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Could not load messages')
@@ -80,6 +85,39 @@ function Popup({ reservationId, guestName, onClose }: Props & { onClose: () => v
     setBusy(false)
   }
 
+  async function setConvStatus(next: 'active' | 'human_takeover') {
+    if (!conv || ctlBusy) return
+    setCtlBusy(next === 'human_takeover' ? 'take' : 'hand')
+    setNote(null)
+    try {
+      const res = await fetch(`/api/conversations/${conv.conversationId}/status`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: next }) })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error ?? 'Could not change who is handling this chat')
+      setStatus(next)
+      setNote({ ok: true, text: next === 'active' ? 'Handed back to Lana.' : 'You have taken over.' })
+    } catch (e) {
+      setNote({ ok: false, text: e instanceof Error ? e.message : 'Could not change who is handling this chat' })
+    }
+    setCtlBusy(null)
+  }
+
+  async function lanaAnswers() {
+    if (!conv || ctlBusy) return
+    setCtlBusy('answer')
+    setNote({ ok: true, text: 'Lana is answering…' })
+    try {
+      const res = await fetch(`/api/conversations/${conv.conversationId}/answer`, { method: 'POST' })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error ?? 'Could not hand over')
+      setStatus('active')
+      setNote(j.answered ? { ok: true, text: 'Lana answered the last message.' } : { ok: false, text: `Handed to Lana. ${j.reason ?? 'Nothing was sent.'}` })
+      await load(conv)
+    } catch (e) {
+      setNote({ ok: false, text: e instanceof Error ? e.message : 'Could not hand over' })
+    }
+    setCtlBusy(null)
+  }
+
   function onDown(e: React.PointerEvent<HTMLDivElement>) {
     if ((e.target as HTMLElement).closest('button')) return
     const box = e.currentTarget.parentElement!.getBoundingClientRect()
@@ -106,6 +144,20 @@ function Popup({ reservationId, guestName, onClose }: Props & { onClose: () => v
           <p className="text-[11px] text-white/70">Message history · WhatsApp</p>
         </div>
         <button onClick={onClose} aria-label="Close message history" className="ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/30 text-base leading-none text-white hover:bg-white/10">×</button>
+      </div>
+
+      <div className="flex items-center gap-1.5 border-b border-[#eef0f4] bg-white px-3 py-2">
+        <span className={`rounded-full px-2.5 py-[3px] text-[11px] font-semibold ${status === 'human_takeover' ? 'bg-[#efe6fb] text-[#5b2ea6]' : status === 'closed' ? 'bg-[#eef0f4] text-[#667085]' : 'bg-[#e0f3ec] text-[#0e5f47]'}`}>
+          {status === 'human_takeover' ? 'You are handling' : status === 'closed' ? 'Closed' : 'Lana is handling'}
+        </span>
+        <span className="flex-1" />
+        {status === 'human_takeover'
+          ? <button disabled={!conv || !!ctlBusy} onClick={() => setConvStatus('active')} className={`${btn} !h-[26px] !px-2.5 !text-[11px]`}>{ctlBusy === 'hand' ? '…' : 'Hand to Lana'}</button>
+          : <button disabled={!conv || !!ctlBusy || status === 'closed'} onClick={() => setConvStatus('human_takeover')} className={`${btn} !h-[26px] !px-2.5 !text-[11px] !border-[#e1d3f6] !text-[#5b2ea6]`}>{ctlBusy === 'take' ? '…' : 'Take over'}</button>}
+        {channel === 'whatsapp' && (
+          <button disabled={!conv || !!ctlBusy} onClick={lanaAnswers} title="Hands the chat to Lana and has her answer the guest's last message now"
+            className={`${btn} !h-[26px] !px-2.5 !text-[11px] !border-[#c3e5db] !bg-[#e6f5f0] !text-[#0e5f47]`}>{ctlBusy === 'answer' ? 'Answering…' : 'Lana answers last'}</button>
+        )}
       </div>
 
       <div className="min-h-[220px] flex-1 space-y-2 overflow-y-auto bg-[#f6f8f9] px-3.5 py-3">

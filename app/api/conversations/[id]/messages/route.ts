@@ -10,6 +10,7 @@ export async function GET(_r: Request, { params }: { params: Promise<{ id: strin
   } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const { data: conv } = await supabase.from('conversations').select('status, channel').eq('id', id).maybeSingle()
   const { data, error } = await supabase
     .from('messages')
     .select('id, sender_type, content, created_at')
@@ -17,5 +18,5 @@ export async function GET(_r: Request, { params }: { params: Promise<{ id: strin
     .order('created_at', { ascending: false })
     .limit(100)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ messages: (data ?? []).reverse() })
+  return NextResponse.json({ messages: (data ?? []).reverse(), status: (conv?.status as string) ?? 'active', channel: (conv?.channel as string) ?? 'whatsapp' })
 }
