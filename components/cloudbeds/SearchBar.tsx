@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { cbApi, dmy, statusLabel, type DashRow } from './shared'
 
 /** Beta's "Search reservations, guests, and more" bar with a results list. */
-export default function SearchBar({ onOpen }: { onOpen: (id: string) => void }) {
+export default function SearchBar({ onOpen, dark = false }: { onOpen: (id: string) => void; dark?: boolean }) {
   const [q, setQ] = useState('')
   const [rows, setRows] = useState<DashRow[] | null>(null)
   const [busy, setBusy] = useState(false)
@@ -25,11 +25,11 @@ export default function SearchBar({ onOpen }: { onOpen: (id: string) => void }) 
   return (
     <div className="relative w-full max-w-2xl">
       <form onSubmit={(e) => { e.preventDefault(); search() }}
-        className="flex items-center gap-2 rounded-[10px] border border-gray-300 bg-white py-1 pl-4 pr-1 shadow-[0_1px_2px_rgba(20,33,61,.04)]">
+        className={`flex items-center gap-2 border py-1 pl-4 pr-1 ${dark ? 'h-9 rounded-full border-white/10 bg-white/[.06]' : 'rounded-[10px] border-gray-300 bg-white shadow-[0_1px_2px_rgba(20,33,61,.04)]'}`}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search reservations, guests, and more"
-          className="flex-1 bg-transparent py-1 text-sm text-[#14213d] outline-none placeholder:text-gray-500" />
-        <button className="h-8 rounded-lg bg-[#1f9d78] px-4 text-[13px] font-semibold text-white hover:bg-[#188a69]">{busy ? '…' : 'Search'}</button>
+          className={`flex-1 bg-transparent py-1 text-sm outline-none ${dark ? 'text-[#eaf0fb] placeholder:text-[#8a9bb0]' : 'text-[#14213d] placeholder:text-gray-500'}`} />
+        <button className={`h-8 bg-[#1f9d78] px-4 text-[13px] font-semibold text-white hover:bg-[#188a69] ${dark ? 'rounded-full' : 'rounded-lg'}`}>{busy ? '…' : 'Search'}</button>
       </form>
       {(rows || error) && (
         <div className="absolute left-0 right-0 top-full z-40 mt-2 max-h-80 overflow-y-auto rounded-2xl border border-gray-200 bg-white text-sm text-[#14213d] shadow-[0_16px_40px_rgba(20,33,61,.18)]">

@@ -24,8 +24,8 @@ interface Chunk {
   blocks: Block[]
 }
 
-const LEFT_W = 156
-const ROW_H = 30
+const LEFT_W = 184
+const ROW_H = 46
 const SPANS = [{ days: 7, label: '1w' }, { days: 14, label: '2w' }, { days: 21, label: '3w' }, { days: 30, label: '1m' }] as const
 const DEFAULT_SPAN = 21 // days that fit on screen by default
 const MIN_DAY_W = 30
@@ -34,21 +34,24 @@ const EDGE_PX = 400
 const MONTH_ROW_H = 20
 const PCT_ROW_H = 18
 const DAY_ROW_H = 40
-const TYPE_ROW_H = 34
+const TYPE_ROW_H = 38
 
-// Soft bar colours by reservation status (text stays dark enough to read on each).
-const BAR: Record<string, { bg: string; border: string; text: string }> = {
-  confirmed: { bg: '#bcd3f8', border: '#86aaec', text: '#17356b' },
-  not_confirmed: { bg: '#fdeccb', border: '#f0c978', text: '#7a4a05' },
-  checked_in: { bg: '#b4e6d0', border: '#74c9a6', text: '#0e4d38' },
-  checked_out: { bg: '#d5d9e0', border: '#b3bac6', text: '#454d5c' },
-}
-function barColors(status: string) {
+// Reservation colours: upcoming blue, checked in green, checked out grey (not confirmed amber).
+const EDGE: Record<string, string> = { confirmed: '#5b95f5', not_confirmed: '#f0b548', checked_in: '#3ccf8a', checked_out: '#8793a6' }
+function statusEdge(status: string) {
   const k = status.toLowerCase()
-  return BAR[k === 'in_house' ? 'checked_in' : k] ?? BAR.confirmed
+  return EDGE[k === 'in_house' ? 'checked_in' : k] ?? EDGE.confirmed
 }
-const HATCH_BLOCK = 'repeating-linear-gradient(135deg,#e3e6ec 0 5px,#f1f3f6 5px 10px)'
-const HATCH_SERVICE = 'repeating-linear-gradient(135deg,#fde7c2 0 5px,#fff4de 5px 10px)'
+const HATCH_BLOCK = 'repeating-linear-gradient(135deg,#3a4a5c 0 5px,#2a3846 5px 10px)'
+const HATCH_SERVICE = 'repeating-linear-gradient(135deg,#6b4a14 0 5px,#4a3410 5px 10px)'
+// One colour per room category (assigned by the category's position in Cloudbeds' list).
+const CAT_COLORS = ['#ffb454', '#b392ff', '#ff7aa2', '#e39a6b', '#cfe08f', '#f0abfc', '#7fe0d0']
+const HEAD_BG = '#17293b'
+const ROOM_BG = '#162a3c'
+const HOLO_BG =
+  'repeating-radial-gradient(circle at 92% 8%,transparent 0,transparent 58px,rgba(111,227,227,.05) 58px,rgba(111,227,227,.05) 59px),' +
+  'linear-gradient(rgba(111,227,227,.07) 1px,transparent 1px) 0 0/44px 44px,linear-gradient(90deg,rgba(111,227,227,.07) 1px,transparent 1px) 0 0/44px 44px,' +
+  'radial-gradient(900px 520px at 0% 0%,rgba(50,160,180,.38),transparent 62%),radial-gradient(900px 520px at 100% 100%,rgba(70,90,190,.28),transparent 62%),linear-gradient(180deg,#1a3347,#122436)'
 
 function addDays(d: string, n: number) {
   const x = new Date(`${d}T12:00:00Z`)
@@ -80,19 +83,19 @@ function mergeChunk(prev: Chunk | null, next: Chunk, from: string, to: string): 
   }
 }
 
-/** Small source badge shown after the guest name: Booking.com, Airbnb, walk-in, website/direct. */
-function sourceBadge(src?: string): { t: string; bg: string; name: string } | null {
+/** Where the booking came from, as a short text chip (Booking.com, Airbnb, Walk-in, Website). */
+function sourceName(src?: string): string | null {
   const s = (src ?? '').toLowerCase()
   if (!s) return null
-  if (s.includes('booking.com')) return { t: 'B.', bg: '#0b4aa8', name: 'Booking.com' }
-  if (s.includes('airbnb')) return { t: 'A', bg: '#ff5a7a', name: 'Airbnb' }
-  if (s.includes('walk')) return { t: 'W', bg: '#2f9e6b', name: 'Walk-in' }
-  if (s.includes('website') || s.includes('direct') || s.includes('engine') || s.includes('soiree') || s.includes('soirée')) return { t: '@', bg: '#7a54d6', name: 'Website' }
+  if (s.includes('booking.com')) return 'Booking.com'
+  if (s.includes('airbnb')) return 'Airbnb'
+  if (s.includes('walk')) return 'Walk-in'
+  if (s.includes('website') || s.includes('direct') || s.includes('engine') || s.includes('soiree') || s.includes('soirée')) return 'Website'
   return null
 }
 
-function Bar({ start, end, viewStart, totalDays, label, bg, border, text, onClick, onContextMenu, title, dayW, due, src }: {
-  start: string; end: string; viewStart: string; totalDays: number; label: string; bg: string; border: string; text: string; onClick?: () => void
+function Bar({ start, end, viewStart, totalDays, label, sub, bg, border, text, edge, onClick, onContextMenu, title, dayW, due, src }: {
+  start: string; end: string; viewStart: string; totalDays: number; label: string; sub?: string; bg: string; border: string; text: string; edge?: string; onClick?: () => void
   onContextMenu?: (e: React.MouseEvent) => void; title?: string; dayW: number; due?: boolean; src?: string
 }) {
   const from = diff(viewStart, start) + 0.5
@@ -100,20 +103,33 @@ function Bar({ start, end, viewStart, totalDays, label, bg, border, text, onClic
   const left = Math.max(0, from) * dayW
   const right = Math.min(totalDays, to) * dayW
   if (right <= left) return null
+  const w = right - left - 2
+  if (!edge) {
+    // Blocks and out-of-service periods: flat hatched strip.
+    return (
+      <button onClick={onClick} onContextMenu={onContextMenu} title={title ?? label}
+        className="absolute top-1 flex items-center overflow-hidden whitespace-nowrap rounded-[10px] border px-2.5 text-left text-[11px] font-semibold leading-none hover:brightness-110"
+        style={{ left: left + 1, width: w, height: ROW_H - 8, background: bg, borderColor: border, color: text }}>
+        <span className="truncate">{label}</span>
+      </button>
+    )
+  }
+  const chip = sourceName(src)
   return (
     <button
       onClick={onClick}
       onContextMenu={onContextMenu}
       title={title ?? label}
-      className="absolute top-1 flex items-center overflow-hidden whitespace-nowrap rounded-lg border px-2.5 text-left text-[11px] font-semibold leading-none hover:brightness-95"
-      style={{ left: left + 1, width: right - left - 2, height: ROW_H - 8, background: bg, borderColor: border, color: text }}
+      className="absolute top-1 flex items-center gap-2 overflow-hidden whitespace-nowrap rounded-[10px] border pl-3.5 pr-2 text-left hover:brightness-110"
+      style={{ left: left + 1, width: w, height: ROW_H - 8, color: text, borderColor: edge, background: `linear-gradient(100deg,${edge}55,${edge}1c)`, boxShadow: `0 0 14px ${edge}44, inset 0 0 12px ${edge}22` }}
     >
-      {due && <i aria-label="Balance due" className="absolute left-[3px] top-[3px] h-[6px] w-[6px] rounded-full bg-[#e5484d]" />}
-      <span className="truncate">{label}</span>
-      {(() => {
-        const b = sourceBadge(src)
-        return b ? <i title={b.name} className="ml-1.5 inline-flex h-[15px] min-w-[15px] shrink-0 items-center justify-center rounded-[4px] border bg-white/50 px-0.5 text-[9px] font-bold not-italic leading-none" style={{ borderColor: b.bg, color: b.bg }}>{b.t}</i> : null
-      })()}
+      <i className="absolute bottom-0 left-0 top-0 w-1" style={{ background: edge }} />
+      <span className="min-w-0 flex-1 leading-tight">
+        <span className="block truncate text-[11.5px] font-bold">{label}</span>
+        {sub && w >= 70 && <span className="block truncate text-[10px] opacity-80">{sub}</span>}
+      </span>
+      {chip && w >= 150 && <span className="shrink-0 rounded-full border border-white/30 bg-white/[.18] px-2 py-[1px] text-[9.5px] font-semibold">{chip}</span>}
+      {due && <b aria-label="Balance due" title="Balance due" className="shrink-0 rounded-full bg-white px-2 py-[1px] text-[9.5px] font-bold text-[#d12a3a]">Due</b>}
     </button>
   )
 }
@@ -491,90 +507,122 @@ export default function CalendarPage() {
     return bands
   }, [data, dayW])
 
+  const stats = (() => {
+    if (!data) return { arrivals: 0, departures: 0, inHouse: 0, due: 0 }
+    const all = [...data.bookings, ...data.unassigned].filter((b) => !/cancel|no_show/i.test(b.status))
+    return {
+      arrivals: all.filter((b) => b.start === data.today).length,
+      departures: all.filter((b) => b.end === data.today).length,
+      inHouse: all.filter((b) => b.start <= data.today && data.today < b.end).length,
+      due: all.filter((b) => dueOf(b.reservationID, b.due)).length,
+    }
+  })()
+  const catColor = (typeID: string) => {
+    const i = Math.max(0, (data?.roomTypes ?? []).findIndex((x) => x.id === typeID))
+    return CAT_COLORS[i % CAT_COLORS.length]
+  }
+  const pill = `h-9 rounded-full border border-white/10 bg-white/[.06] px-3.5 text-[13px] font-medium text-[#eaf0fb] transition hover:bg-white/10`
+
   return (
     <div className="p-2 md:p-3">
-      <div className="min-h-[calc(100vh-1.5rem)] rounded-2xl bg-[#f6f7f9] p-5 text-[#14213d]">
-        <div className="mb-5 flex flex-wrap items-center gap-3">
-          <div className="mr-2">
-            <Link href="/cloudbeds" className="text-xs font-semibold text-[#3b6fe0] hover:underline">← Activity</Link>
-            <h1 className="text-[22px] font-bold leading-tight tracking-tight">Calendar</h1>
-            <p className="flex items-center gap-1.5 text-[12.5px] text-gray-600">
+      <div className="min-h-[calc(100vh-1.5rem)] rounded-2xl p-5 text-[#eaf0fb]" style={{ background: HOLO_BG }}>
+        <div className="mb-3 flex flex-wrap items-center gap-2.5">
+          <div className="mr-3">
+            <Link href="/cloudbeds" className="text-[11px] font-bold uppercase tracking-[.3em] text-[#6fe3e3] hover:underline">Soirée</Link>
+            <h1 className="text-[26px] font-bold leading-[1.1] tracking-tight">Calendar</h1>
+            <p className="flex items-center gap-1.5 text-[11.5px] text-[#8a9bb0]">
               {roomCount} rooms
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Updates automatically
+              <span className="h-1.5 w-1.5 rounded-full bg-[#3ccf8a]" /> Updates automatically
             </p>
           </div>
           <div className="flex items-center gap-1.5">
-            <button onClick={() => scrollBy(-7)} className="h-9 w-9 rounded-[10px] border border-gray-300 bg-white text-base hover:bg-gray-50" aria-label="Back a week">‹</button>
-            <button onClick={() => { if (data) { jumpTo(data.today); setMarkDay(data.today) } }} className="h-9 rounded-[10px] border border-gray-300 bg-white px-3.5 text-[13px] font-semibold hover:bg-gray-50">Today</button>
-            <button onClick={() => scrollBy(7)} className="h-9 w-9 rounded-[10px] border border-gray-300 bg-white text-base hover:bg-gray-50" aria-label="Forward a week">›</button>
-            <div className="ml-1 flex rounded-[10px] bg-[#e9ecf1] p-[3px]" role="group" aria-label="Days shown">
+            <button onClick={() => scrollBy(-7)} className={`${pill} w-9 !px-0 text-base`} aria-label="Back a week">‹</button>
+            <button onClick={() => { if (data) { jumpTo(data.today); setMarkDay(data.today) } }} className={`${pill} font-bold !text-[#6fe3e3]`}>Today</button>
+            <button onClick={() => scrollBy(7)} className={`${pill} w-9 !px-0 text-base`} aria-label="Forward a week">›</button>
+            <div className="ml-1 flex rounded-full border border-white/10 bg-white/[.06] p-[3px]" role="group" aria-label="Days shown">
               {SPANS.map((o) => (
                 <button key={o.days} onClick={() => changeSpan(o.days)} aria-pressed={span === o.days}
-                  className={`h-[30px] rounded-[8px] px-2.5 text-[12.5px] font-semibold ${span === o.days ? 'bg-white text-[#14213d] shadow-sm' : 'text-gray-500 hover:text-[#14213d]'}`}>{o.label}</button>
+                  className={`h-[28px] rounded-full border px-3 text-[12.5px] font-semibold ${span === o.days ? 'border-[#6fe3e3]/50 bg-white/15 text-white' : 'border-transparent text-[#9aa8bb] hover:text-white'}`}>{o.label}</button>
               ))}
             </div>
           </div>
           <div className="flex items-center gap-1.5 text-[13px]">
             <input type="date" value={goTo} onChange={(e) => setGoTo(e.target.value)} aria-label="Go to date"
-              className="h-9 rounded-[10px] border border-gray-300 bg-white px-2.5 text-[13px] outline-none focus:border-[#3b6fe0]" />
-            <button onClick={() => goTo && jumpTo(goTo)} className="h-9 rounded-[10px] border border-gray-300 bg-white px-3.5 text-[13px] font-semibold hover:bg-gray-50">Go</button>
+              className="h-9 rounded-full border border-white/10 bg-white/[.06] px-3 text-[13px] text-[#eaf0fb] outline-none [color-scheme:dark] focus:border-[#6fe3e3]/60" />
+            <button onClick={() => goTo && jumpTo(goTo)} className={pill}>Go</button>
           </div>
-          <div className="min-w-[220px] flex-1"><SearchBar onOpen={setOpen} /></div>
+          <div className="min-w-[200px] flex-1"><SearchBar onOpen={setOpen} dark /></div>
           {data && (
-            <div className="relative h-9">
-              <button onClick={() => setCreating('block')} className="h-9 rounded-[10px] border border-gray-300 bg-white px-4 text-[13px] font-semibold hover:bg-gray-50">Block dates</button>
-              <button onClick={() => setCreating('blank')} className="absolute right-0 top-full mt-1.5 h-9 whitespace-nowrap rounded-[10px] bg-[#1f9d78] px-[18px] text-[13px] font-semibold text-white hover:bg-[#188a69]">+ Create new reservation</button>
+            <div className="flex items-center gap-2">
+              {([['arrivals', stats.arrivals, '#6fe0a4'], ['departures', stats.departures, '#b9c3d6'], ['in house', stats.inHouse, '#ffffff'], ['balances due', stats.due, '#ffd479']] as const).map(([l, v, c]) => (
+                <div key={l} className="flex h-10 flex-col justify-center rounded-xl border border-white/10 bg-white/[.06] px-3.5">
+                  <b className="text-[15px] leading-[1.1]" style={{ color: c }}>{v}</b>
+                  <span className="text-[10px] text-[#8a9bb0]">{l}</span>
+                </div>
+              ))}
+              <button onClick={() => setCreating('block')} className={pill}>Block dates</button>
+              <button onClick={() => setCreating('blank')} className={`${priGreen} !h-9 shadow-[0_4px_18px_rgba(39,173,134,.5),inset_0_1px_0_rgba(255,255,255,.28)]`}>+ New reservation</button>
             </div>
           )}
         </div>
 
-        <div className="mb-3 flex flex-wrap items-center gap-x-[18px] gap-y-1 text-xs text-gray-600">
-          {([['Confirmed', BAR.confirmed.bg, BAR.confirmed.border], ['Not confirmed', BAR.not_confirmed.bg, BAR.not_confirmed.border], ['Checked in', BAR.checked_in.bg, BAR.checked_in.border], ['Checked out', BAR.checked_out.bg, BAR.checked_out.border], ['Blocked', HATCH_BLOCK, '#c5cad4'], ['Out of service', HATCH_SERVICE, '#efc47a']] as const).map(([l, bg, bd]) => (
-            <span key={l} className="flex items-center gap-1.5"><i className="h-3 w-3 rounded border" style={{ background: bg, borderColor: bd }} />{l}</span>
+        <div className="mb-3 flex flex-wrap items-center gap-x-[18px] gap-y-1 px-1 text-xs text-[#9aa8bb]">
+          {([['Confirmed', EDGE.confirmed], ['Not confirmed', EDGE.not_confirmed], ['Checked in', EDGE.checked_in], ['Checked out', EDGE.checked_out]] as const).map(([l, e]) => (
+            <span key={l} className="flex items-center gap-1.5"><i className="h-3 w-3 rounded-[4px] border" style={{ background: `linear-gradient(100deg,${e}88,${e}33)`, borderColor: e }} />{l}</span>
           ))}
+          <span className="flex items-center gap-1.5"><i className="h-3 w-3 rounded-[4px] border" style={{ background: HATCH_BLOCK, borderColor: '#5b6b80' }} />Blocked</span>
+          <span className="flex items-center gap-1.5"><i className="h-3 w-3 rounded-[4px] border" style={{ background: HATCH_SERVICE, borderColor: '#b88a2e' }} />Out of service</span>
+          <span className="flex items-center gap-1.5"><i className="h-[7px] w-[7px] rounded-full bg-[#ff5d6c]" />Balance due</span>
         </div>
 
-        {error && <p className="mb-2 rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>}
-        {!data && !error && <p className="py-10 text-center text-sm text-gray-500">Loading the calendar…</p>}
+        {error && <p className="mb-2 rounded-md bg-red-500/15 px-4 py-2 text-sm text-red-200">{error}</p>}
+        {!data && !error && <p className="py-10 text-center text-sm text-[#8a9bb0]">Loading the calendar…</p>}
 
         {data && (
-          <div ref={scroller} onScroll={onScroll} onMouseLeave={() => setHoverDay(null)} className="relative overflow-x-auto rounded-2xl border border-gray-200 bg-white shadow-[0_1px_2px_rgba(20,33,61,.04)]">
+          <div ref={scroller} onScroll={onScroll} onMouseLeave={() => setHoverDay(null)} className="relative overflow-x-auto rounded-3xl border border-[#6fe3e3]/25 shadow-[0_0_40px_rgba(111,227,227,.08),0_24px_60px_rgba(0,0,0,.45)]" style={{ background: 'rgba(22,46,64,.5)' }}>
             {loading && (
-              <div className={`pointer-events-none sticky top-0 z-30 ${loading === 'past' ? 'left-0' : 'left-0'} h-0`}>
-                <span className="absolute left-2 top-1 rounded bg-white/90 px-2 py-0.5 text-[10px] text-gray-500 shadow">Loading {loading === 'past' ? 'earlier' : 'later'} days…</span>
+              <div className="pointer-events-none sticky top-0 left-0 z-30 h-0">
+                <span className="absolute left-2 top-1 rounded bg-[#162a3c] px-2 py-0.5 text-[10px] text-[#9aa8bb] shadow">Loading {loading === 'past' ? 'earlier' : 'later'} days…</span>
               </div>
             )}
             <div className="relative" style={{ width: gridW }}>
               {markDay && data.days.includes(markDay) && (
-                <div className="pointer-events-none absolute bottom-0 top-0" style={{
+                <div className="pointer-events-none absolute bottom-0 top-0 z-[5]" style={{
                   left: LEFT_W + data.days.indexOf(markDay) * dayW, width: dayW,
-                  background: 'rgba(255,193,59,.22)', boxShadow: 'inset 1px 0 0 rgba(224,150,20,.7), inset -1px 0 0 rgba(224,150,20,.7)',
+                  background: 'rgba(255,193,59,.14)', boxShadow: 'inset 1px 0 0 rgba(255,193,59,.6), inset -1px 0 0 rgba(255,193,59,.6)',
                 }} />
               )}
-              <div className="sticky top-0 z-20 flex border-b border-gray-200 bg-gray-50 text-[9px] font-semibold text-gray-500">
-                <div className="sticky left-0 z-10 border-r-2 border-gray-200 bg-gray-50" style={{ width: LEFT_W, minWidth: LEFT_W, height: MONTH_ROW_H }} />
+              {data.days.includes(data.today) && (
+                <div className="pointer-events-none absolute bottom-0 z-[5] w-[2px]" style={{
+                  left: LEFT_W + data.days.indexOf(data.today) * dayW + dayW / 2 - 1, top: MONTH_ROW_H + PCT_ROW_H + DAY_ROW_H,
+                  background: 'linear-gradient(180deg,#6fe3e3,rgba(111,227,227,.08))',
+                }} />
+              )}
+              <div className="sticky top-0 z-20 flex border-b border-white/10 text-[9px] font-semibold text-[#6f7f94]" style={{ background: HEAD_BG }}>
+                <div className="sticky left-0 z-10 border-r border-white/10" style={{ width: LEFT_W, minWidth: LEFT_W, height: MONTH_ROW_H, background: HEAD_BG }} />
                 <div className="relative" style={{ width: totalDays * dayW, height: MONTH_ROW_H }}>
                   {monthBands.map((m) => (
-                    <div key={m.left} className="absolute top-0 flex h-full items-center border-l-2 border-gray-300 pl-1.5 tracking-wide" style={{ left: m.left, width: m.width }}>{m.label}</div>
+                    <div key={m.left} className="absolute top-0 flex h-full items-center border-l-2 border-[#6fe3e3]/30 pl-1.5 tracking-[.12em]" style={{ left: m.left, width: m.width }}>{m.label}</div>
                   ))}
                 </div>
               </div>
 
-              <div className="sticky z-20 flex border-b border-gray-200 bg-gray-50 text-[9.5px] font-semibold text-gray-500" style={{ top: MONTH_ROW_H }}>
-                <div className="sticky left-0 z-10 border-r-2 border-gray-200 bg-gray-50" style={{ width: LEFT_W, minWidth: LEFT_W, height: PCT_ROW_H }} />
+              <div className="sticky z-20 flex border-b border-white/10 text-[9.5px] font-semibold text-[#8a9bb0]" style={{ top: MONTH_ROW_H, background: HEAD_BG }}>
+                <div className="sticky left-0 z-10 border-r border-white/10" style={{ width: LEFT_W, minWidth: LEFT_W, height: PCT_ROW_H, background: HEAD_BG }} />
                 {data.days.map((d) => {
                   const pct = roomCount ? ((dayStats?.occupiedByDay[d] ?? 0) / roomCount) * 100 : 0
                   const isToday = d === data.today
                   return (
-                    <div key={d} className={`flex items-center justify-center border-r border-gray-200 ${markDay === d ? '!bg-[#ffe9a8]' : ''} ${isToday ? 'bg-[#eefaf5] text-[#1f7d60]' : ''}`} style={{ width: dayW, minWidth: dayW, height: PCT_ROW_H }}>
-                      {pct.toFixed(2)}%
+                    <div key={d} className={`relative flex items-center justify-center border-r border-white/[.06] ${isToday ? 'text-[#6fe3e3]' : ''}`} style={{ width: dayW, minWidth: dayW, height: PCT_ROW_H }}>
+                      {pct.toFixed(0)}%
+                      <i className="absolute bottom-0 left-1/2 h-[2px] -translate-x-1/2 rounded-full" style={{ width: dayW * 0.55, background: `linear-gradient(90deg,#6fe3e3 ${pct}%,rgba(255,255,255,.1) ${pct}%)` }} />
                     </div>
                   )
                 })}
               </div>
 
-              <div className="sticky z-20 flex border-b-2 border-gray-200 bg-gray-50 text-[10px] font-semibold" style={{ top: MONTH_ROW_H + PCT_ROW_H }}>
-                <div className="sticky left-0 z-10 flex items-center border-r-2 border-gray-200 bg-gray-50 px-2.5" style={{ width: LEFT_W, minWidth: LEFT_W, height: DAY_ROW_H }}>Room type / room</div>
+              <div className="sticky z-20 flex border-b border-white/10 text-[10px] font-semibold" style={{ top: MONTH_ROW_H + PCT_ROW_H, background: HEAD_BG }}>
+                <div className="sticky left-0 z-10 flex items-center border-r border-white/10 px-3 text-[10.5px] font-semibold uppercase tracking-[.1em] text-[#6f7f94]" style={{ width: LEFT_W, minWidth: LEFT_W, height: DAY_ROW_H, background: HEAD_BG }}>Rooms</div>
                 {data.days.map((d) => {
                   const dt = new Date(`${d}T12:00:00Z`)
                   const isToday = d === data.today
@@ -582,10 +630,10 @@ export default function CalendarPage() {
                     <div key={d}
                       onClick={() => setMarkDay((m) => (m === d ? null : d))}
                       title={markDay === d ? 'Click to unmark this day' : 'Click to mark this whole day'}
-                      className={`flex cursor-pointer flex-col items-center justify-center border-r text-center leading-tight border-gray-200 ${markDay === d ? '!bg-[#ffd666]' : ''} ${d === hoverDay ? 'bg-[#dbe8f7]' : ''} ${dt.getUTCDate() === 1 ? 'border-l-2 border-l-gray-300' : ''} ${isToday ? 'bg-[#eefaf5] text-[#1f7d60]' : ''}`}
-                      style={{ width: dayW, minWidth: dayW, height: DAY_ROW_H }}>
-                      <span className="text-[10px] font-medium text-gray-500">{dt.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })}</span>
-                      <span className={`mt-0.5 flex h-6 min-w-6 items-center justify-center rounded-full text-[12.5px] font-semibold ${isToday ? 'bg-[#1f9d78] text-white' : markDay === d ? 'bg-[#e08a00] text-white' : ''}`}>{dt.getUTCDate()}</span>
+                      className={`flex cursor-pointer flex-col items-center justify-center border-r border-white/[.06] text-center leading-tight ${dt.getUTCDate() === 1 ? 'border-l-2 border-l-[#6fe3e3]/30' : ''} ${d === hoverDay ? 'bg-white/[.06]' : ''}`}
+                      style={{ width: dayW, minWidth: dayW, height: DAY_ROW_H, backgroundImage: isToday ? 'linear-gradient(180deg,rgba(111,227,227,.25),rgba(111,227,227,0))' : undefined }}>
+                      <span className="text-[10px] font-medium text-[#8a9bb0]">{dt.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })}</span>
+                      <span className={`mt-0.5 flex h-6 min-w-6 items-center justify-center rounded-full text-[13px] font-bold ${isToday ? 'bg-[#6fe3e3] text-[#06202a]' : markDay === d ? 'bg-[#e08a00] text-white' : 'text-white'}`}>{dt.getUTCDate()}</span>
                     </div>
                   )
                 })}
@@ -594,28 +642,31 @@ export default function CalendarPage() {
               {orderedTypes.map((t, ti) => {
                 const isCollapsed = collapsed.has(t.id)
                 const unassigned = data.unassigned.filter((u) => u.roomTypeID === t.id)
+                const c = catColor(t.id)
                 return (
-                  <div key={t.id} className="border-b border-gray-300">
-                    <div className="flex bg-gray-50 text-[9px] text-gray-500">
+                  <div key={t.id} className="border-b" style={{ borderColor: `${c}33` }}>
+                    <div className="flex text-[9px]" style={{ backgroundImage: `linear-gradient(90deg,${c}2e,${c}08)`, borderTop: `1px solid ${c}66` }}>
                       <div
                         draggable
                         onDragStart={() => setDragType(t.id)}
                         onDragOver={(e) => { if (dragType && dragType !== t.id) e.preventDefault() }}
                         onDrop={() => { if (dragType) moveType(dragType, t.id); setDragType(null) }}
                         onDragEnd={() => setDragType(null)}
-                        className={`sticky left-0 z-10 flex items-center border-r-2 border-gray-200 bg-gray-50 pl-1 pr-1 ${dragType === t.id ? 'opacity-50' : ''} ${dragType && dragType !== t.id ? 'outline-dashed outline-1 -outline-offset-2 outline-[#1f9d78]/40' : ''}`}
-                        style={{ width: LEFT_W, minWidth: LEFT_W, height: TYPE_ROW_H }}
+                        className={`sticky left-0 z-10 flex items-center border-r border-white/10 pr-1 ${dragType === t.id ? 'opacity-50' : ''} ${dragType && dragType !== t.id ? 'outline-dashed outline-1 -outline-offset-2 outline-[#6fe3e3]/50' : ''}`}
+                        style={{ width: LEFT_W, minWidth: LEFT_W, height: TYPE_ROW_H, backgroundColor: HEAD_BG, backgroundImage: `linear-gradient(${c}33,${c}33)` }}
                       >
-                        <span title="Drag to re-order" className="cursor-grab select-none px-0.5 text-[11px] leading-none text-gray-400 hover:text-gray-600" aria-hidden="true">⋮⋮</span>
+                        <i className="mr-1.5 h-full w-[6px] shrink-0" style={{ background: c, boxShadow: `0 0 12px ${c}aa` }} />
+                        <span title="Drag to re-order" className="cursor-grab select-none px-0.5 text-[11px] leading-none text-white/30 hover:text-white/70" aria-hidden="true">⋮⋮</span>
                         <button
                           onClick={() => { const n = new Set(collapsed); if (n.has(t.id)) n.delete(t.id); else n.add(t.id); setCollapsed(n) }}
-                          className="flex min-w-0 flex-1 items-center truncate px-1 text-left text-[11px] font-semibold text-[#14213d]"
+                          className="flex min-w-0 flex-1 items-center truncate px-1 text-left text-[12.5px] font-bold" style={{ color: c }}
                         >
-                          <span className="mr-1 inline-block shrink-0 text-[10px] text-gray-500">{isCollapsed ? '›' : '⌄'}</span><span className="truncate">{t.name}</span>
+                          <span className="mr-1 inline-block shrink-0 text-[10px] opacity-70">{isCollapsed ? '›' : '⌄'}</span><span className="truncate">{t.name}</span>
                         </button>
+                        <span className="mr-1 shrink-0 rounded-full border px-1.5 text-[10px] font-semibold" style={{ borderColor: `${c}66`, color: c }}>{t.rooms.length}</span>
                         <span className="flex shrink-0 flex-col">
-                          <button onClick={() => shiftType(t.id, -1)} disabled={ti === 0} title="Move up" aria-label={`Move ${t.name} up`} className="px-1 text-[8px] leading-[10px] text-gray-400 hover:text-[#14213d] disabled:opacity-30">▲</button>
-                          <button onClick={() => shiftType(t.id, 1)} disabled={ti === orderedTypes.length - 1} title="Move down" aria-label={`Move ${t.name} down`} className="px-1 text-[8px] leading-[10px] text-gray-400 hover:text-[#14213d] disabled:opacity-30">▼</button>
+                          <button onClick={() => shiftType(t.id, -1)} disabled={ti === 0} title="Move up" aria-label={`Move ${t.name} up`} className="px-1 text-[8px] leading-[10px] text-white/30 hover:text-white disabled:opacity-20">▲</button>
+                          <button onClick={() => shiftType(t.id, 1)} disabled={ti === orderedTypes.length - 1} title="Move down" aria-label={`Move ${t.name} down`} className="px-1 text-[8px] leading-[10px] text-white/30 hover:text-white disabled:opacity-20">▼</button>
                         </span>
                       </div>
                       {data.days.map((d) => {
@@ -623,16 +674,16 @@ export default function CalendarPage() {
                         const rate = t.rates[d]
                         return (
                           <div key={d}
-                            className={`flex flex-col items-center justify-center border-r border-gray-200 leading-tight ${new Date(`${d}T12:00:00Z`).getUTCDate() === 1 ? 'border-l-2 border-l-gray-300' : ''} ${d === data.today ? 'bg-[#e6f6ef] font-semibold text-[#1f7d60]' : ''}`}
-                            style={{ width: dayW, minWidth: dayW, height: TYPE_ROW_H }}>
+                            className={`flex flex-col items-center justify-center border-r border-white/[.05] leading-tight ${new Date(`${d}T12:00:00Z`).getUTCDate() === 1 ? 'border-l-2 border-l-[#6fe3e3]/30' : ''}`}
+                            style={{ width: dayW, minWidth: dayW, height: TYPE_ROW_H, color: c, background: d === data.today ? `${c}22` : undefined }}>
                             {rate ? (
                               <>
-                                <span>{avail ?? ''}</span>
+                                <span className="opacity-70">{avail ?? ''}</span>
                                 <button
                                   title="Click to change the price"
                                   onClick={(e) => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); setPriceEdit({ typeID: t.id, day: d, value: String(Math.round(rate)), through: d, x: r.left, y: r.bottom + 4, busy: false, err: null }) }}
-                                  className="rounded px-1 font-normal underline-offset-2 hover:bg-[#fff3d6] hover:text-[#8a5a00] hover:underline"
-                                >${Math.round(rate).toLocaleString('en-US')}.00</button>
+                                  className="rounded px-1 text-[10px] font-semibold underline-offset-2 hover:bg-white/10 hover:underline"
+                                >${Math.round(rate).toLocaleString('en-US')}</button>
                               </>
                             ) : (
                               <span>{avail || ''}</span>
@@ -647,10 +698,11 @@ export default function CalendarPage() {
                       const stays = isUnassigned ? unassigned.map((u) => ({ ...u, roomID: room.id })) : data.bookings.filter((b) => b.roomID === room.id)
                       const blocks = data.blocks.filter((b) => b.roomID === room.id)
                       return (
-                        <div key={room.id} className="group flex border-t border-[#d5dae4] hover:bg-[#f4f8fb]">
-                          <div className={`sticky left-0 z-10 border-r-2 border-gray-200 bg-white px-2.5 text-[11px] font-semibold group-hover:bg-[#f4f8fb] ${isUnassigned ? 'italic text-amber-700' : ''}`}
-                            style={{ width: LEFT_W, minWidth: LEFT_W, height: ROW_H, lineHeight: `${ROW_H}px` }}>
-                            {room.name}
+                        <div key={room.id} className="group flex border-t border-white/[.06]">
+                          <div className={`sticky left-0 z-10 flex items-center gap-2 border-r border-white/10 pl-2.5 pr-2 text-[11.5px] font-semibold ${isUnassigned ? 'italic text-amber-300' : ''}`}
+                            style={{ width: LEFT_W, minWidth: LEFT_W, height: ROW_H, backgroundColor: ROOM_BG }}>
+                            {!isUnassigned && <i className="h-5 w-[3px] shrink-0 rounded-full" style={{ background: c, opacity: 0.6 }} />}
+                            <span className={`truncate rounded-md ${isUnassigned ? '' : 'border px-2 py-0.5'}`} style={isUnassigned ? undefined : { borderColor: `${c}88`, color: c, background: `${c}18`, boxShadow: `0 0 8px ${c}33` }}>{room.name}</span>
                           </div>
                           <div className="relative flex" style={{ height: ROW_H }}>
                             {data.days.map((d) => {
@@ -659,7 +711,7 @@ export default function CalendarPage() {
                                 ? d >= (pick.hover < pick.start ? pick.hover : pick.start) && d <= (pick.hover < pick.start ? pick.start : pick.hover)
                                 : pick?.roomID === room.id && d === pick.start
                               const dow = new Date(`${d}T12:00:00Z`).getUTCDay()
-                              const bg = inRange ? 'bg-[#bfe7d8]' : d === hoverDay ? 'bg-[#e8f1fb]' : d === data.today ? 'bg-[#f1fbf7]' : dow === 0 || dow === 6 ? 'bg-[#f6f7fa]' : ''
+                              const bg = inRange ? 'bg-[#3ccf8a]/30' : d === hoverDay ? 'bg-white/[.06]' : d === data.today ? 'bg-[#6fe3e3]/[.07]' : dow === 0 || dow === 6 ? 'bg-white/[.025]' : ''
                               return (
                                 <div key={d}
                                   onClick={canPick ? () => clickDay(room, t.id, d) : undefined}
@@ -667,25 +719,26 @@ export default function CalendarPage() {
                                     setHoverDay(d)
                                     if (pick && pick.roomID === room.id) setPick((p) => (p ? { ...p, hover: d } : p))
                                   }}
-                                  className={`${canPick ? 'cursor-pointer hover:bg-[#d9f0e6]' : ''} ${bg}`}
+                                  className={`${canPick ? 'cursor-pointer hover:bg-[#3ccf8a]/20' : ''} ${bg}`}
                                   style={{ width: dayW, minWidth: dayW }} />
                               )
                             })}
                             <div className="pointer-events-none absolute inset-0" style={{
-                              backgroundImage: 'linear-gradient(to left, #cfd5e0 1px, transparent 1px)',
+                              backgroundImage: 'linear-gradient(to left, rgba(111,227,227,.09) 1px, transparent 1px)',
                               backgroundSize: `${dayW}px 100%`,
                             }} />
                             {blocks.map((b, i) => {
                               const service = b.type === 'out_of_service' || /service|servicio|mainten|repair|mantenim|reparaci/i.test(b.reason)
                               return (
                                 <Bar key={`b${i}`} start={b.start} end={addDays(b.end, 1)} viewStart={data.start} totalDays={totalDays} label={b.reason}
-                                  bg={service ? HATCH_SERVICE : HATCH_BLOCK} border={service ? '#efc47a' : '#c5cad4'} text={service ? '#7a4a05' : '#4a5262'}
+                                  bg={service ? HATCH_SERVICE : HATCH_BLOCK} border={service ? '#b88a2e' : '#5b6b80'} text={service ? '#ffd9a0' : '#cdd6e2'}
                                   title={`${service ? 'Out of service' : 'Blocked'}: ${b.reason} (click to open)`} dayW={dayW} onClick={() => setOpenBlock(b)} />
                               )
                             })}
                             {stays.map((s) => (
                               <Bar key={`${s.reservationID}-${s.start}`} start={s.start} end={s.end} viewStart={data.start} totalDays={totalDays}
-                                label={s.guestName} due={dueOf(s.reservationID, s.due)} src={s.src} bg={barColors(s.status).bg} border={barColors(s.status).border} text={barColors(s.status).text} onClick={() => setOpen(s.reservationID)} dayW={dayW}
+                                label={s.guestName} sub={`${diff(s.start, s.end)} night${diff(s.start, s.end) === 1 ? '' : 's'}`} due={dueOf(s.reservationID, s.due)} src={s.src}
+                                edge={statusEdge(s.status)} bg="" border="" text="#fff" onClick={() => setOpen(s.reservationID)} dayW={dayW}
                                 onContextMenu={(e) => {
                                   e.preventDefault()
                                   e.stopPropagation()
