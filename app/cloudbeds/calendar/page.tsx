@@ -24,17 +24,17 @@ interface Chunk {
   blocks: Block[]
 }
 
-const LEFT_W = 184
-const ROW_H = 46
+const LEFT_W = 160
+const ROW_H = 38
 const SPANS = [{ days: 7, label: '1w' }, { days: 14, label: '2w' }, { days: 21, label: '3w' }, { days: 30, label: '1m' }] as const
 const DEFAULT_SPAN = 21 // days that fit on screen by default
 const MIN_DAY_W = 30
 const CHUNK = 28 // days loaded each time you scroll near an edge
 const EDGE_PX = 400
-const MONTH_ROW_H = 20
-const PCT_ROW_H = 18
-const DAY_ROW_H = 40
-const TYPE_ROW_H = 38
+const MONTH_ROW_H = 18
+const PCT_ROW_H = 16
+const DAY_ROW_H = 34
+const TYPE_ROW_H = 32
 
 // Reservation colours: upcoming blue, checked in green, checked out grey (not confirmed amber).
 const EDGE: Record<string, string> = { confirmed: '#5b95f5', not_confirmed: '#f0b548', checked_in: '#3ccf8a', checked_out: '#8793a6' }
@@ -120,16 +120,16 @@ function Bar({ start, end, viewStart, totalDays, label, sub, bg, border, text, e
       onClick={onClick}
       onContextMenu={onContextMenu}
       title={title ?? label}
-      className="absolute top-1 flex items-center gap-2 overflow-hidden whitespace-nowrap rounded-[10px] border pl-3.5 pr-2 text-left hover:brightness-110"
+      className="absolute top-1 flex items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-[9px] border pl-3 pr-1.5 text-left hover:brightness-110"
       style={{ left: left + 1, width: w, height: ROW_H - 8, color: text, borderColor: edge, background: `linear-gradient(100deg,${edge}55,${edge}1c)`, boxShadow: `0 0 14px ${edge}44, inset 0 0 12px ${edge}22` }}
     >
       <i className="absolute bottom-0 left-0 top-0 w-1" style={{ background: edge }} />
       <span className="min-w-0 flex-1 leading-tight">
-        <span className="block truncate text-[11.5px] font-bold">{label}</span>
-        {sub && w >= 70 && <span className="block truncate text-[10px] opacity-80">{sub}</span>}
+        <span className="block truncate text-[11px] font-bold">{label}</span>
+        {sub && w >= 70 && <span className="block truncate text-[9.5px] opacity-80">{sub}</span>}
       </span>
-      {chip && w >= 150 && <span className="shrink-0 rounded-full border border-white/30 bg-white/[.18] px-2 py-[1px] text-[9.5px] font-semibold">{chip}</span>}
-      {due && <b aria-label="Balance due" title="Balance due" className="shrink-0 rounded-full bg-white px-2 py-[1px] text-[9.5px] font-bold text-[#d12a3a]">Due</b>}
+      {chip && w >= 150 && <span className="shrink-0 rounded-full border border-white/30 bg-white/[.18] px-1.5 py-[1px] text-[9px] font-semibold">{chip}</span>}
+      {due && <b aria-label="Balance due" title="Balance due" className="shrink-0 rounded-full bg-white px-1.5 py-[1px] text-[9px] font-bold text-[#d12a3a]">Due</b>}
     </button>
   )
 }
@@ -521,52 +521,52 @@ export default function CalendarPage() {
     const i = Math.max(0, (data?.roomTypes ?? []).findIndex((x) => x.id === typeID))
     return CAT_COLORS[i % CAT_COLORS.length]
   }
-  const pill = `h-9 rounded-full border border-white/10 bg-white/[.06] px-3.5 text-[13px] font-medium text-[#eaf0fb] transition hover:bg-white/10`
+  const pill = `h-8 rounded-full border border-white/10 bg-white/[.06] px-3 text-[12px] font-medium text-[#eaf0fb] transition hover:bg-white/10`
 
   return (
     <div className="p-2 md:p-3">
-      <div className="min-h-[calc(100vh-1.5rem)] rounded-2xl p-5 text-[#eaf0fb]" style={{ background: HOLO_BG }}>
-        <div className="mb-3 flex flex-wrap items-center gap-2.5">
+      <div className="min-h-[calc(100vh-1.5rem)] rounded-2xl p-4 text-[#eaf0fb]" style={{ background: HOLO_BG }}>
+        <div className="mb-2.5 flex flex-wrap items-center gap-2">
           <div className="mr-3">
             <Link href="/cloudbeds" className="text-[11px] font-bold uppercase tracking-[.3em] text-[#6fe3e3] hover:underline">Soirée</Link>
-            <h1 className="text-[26px] font-bold leading-[1.1] tracking-tight">Calendar</h1>
+            <h1 className="text-[22px] font-bold leading-[1.1] tracking-tight">Calendar</h1>
             <p className="flex items-center gap-1.5 text-[11.5px] text-[#8a9bb0]">
               {roomCount} rooms
               <span className="h-1.5 w-1.5 rounded-full bg-[#3ccf8a]" /> Updates automatically
             </p>
           </div>
           <div className="flex items-center gap-1.5">
-            <button onClick={() => scrollBy(-7)} className={`${pill} w-9 !px-0 text-base`} aria-label="Back a week">‹</button>
+            <button onClick={() => scrollBy(-7)} className={`${pill} w-8 !px-0 text-base`} aria-label="Back a week">‹</button>
             <button onClick={() => { if (data) { jumpTo(data.today); setMarkDay(data.today) } }} className={`${pill} font-bold !text-[#6fe3e3]`}>Today</button>
-            <button onClick={() => scrollBy(7)} className={`${pill} w-9 !px-0 text-base`} aria-label="Forward a week">›</button>
+            <button onClick={() => scrollBy(7)} className={`${pill} w-8 !px-0 text-base`} aria-label="Forward a week">›</button>
             <div className="ml-1 flex rounded-full border border-white/10 bg-white/[.06] p-[3px]" role="group" aria-label="Days shown">
               {SPANS.map((o) => (
                 <button key={o.days} onClick={() => changeSpan(o.days)} aria-pressed={span === o.days}
-                  className={`h-[28px] rounded-full border px-3 text-[12.5px] font-semibold ${span === o.days ? 'border-[#6fe3e3]/50 bg-white/15 text-white' : 'border-transparent text-[#9aa8bb] hover:text-white'}`}>{o.label}</button>
+                  className={`h-[26px] rounded-full border px-2.5 text-[12px] font-semibold ${span === o.days ? 'border-[#6fe3e3]/50 bg-white/15 text-white' : 'border-transparent text-[#9aa8bb] hover:text-white'}`}>{o.label}</button>
               ))}
             </div>
           </div>
           <div className="flex items-center gap-1.5 text-[13px]">
             <input type="date" value={goTo} onChange={(e) => setGoTo(e.target.value)} aria-label="Go to date"
-              className="h-9 rounded-full border border-white/10 bg-white/[.06] px-3 text-[13px] text-[#eaf0fb] outline-none [color-scheme:dark] focus:border-[#6fe3e3]/60" />
+              className="h-8 rounded-full border border-white/10 bg-white/[.06] px-3 text-[12px] text-[#eaf0fb] outline-none [color-scheme:dark] focus:border-[#6fe3e3]/60" />
             <button onClick={() => goTo && jumpTo(goTo)} className={pill}>Go</button>
           </div>
           <div className="min-w-[200px] flex-1"><SearchBar onOpen={setOpen} dark /></div>
           {data && (
             <div className="flex items-center gap-2">
               {([['arrivals', stats.arrivals, '#6fe0a4'], ['departures', stats.departures, '#b9c3d6'], ['in house', stats.inHouse, '#ffffff'], ['balances due', stats.due, '#ffd479']] as const).map(([l, v, c]) => (
-                <div key={l} className="flex h-10 flex-col justify-center rounded-xl border border-white/10 bg-white/[.06] px-3.5">
-                  <b className="text-[15px] leading-[1.1]" style={{ color: c }}>{v}</b>
-                  <span className="text-[10px] text-[#8a9bb0]">{l}</span>
+                <div key={l} className="flex h-9 flex-col justify-center rounded-xl border border-white/10 bg-white/[.06] px-3">
+                  <b className="text-[13.5px] leading-[1.1]" style={{ color: c }}>{v}</b>
+                  <span className="text-[9.5px] text-[#8a9bb0]">{l}</span>
                 </div>
               ))}
               <button onClick={() => setCreating('block')} className={pill}>Block dates</button>
-              <button onClick={() => setCreating('blank')} className={`${priGreen} !h-9 shadow-[0_4px_18px_rgba(39,173,134,.5),inset_0_1px_0_rgba(255,255,255,.28)]`}>+ New reservation</button>
+              <button onClick={() => setCreating('blank')} className={`${priGreen} !h-8 !text-[12px] shadow-[0_4px_18px_rgba(39,173,134,.5),inset_0_1px_0_rgba(255,255,255,.28)]`}>+ New reservation</button>
             </div>
           )}
         </div>
 
-        <div className="mb-3 flex flex-wrap items-center gap-x-[18px] gap-y-1 px-1 text-xs text-[#9aa8bb]">
+        <div className="mb-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[11px] text-[#9aa8bb]">
           {([['Confirmed', EDGE.confirmed], ['Not confirmed', EDGE.not_confirmed], ['Checked in', EDGE.checked_in], ['Checked out', EDGE.checked_out]] as const).map(([l, e]) => (
             <span key={l} className="flex items-center gap-1.5"><i className="h-3 w-3 rounded-[4px] border" style={{ background: `linear-gradient(100deg,${e}88,${e}33)`, borderColor: e }} />{l}</span>
           ))}
@@ -593,9 +593,9 @@ export default function CalendarPage() {
                 }} />
               )}
               {data.days.includes(data.today) && (
-                <div className="pointer-events-none absolute bottom-0 z-[5] w-[2px]" style={{
-                  left: LEFT_W + data.days.indexOf(data.today) * dayW + dayW / 2 - 1, top: MONTH_ROW_H + PCT_ROW_H + DAY_ROW_H,
-                  background: 'linear-gradient(180deg,#6fe3e3,rgba(111,227,227,.08))',
+                <div className="pointer-events-none absolute bottom-0 z-[5] w-px" style={{
+                  left: LEFT_W + data.days.indexOf(data.today) * dayW + dayW / 2 - 0.5, top: MONTH_ROW_H + PCT_ROW_H + DAY_ROW_H,
+                  background: 'linear-gradient(180deg,rgba(111,227,227,.38),rgba(111,227,227,.03))',
                 }} />
               )}
               <div className="sticky top-0 z-20 flex border-b border-white/10 text-[9px] font-semibold text-[#6f7f94]" style={{ background: HEAD_BG }}>
@@ -631,9 +631,9 @@ export default function CalendarPage() {
                       onClick={() => setMarkDay((m) => (m === d ? null : d))}
                       title={markDay === d ? 'Click to unmark this day' : 'Click to mark this whole day'}
                       className={`flex cursor-pointer flex-col items-center justify-center border-r border-white/[.06] text-center leading-tight ${dt.getUTCDate() === 1 ? 'border-l-2 border-l-[#6fe3e3]/30' : ''} ${d === hoverDay ? 'bg-white/[.06]' : ''}`}
-                      style={{ width: dayW, minWidth: dayW, height: DAY_ROW_H, backgroundImage: isToday ? 'linear-gradient(180deg,rgba(111,227,227,.25),rgba(111,227,227,0))' : undefined }}>
+                      style={{ width: dayW, minWidth: dayW, height: DAY_ROW_H, backgroundImage: isToday ? 'linear-gradient(180deg,rgba(111,227,227,.10),rgba(111,227,227,0))' : undefined }}>
                       <span className="text-[10px] font-medium text-[#8a9bb0]">{dt.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })}</span>
-                      <span className={`mt-0.5 flex h-6 min-w-6 items-center justify-center rounded-full text-[13px] font-bold ${isToday ? 'bg-[#6fe3e3] text-[#06202a]' : markDay === d ? 'bg-[#e08a00] text-white' : 'text-white'}`}>{dt.getUTCDate()}</span>
+                      <span className={`mt-px flex h-[22px] min-w-[22px] items-center justify-center rounded-full text-[12px] font-bold ${isToday ? 'border border-[#6fe3e3]/50 bg-[#6fe3e3]/15 text-[#6fe3e3]' : markDay === d ? 'bg-[#e08a00] text-white' : 'text-white'}`}>{dt.getUTCDate()}</span>
                     </div>
                   )
                 })}
@@ -659,7 +659,7 @@ export default function CalendarPage() {
                         <span title="Drag to re-order" className="cursor-grab select-none px-0.5 text-[11px] leading-none text-white/30 hover:text-white/70" aria-hidden="true">⋮⋮</span>
                         <button
                           onClick={() => { const n = new Set(collapsed); if (n.has(t.id)) n.delete(t.id); else n.add(t.id); setCollapsed(n) }}
-                          className="flex min-w-0 flex-1 items-center truncate px-1 text-left text-[12.5px] font-bold" style={{ color: c }}
+                          className="flex min-w-0 flex-1 items-center truncate px-1 text-left text-[12px] font-bold" style={{ color: c }}
                         >
                           <span className="mr-1 inline-block shrink-0 text-[10px] opacity-70">{isCollapsed ? '›' : '⌄'}</span><span className="truncate">{t.name}</span>
                         </button>
@@ -675,7 +675,7 @@ export default function CalendarPage() {
                         return (
                           <div key={d}
                             className={`flex flex-col items-center justify-center border-r border-white/[.05] leading-tight ${new Date(`${d}T12:00:00Z`).getUTCDate() === 1 ? 'border-l-2 border-l-[#6fe3e3]/30' : ''}`}
-                            style={{ width: dayW, minWidth: dayW, height: TYPE_ROW_H, color: c, background: d === data.today ? `${c}22` : undefined }}>
+                            style={{ width: dayW, minWidth: dayW, height: TYPE_ROW_H, color: c, background: d === data.today ? `${c}12` : undefined }}>
                             {rate ? (
                               <>
                                 <span className="opacity-70">{avail ?? ''}</span>
@@ -699,10 +699,10 @@ export default function CalendarPage() {
                       const blocks = data.blocks.filter((b) => b.roomID === room.id)
                       return (
                         <div key={room.id} className="group flex border-t border-white/[.06]">
-                          <div className={`sticky left-0 z-10 flex items-center gap-2 border-r border-white/10 pl-2.5 pr-2 text-[11.5px] font-semibold ${isUnassigned ? 'italic text-amber-300' : ''}`}
+                          <div className={`sticky left-0 z-10 flex items-center gap-2 border-r border-white/10 pl-2.5 pr-2 text-[11px] font-semibold ${isUnassigned ? 'italic text-amber-300' : ''}`}
                             style={{ width: LEFT_W, minWidth: LEFT_W, height: ROW_H, backgroundColor: ROOM_BG }}>
                             {!isUnassigned && <i className="h-5 w-[3px] shrink-0 rounded-full" style={{ background: c, opacity: 0.6 }} />}
-                            <span className={`truncate rounded-md ${isUnassigned ? '' : 'border px-2 py-0.5'}`} style={isUnassigned ? undefined : { borderColor: `${c}88`, color: c, background: `${c}18`, boxShadow: `0 0 8px ${c}33` }}>{room.name}</span>
+                            <span className={`truncate rounded-md ${isUnassigned ? '' : 'border px-1.5 py-px'}`} style={isUnassigned ? undefined : { borderColor: `${c}88`, color: c, background: `${c}18`, boxShadow: `0 0 8px ${c}33` }}>{room.name}</span>
                           </div>
                           <div className="relative flex" style={{ height: ROW_H }}>
                             {data.days.map((d) => {
@@ -711,7 +711,7 @@ export default function CalendarPage() {
                                 ? d >= (pick.hover < pick.start ? pick.hover : pick.start) && d <= (pick.hover < pick.start ? pick.start : pick.hover)
                                 : pick?.roomID === room.id && d === pick.start
                               const dow = new Date(`${d}T12:00:00Z`).getUTCDay()
-                              const bg = inRange ? 'bg-[#3ccf8a]/30' : d === hoverDay ? 'bg-white/[.06]' : d === data.today ? 'bg-[#6fe3e3]/[.07]' : dow === 0 || dow === 6 ? 'bg-white/[.025]' : ''
+                              const bg = inRange ? 'bg-[#3ccf8a]/30' : d === hoverDay ? 'bg-white/[.06]' : d === data.today ? 'bg-[#6fe3e3]/[.035]' : dow === 0 || dow === 6 ? 'bg-white/[.025]' : ''
                               return (
                                 <div key={d}
                                   onClick={canPick ? () => clickDay(room, t.id, d) : undefined}
