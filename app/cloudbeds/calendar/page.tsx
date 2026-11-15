@@ -37,7 +37,7 @@ const DAY_ROW_H = 30
 const TYPE_ROW_H = 28
 
 // Reservation colours: upcoming blue, checked in green, checked out grey (not confirmed amber).
-const EDGE: Record<string, string> = { confirmed: '#5b95f5', not_confirmed: '#f0b548', checked_in: '#3ccf8a', checked_out: '#8793a6' }
+const EDGE: Record<string, string> = { confirmed: '#5f84c4', not_confirmed: '#d6a950', checked_in: '#5fa386', checked_out: '#7e8a9f' }
 function statusEdge(status: string) {
   const k = status.toLowerCase()
   return EDGE[k === 'in_house' ? 'checked_in' : k] ?? EDGE.confirmed
@@ -46,10 +46,10 @@ const HATCH_BLOCK = 'repeating-linear-gradient(135deg,#3a4a5c 0 5px,#2a3846 5px 
 const HATCH_SERVICE = 'repeating-linear-gradient(135deg,#6b4a14 0 5px,#4a3410 5px 10px)'
 // Solid, opaque fills for reservation bars (top, bottom), keyed by the status colour.
 const BAR_FILL: Record<string, [string, string]> = {
-  [EDGE.confirmed]: ['#5b95f5', '#3b6fdc'],
-  [EDGE.not_confirmed]: ['#f0b548', '#c98a14'],
-  [EDGE.checked_in]: ['#3ccf8a', '#1c9a66'],
-  [EDGE.checked_out]: ['#8f9aab', '#667084'],
+  [EDGE.confirmed]: ['#5f84c4', '#4a6aa6'],
+  [EDGE.not_confirmed]: ['#d6a950', '#b88d38'],
+  [EDGE.checked_in]: ['#5fa386', '#4a8a6f'],
+  [EDGE.checked_out]: ['#7e8a9f', '#6a768b'],
 }
 const HEAD_BG = '#16254f'
 const ROOM_BG = '#142350'
