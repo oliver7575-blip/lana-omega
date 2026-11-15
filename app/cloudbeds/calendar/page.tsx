@@ -626,7 +626,7 @@ export default function CalendarPage() {
               {markDay && data.days.includes(markDay) && (
                 <div className="pointer-events-none absolute bottom-0 top-0 z-[5]" style={{
                   left: LEFT_W + data.days.indexOf(markDay) * dayW, width: dayW,
-                  background: 'rgba(255,193,59,.14)', boxShadow: 'inset 1px 0 0 rgba(255,193,59,.6), inset -1px 0 0 rgba(255,193,59,.6)',
+                  background: 'rgba(143,180,255,.055)', boxShadow: 'inset 1px 0 0 rgba(143,180,255,.2), inset -1px 0 0 rgba(143,180,255,.2)',
                 }} />
               )}
               {data.days.includes(data.today) && (
@@ -670,7 +670,7 @@ export default function CalendarPage() {
                       className={`flex cursor-pointer flex-col items-center justify-center border-r border-white/[.06] text-center leading-tight ${dt.getUTCDate() === 1 ? 'border-l-2 border-l-[#8fb4ff]/30' : ''} ${d === hoverDay ? 'bg-white/[.06]' : ''}`}
                       style={{ width: dayW, minWidth: dayW, height: DAY_ROW_H, backgroundImage: isToday ? 'linear-gradient(180deg,rgba(143,180,255,.10),rgba(143,180,255,0))' : undefined }}>
                       <span className="text-[9.5px] font-medium text-[#8a9bb0]">{dt.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })}</span>
-                      <span className={`mt-px flex h-5 min-w-5 items-center justify-center rounded-full text-[11.5px] font-bold ${isToday ? 'border border-[#8fb4ff]/50 bg-[#8fb4ff]/15 text-[#8fb4ff]' : markDay === d ? 'bg-[#e08a00] text-white' : 'text-white'}`}>{dt.getUTCDate()}</span>
+                      <span className={`mt-px flex h-5 min-w-5 items-center justify-center rounded-full text-[11.5px] font-bold ${isToday ? 'border border-[#8fb4ff]/50 bg-[#8fb4ff]/15 text-[#8fb4ff]' : markDay === d ? 'bg-white/15 text-white' : 'text-white'}`}>{dt.getUTCDate()}</span>
                     </div>
                   )
                 })}
