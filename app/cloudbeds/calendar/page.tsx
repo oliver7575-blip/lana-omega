@@ -301,16 +301,19 @@ export default function CalendarPage() {
     bumpDue((n) => n + 1)
   }
 
+  const priceSaving = useRef(false)
   const savePrice = async () => {
     const pe = priceEdit
     const cur = dataRef.current
-    if (!pe || !cur) return
+    if (!pe || !cur || priceSaving.current) return
+    const fail = (text: string) => { setPriceEdit(null); setToast({ ok: false, text }) }
     const t = cur.roomTypes.find((x) => x.id === pe.typeID)
     const rate = Number(pe.value.replace(',', '.'))
-    if (!t?.rateID) { setPriceEdit({ ...pe, err: 'This category has no editable base rate.' }); return }
-    if (!Number.isFinite(rate) || rate <= 0) { setPriceEdit({ ...pe, err: 'Enter a valid price.' }); return }
+    if (!t?.rateID) { fail('This category has no editable base rate.'); return }
+    if (!Number.isFinite(rate) || rate <= 0) { fail('Enter a valid price.'); return }
     const through = pe.through && pe.through >= pe.day ? pe.through : pe.day
-    if (diff(pe.day, through) >= 30) { setPriceEdit({ ...pe, err: 'Up to 30 nights at a time.' }); return }
+    if (diff(pe.day, through) >= 30) { fail('Up to 30 nights at a time.'); return }
+    priceSaving.current = true
     setPriceEdit({ ...pe, busy: true, err: null })
     try {
       const res = await fetch('/api/cloudbeds/rates', {
@@ -333,8 +336,9 @@ export default function CalendarPage() {
       const nights = diff(pe.day, through) + 1
       setToast({ ok: true, text: `${t.name}: $${Math.round(rate).toLocaleString('en-US')} set for ${nights === 1 ? pe.day : `${pe.day} to ${through}`}. Cloudbeds may take a moment to apply it.` })
     } catch (e) {
-      setPriceEdit({ ...pe, busy: false, err: e instanceof Error ? e.message : 'Cloudbeds error' })
+      fail(e instanceof Error ? e.message : 'Cloudbeds error')
     }
+    priceSaving.current = false
   }
 
   // Live refresh of the part on screen (and a week either side).
@@ -700,11 +704,27 @@ export default function CalendarPage() {
                             {rate ? (
                               <>
                                 <span className="opacity-70">{avail ?? ''}</span>
-                                <button
-                                  title="Click to change the price"
-                                  onClick={(e) => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); setPriceEdit({ typeID: t.id, day: d, value: String(Math.round(rate)), through: d, x: r.left, y: r.bottom + 4, busy: false, err: null }) }}
-                                  className="rounded px-1 text-[9.5px] font-semibold underline-offset-2 hover:bg-white/10 hover:underline"
-                                >${Math.round(rate).toLocaleString('en-US')}</button>
+                                {priceEdit && priceEdit.typeID === t.id && priceEdit.day === d ? (
+                                  <input
+                                    autoFocus
+                                    inputMode="decimal"
+                                    disabled={priceEdit.busy}
+                                    value={priceEdit.value}
+                                    onFocus={(e) => e.currentTarget.select()}
+                                    onChange={(e) => setPriceEdit({ ...priceEdit, value: e.target.value, err: null })}
+                                    onKeyDown={(e) => { if (e.key === 'Escape') setPriceEdit(null); if (e.key === 'Enter') savePrice() }}
+                                    onBlur={() => { if (!priceEdit.busy) { if (Number(priceEdit.value.replace(',', '.')) === Math.round(rate)) setPriceEdit(null); else savePrice() } }}
+                                    aria-label="Price for this night"
+                                    className="rounded border border-[#8fb4ff] bg-[#0f1c42] px-0.5 text-center text-[9.5px] font-semibold text-white outline-none disabled:opacity-60"
+                                    style={{ width: Math.max(36, dayW - 14) }}
+                                  />
+                                ) : (
+                                  <button
+                                    title="Click to change the price"
+                                    onClick={() => setPriceEdit({ typeID: t.id, day: d, value: String(Math.round(rate)), through: d, x: 0, y: 0, busy: false, err: null })}
+                                    className="rounded px-1 text-[9.5px] font-semibold underline-offset-2 hover:bg-white/10 hover:underline"
+                                  >${Math.round(rate).toLocaleString('en-US')}</button>
+                                )}
                               </>
                             ) : (
                               <span>{avail || ''}</span>
@@ -855,39 +875,6 @@ export default function CalendarPage() {
       })()}
 
 
-      {priceEdit && (() => {
-        const t = data?.roomTypes.find((x) => x.id === priceEdit.typeID)
-        const left = Math.min(priceEdit.x, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 250)
-        const top = Math.min(priceEdit.y, (typeof window !== 'undefined' ? window.innerHeight : 800) - 200)
-        return (
-          <>
-            <div className="fixed inset-0 z-40" onClick={() => setPriceEdit(null)} />
-            <div className="fixed z-50 w-[250px] overflow-hidden rounded-[18px] bg-white shadow-[0_18px_44px_rgba(20,33,61,.28)]" style={{ left, top }}
-              onKeyDown={(e) => { if (e.key === 'Escape') setPriceEdit(null); if (e.key === 'Enter') savePrice() }}>
-              <div className={`px-4 py-2.5 text-white ${headerGradient('blue')}`}>
-                <div className="text-[13px] font-bold">{t?.name}</div>
-                <div className="text-[11px] text-white/70">{priceEdit.day}</div>
-              </div>
-              <div className="space-y-2.5 p-3.5">
-                <label className={lbl}>Price per night
-                  <input autoFocus inputMode="decimal" value={priceEdit.value} onFocus={(e) => e.currentTarget.select()}
-                    onChange={(e) => setPriceEdit({ ...priceEdit, value: e.target.value, err: null })}
-                    className={`${field} mt-1.5 !text-[15px] !font-semibold normal-case tracking-normal`} />
-                </label>
-                <label className={lbl}>Same price through <span className="font-normal normal-case text-gray-400">(optional)</span>
-                  <input type="date" value={priceEdit.through} min={priceEdit.day} onChange={(e) => setPriceEdit({ ...priceEdit, through: e.target.value, err: null })}
-                    className={`${field} mt-1.5 normal-case tracking-normal`} />
-                </label>
-                {priceEdit.err && <div className="text-[11.5px] text-red-600">{priceEdit.err}</div>}
-                <div className="flex justify-end gap-2 pt-0.5">
-                  <button onClick={() => setPriceEdit(null)} className={btn}>Cancel</button>
-                  <button onClick={savePrice} disabled={priceEdit.busy} className={`${priGreen} !h-[34px] !px-4 !text-[12.5px]`}>{priceEdit.busy ? 'Saving…' : 'Save price'}</button>
-                </div>
-              </div>
-            </div>
-          </>
-        )
-      })()}
       {open && data && <ReservationModal id={open} today={data.today} onClose={() => setOpen(null)} onChanged={refreshVisible} onCheckedOut={(text) => setToast({ ok: true, text })} onBalance={onBalance} />}
     </div>
   )
