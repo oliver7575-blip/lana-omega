@@ -117,6 +117,19 @@ interface PaymentLinkResult {
 
 interface Note { author: string; date: string; text: string }
 
+/** The payment method preselected in "Add payment", chosen from where the booking came from. */
+function defaultPaymentMethod(source: string | null | undefined, methods: { code: string; name: string }[]): string {
+  const find = (re: RegExp) => methods.find((m) => re.test(`${m.code} ${m.name}`))
+  const src = (source ?? '').toLowerCase()
+  const cash = find(/cash|efectivo/i)
+  let pick: { code: string } | undefined
+  if (/booking\.com/.test(src)) pick = find(/booking[\s\S]*prepaid|prepaid[\s\S]*check/i)
+  else if (/airbnb/.test(src)) pick = find(/air\s?bnb[\s\S]*prepaid|prepaid[\s\S]*card/i)
+  else if (/walk/.test(src)) pick = cash
+  else if (/website|booking engine|bookings engine|engine|direct|soir[ée]e/.test(src)) pick = find(/credit\s?card|tarjeta/i)
+  return (pick ?? cash ?? methods[0])?.code ?? ''
+}
+
 /** Booking source pill: Booking.com blue, Airbnb pink, walk-in light green, anything else light grey. */
 function sourceStyle(source: string): React.CSSProperties {
   const s = source.toLowerCase()
@@ -189,12 +202,15 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
     setMpNote('')
     const suggest = kind === 'payment' ? (r.balance && r.balance > 0 ? r.balance : 0) : (r.breakdown.paid ?? 0)
     setMpAmount(suggest > 0 ? String(Math.round(suggest * 100) / 100) : '')
-    if (!mpMethods) {
+    // A payment starts on the method that matches the booking source; a refund starts on cash.
+    const preset = (methods: { code: string; name: string }[]) =>
+      setMpMethod(kind === 'payment' ? defaultPaymentMethod(r.source, methods) : defaultPaymentMethod('walk-in', methods))
+    if (mpMethods) preset(mpMethods)
+    else {
       cbApi<{ paymentMethods: { code: string; name: string }[] }>('/api/cloudbeds/availability?options=1')
         .then((o) => {
           setMpMethods(o.paymentMethods)
-          const cash = o.paymentMethods.find((m) => /cash|efectivo/i.test(m.code + m.name)) ?? o.paymentMethods[0]
-          if (cash) setMpMethod((cur) => cur || cash.code)
+          preset(o.paymentMethods)
         })
         .catch(() => setMpMethods([]))
     }
