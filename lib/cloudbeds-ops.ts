@@ -130,18 +130,37 @@ export interface ReservationDetail {
   breakdown: { subTotal: number | null; additionalItems: number | null; taxesFees: number | null; paid: number | null }
 }
 
-export interface ReservationNote { author: string; date: string; text: string }
+export interface ReservationNote { id: string; author: string; date: string; text: string }
 
 /** The notes staff have written on a reservation in Cloudbeds. */
 export async function getReservationNotes(cb: CB, reservationID: string): Promise<ReservationNote[]> {
   const json = await cbGet(cb, 'getReservationNotes', { propertyID: cb.propertyId, reservationID })
   return ((json.data as Json[]) ?? [])
     .map((n) => ({
+      id: String(n.reservationNoteID ?? n.noteID ?? n.id ?? '').trim(),
       author: String(n.userName ?? n.user ?? '').trim(),
       date: String(n.dateCreated ?? n.dateModified ?? '').trim(),
       text: String(n.reservationNote ?? n.note ?? '').trim(),
     }))
     .filter((n) => n.text)
+}
+
+/** Rewrite one of the staff notes on a reservation in Cloudbeds. */
+export async function updateReservationNote(cb: CB, reservationID: string, reservationNoteID: string, text: string): Promise<void> {
+  await cbPut(cb, 'putReservationNote', { reservationID, reservationNoteID, reservationNote: text })
+}
+
+/** Delete one of the staff notes on a reservation in Cloudbeds. */
+export async function deleteReservationNote(cb: CB, reservationID: string, reservationNoteID: string): Promise<void> {
+  const fields = { propertyID: cb.propertyId, reservationID, reservationNoteID }
+  const res = await fetch(`${BASE}/deleteReservationNote?${new URLSearchParams(fields)}`, {
+    method: 'DELETE',
+    headers: { 'x-api-key': cb.apiKey, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams(fields),
+    signal: AbortSignal.timeout(20000),
+  })
+  const json = (await res.json().catch(() => ({}))) as Json
+  if (!res.ok || json.success === false) throw new Error((json.message as string) ?? `Cloudbeds deleteReservationNote failed: ${res.status}`)
 }
 
 /** The raw getReservation record (used by payments to read source, balance and deposit fields). */

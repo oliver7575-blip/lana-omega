@@ -115,7 +115,7 @@ interface PaymentLinkResult {
   whatsapp: { status: 'sent' | 'skipped' | 'failed'; detail: string }
 }
 
-interface Note { author: string; date: string; text: string }
+interface Note { id?: string; author: string; date: string; text: string }
 
 /** The payment method preselected in "Add payment", chosen from where the booking came from. */
 function defaultPaymentMethod(source: string | null | undefined, methods: { code: string; name: string }[]): string {
@@ -152,6 +152,10 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
   const [r, setR] = useState<Detail | null>(null)
   const [link, setLink] = useState('')
   const [notes, setNotes] = useState<Note[]>([])
+  const [noteEdit, setNoteEdit] = useState<{ id: string; text: string } | null>(null)
+  const [noteDel, setNoteDel] = useState<string | null>(null)
+  const [noteBusy, setNoteBusy] = useState(false)
+  const [noteErr, setNoteErr] = useState<string | null>(null)
   // Quick message bubble opened from the phone number (WhatsApp) or the email address.
   const [payBusy, setPayBusy] = useState(false)
   const [pay, setPay] = useState<PaymentLinkResult | null>(null)
@@ -256,6 +260,21 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
       .then((j) => { apply(j.reservation); setLink(j.link); setNotes(j.notes ?? []) })
       .catch((e) => setError(e.message))
   }, [id])
+
+  async function noteAct(body: Record<string, string>) {
+    setNoteBusy(true)
+    setNoteErr(null)
+    try {
+      const j = await cbApi<{ notes: Note[] }>(`/api/cloudbeds/reservation/${id}`, 'POST', body)
+      setNotes(j.notes ?? [])
+      setNoteEdit(null)
+      setNoteDel(null)
+      onChanged?.()
+    } catch (e) {
+      setNoteErr(e instanceof Error ? e.message : 'Cloudbeds error')
+    }
+    setNoteBusy(false)
+  }
 
   async function act(body: Record<string, string>, ok: string) {
     setBusy(true)
@@ -808,11 +827,38 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                   {notes.length > 0 ? (
                     <div className={`${r.specialRequests ? "mt-2" : ""} max-h-32 space-y-1.5 overflow-y-auto`}>
                       {notes.map((n, i) => (
-                        <div key={i} className="rounded-[10px] bg-gray-50 px-3 py-2 text-[13px]">
-                          <p className="whitespace-pre-wrap">{n.text}</p>
-                          <p className="mt-0.5 text-[11px] text-gray-500">{[n.author, n.date.slice(0, 16)].filter(Boolean).join(' · ')}</p>
+                        <div key={n.id || i} className="rounded-[10px] bg-gray-50 px-3 py-2 text-[13px]">
+                          {n.id && noteEdit?.id === n.id ? (
+                            <div>
+                              <textarea value={noteEdit.text} onChange={(e) => setNoteEdit({ id: n.id!, text: e.target.value })} rows={3} autoFocus className={`${area} !text-[13px]`} />
+                              <div className="mt-1.5 flex justify-end gap-1.5">
+                                <button disabled={noteBusy} onClick={() => { setNoteEdit(null); setNoteErr(null) }} className={`${btn} !h-7 !px-3 !text-[11.5px]`}>Cancel</button>
+                                <button disabled={noteBusy || !noteEdit.text.trim()} onClick={() => noteAct({ action: 'note_update', noteID: n.id!, text: noteEdit.text })} className={`${priGreen} !h-7 !px-3 !text-[11.5px]`}>{noteBusy ? 'Saving…' : 'Save'}</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <p className="whitespace-pre-wrap">{n.text}</p>
+                              <div className="mt-0.5 flex items-center justify-between gap-2">
+                                <p className="min-w-0 truncate text-[11px] text-gray-500">{[n.author, n.date.slice(0, 16)].filter(Boolean).join(' · ')}</p>
+                                {n.id && (noteDel === n.id ? (
+                                  <span className="flex shrink-0 items-center gap-1.5 text-[11px]">
+                                    <span className="text-[#b42318]">Delete in Cloudbeds?</span>
+                                    <button disabled={noteBusy} onClick={() => noteAct({ action: 'note_delete', noteID: n.id! })} className="font-semibold text-[#b42318] hover:underline">{noteBusy ? '…' : 'Yes'}</button>
+                                    <button disabled={noteBusy} onClick={() => setNoteDel(null)} className="font-semibold text-[#475467] hover:underline">No</button>
+                                  </span>
+                                ) : (
+                                  <span className="flex shrink-0 items-center gap-2.5 text-[11px] font-semibold">
+                                    <button onClick={() => { setNoteEdit({ id: n.id!, text: n.text }); setNoteDel(null); setNoteErr(null) }} className="text-[#1d4ed8] hover:underline">Edit</button>
+                                    <button onClick={() => { setNoteDel(n.id!); setNoteEdit(null); setNoteErr(null) }} className="text-[#b42318] hover:underline">Delete</button>
+                                  </span>
+                                ))}
+                              </div>
+                            </>
+                          )}
                         </div>
                       ))}
+                      {noteErr && <p className="text-[12px] text-red-700">{noteErr}</p>}
                     </div>
                   ) : r.specialRequests ? <p className="mt-2 text-xs text-[#8a93a3]">No internal notes yet</p> : null}
                 </div>

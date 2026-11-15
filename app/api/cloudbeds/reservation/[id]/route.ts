@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { cloudbedsForCaller } from '@/lib/cloudbeds-caller'
-import { assignRoom, checkIn, checkOut, cloudbedsLinks, getGuestProfile, getReservationDetail, getReservationGuestContact, getReservationNotes, setArrivalTime, setStatus, setStayDates, unassignRoom } from '@/lib/cloudbeds-ops'
+import { assignRoom, checkIn, checkOut, cloudbedsLinks, getGuestProfile, getReservationDetail, getReservationGuestContact, getReservationNotes, deleteReservationNote, updateReservationNote, setArrivalTime, setStatus, setStayDates, unassignRoom } from '@/lib/cloudbeds-ops'
 
 export const maxDuration = 60
 
@@ -61,8 +61,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     subReservationID?: string
     reservationRoomID?: string
     newRoomID?: string
+    noteID?: string
+    text?: string
   }
   try {
+    if (body.action === 'note_update' || body.action === 'note_delete') {
+      if (!body.noteID) return NextResponse.json({ error: 'Missing note' }, { status: 400 })
+      if (body.action === 'note_update') {
+        const text = (body.text ?? '').trim()
+        if (!text) return NextResponse.json({ error: 'A note cannot be empty — delete it instead' }, { status: 400 })
+        await updateReservationNote(c.cb, id, body.noteID, text)
+      } else {
+        await deleteReservationNote(c.cb, id, body.noteID)
+      }
+      return NextResponse.json({ ok: true, notes: await getReservationNotes(c.cb, id) })
+    }
     if (body.action === 'check_in') {
       await checkIn(c.cb, id)
     } else if (body.action === 'check_out') {
