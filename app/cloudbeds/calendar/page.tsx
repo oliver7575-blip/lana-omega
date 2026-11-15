@@ -134,9 +134,9 @@ function Bar({ start, end, viewStart, totalDays, label, sub, bg, border, text, e
         {sub && w >= 80 && <span className="ml-1.5 font-medium opacity-80">· {sub}</span>}
       </span>
       {badge && w >= 60 && (
-        <i title={badge.name} className="inline-flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-[6px] text-[13px] font-black not-italic leading-none text-white shadow-[0_1px_2px_rgba(0,0,0,.35)]" style={{ background: badge.color }}>
+        <i title={badge.name} className="inline-flex h-[17px] w-[17px] shrink-0 items-center justify-center rounded-[5px] text-[11px] font-black not-italic leading-none text-white shadow-[0_1px_2px_rgba(0,0,0,.35)]" style={{ background: badge.color }}>
           {badge.name === 'Airbnb' ? (
-            <svg viewBox="0 0 24 24" className="h-[14px] w-[14px]" fill="#fff" aria-hidden="true"><path d={AIRBNB_PATH} /></svg>
+            <svg viewBox="0 0 24 24" className="h-[12px] w-[12px]" fill="#fff" aria-hidden="true"><path d={AIRBNB_PATH} /></svg>
           ) : badge.name === 'Booking.com' ? (
             <span className="tracking-[-0.02em]">B<span className="text-[#5ec2ff]">.</span></span>
           ) : badge.t}
