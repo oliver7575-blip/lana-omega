@@ -5,9 +5,9 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        paper: '#0f1c42', // page background
-        surface: '#16285c', // cards and panels
-        line: '#34508f', // borders
+        paper: '#080f26', // page background
+        surface: '#0e1936', // cards and panels
+        line: '#26407a', // borders
         navy: '#e7e9f0', // main text (light on dark)
         clay: '#6aa2ff', // accent
         ink: '#1d3a78', // dark buttons

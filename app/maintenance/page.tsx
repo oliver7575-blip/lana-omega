@@ -194,12 +194,12 @@ export default function MaintenancePage() {
             <p className="text-sm text-[#9fb3dc]">{visible.length} shown</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <select value={staffFilter} onChange={(e) => setStaffFilter(e.target.value)} className="rounded-full border border-[#8fb4ff]/25 bg-[#0f1c42]/60 px-3 py-1.5 text-sm text-[#eaf0fb] outline-none [color-scheme:dark]">
+            <select value={staffFilter} onChange={(e) => setStaffFilter(e.target.value)} className="rounded-full border border-[#8fb4ff]/25 bg-[#0a1330]/60 px-3 py-1.5 text-sm text-[#eaf0fb] outline-none [color-scheme:dark]">
               <option value="">All staff</option>
               {staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
-            <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="rounded-full border border-[#8fb4ff]/25 bg-[#0f1c42]/60 px-3 py-1.5 text-sm text-[#eaf0fb] outline-none [color-scheme:dark]" />
-            <button onClick={() => setDateFilter('')} title="Show all dates" className="rounded-md border border-[#8fb4ff]/25 bg-[#0f1c42]/60 px-2.5 py-1.5 text-sm text-[#9fb3dc] hover:text-navy">×</button>
+            <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="rounded-full border border-[#8fb4ff]/25 bg-[#0a1330]/60 px-3 py-1.5 text-sm text-[#eaf0fb] outline-none [color-scheme:dark]" />
+            <button onClick={() => setDateFilter('')} title="Show all dates" className="rounded-md border border-[#8fb4ff]/25 bg-[#0a1330]/60 px-2.5 py-1.5 text-sm text-[#9fb3dc] hover:text-navy">×</button>
             <div className="flex rounded-full border border-[#8fb4ff]/25 bg-white/[0.06] p-[3px]">
               {(['active', 'completed', 'followups'] as const).map((m) => (
                 <button key={m} onClick={() => { setMode(m); setSelected(new Set()) }} className={`rounded-full px-3.5 py-1 text-[12.5px] font-semibold capitalize ${mode === m ? 'bg-white/90 text-[#14264f]' : 'text-[#cfdcff] hover:text-white'}`}>
@@ -228,7 +228,7 @@ export default function MaintenancePage() {
         )}
 
         {selected.size > 0 && (
-          <div className="mx-5 mt-3 flex items-center gap-4 rounded-lg bg-[#0f1c42]/60 px-4 py-2 text-sm">
+          <div className="mx-5 mt-3 flex items-center gap-4 rounded-lg bg-[#0a1330]/60 px-4 py-2 text-sm">
             <span className="text-navy/70">{selected.size} selected</span>
             {mode === 'active' && <button onClick={() => bulk('mark_done')} className="text-emerald-300 hover:underline">Mark done</button>}
             <button onClick={() => bulk('delete')} className="text-red-300 hover:underline">Delete</button>
@@ -281,7 +281,7 @@ export default function MaintenancePage() {
                       ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200'
                       : t.status === 'waiting'
                         ? 'border-amber-400/30 bg-amber-500/10 text-amber-200'
-                        : 'border-[#8fb4ff]/25 bg-[#0f1c42]/60 text-navy'
+                        : 'border-[#8fb4ff]/25 bg-[#0a1330]/60 text-navy'
                   }`}
                 >
                   {Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -364,7 +364,7 @@ export default function MaintenancePage() {
                       ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200'
                       : t.status === 'waiting'
                         ? 'border-amber-400/30 bg-amber-500/10 text-amber-200'
-                        : 'border-[#8fb4ff]/25 bg-[#0f1c42]/60 text-navy'
+                        : 'border-[#8fb4ff]/25 bg-[#0a1330]/60 text-navy'
                   }`}
                 >
                   {Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -398,7 +398,7 @@ export default function MaintenancePage() {
         {activity.length === 0 && <p className="text-sm text-[#9fb3dc]">No activity yet.</p>}
         <div className="grid min-w-0 gap-3 lg:grid-cols-2">
           {activity.map((e) => (
-            <button key={e.id} onClick={() => setDrawerId(e.task_id)} className="flex w-full min-w-0 gap-3 rounded-xl border border-[#8fb4ff]/25 bg-[#0f1c42]/40 px-4 py-3 text-left hover:bg-[#0f1c42]/60">
+            <button key={e.id} onClick={() => setDrawerId(e.task_id)} className="flex w-full min-w-0 gap-3 rounded-xl border border-[#8fb4ff]/25 bg-[#0a1330]/40 px-4 py-3 text-left hover:bg-[#0a1330]/60">
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#5b95f5]/20 text-sm text-[#8fb4ff]">{eventIcon(e.event_type)}</span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold text-white">{e.task_title}</span>
