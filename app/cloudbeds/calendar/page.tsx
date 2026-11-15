@@ -51,7 +51,7 @@ const BAR_FILL: Record<string, [string, string]> = {
   [EDGE.checked_in]: ['#5fa386', '#4a8a6f'],
   [EDGE.checked_out]: ['#7e8a9f', '#6a768b'],
 }
-const HEAD_BG = '#0a1330'
+const HEAD_BG = '#0e1a3d'
 const ROOM_BG = '#142350'
 
 function addDays(d: string, n: number) {
@@ -619,7 +619,7 @@ export default function CalendarPage() {
           <div ref={scroller} onScroll={onScroll} onMouseLeave={() => setHoverDay(null)} className="relative overflow-x-auto rounded-3xl border border-[#8fb4ff]/25 shadow-[0_0_40px_rgba(143,180,255,.08),0_24px_60px_rgba(0,0,0,.45)]" style={{ background: 'rgba(22,40,92,.5)' }}>
             {loading && (
               <div className="pointer-events-none sticky top-0 left-0 z-30 h-0">
-                <span className="absolute left-2 top-1 rounded bg-[#0a1330] px-2 py-0.5 text-[10px] text-[#9aa8bb] shadow">Loading {loading === 'past' ? 'earlier' : 'later'} days…</span>
+                <span className="absolute left-2 top-1 rounded bg-[#0e1a3d] px-2 py-0.5 text-[10px] text-[#9aa8bb] shadow">Loading {loading === 'past' ? 'earlier' : 'later'} days…</span>
               </div>
             )}
             <div className="relative" style={{ width: gridW }}>
@@ -725,7 +725,7 @@ export default function CalendarPage() {
                                     onKeyDown={(e) => { if (e.key === 'Escape') setPriceEdit(null); if (e.key === 'Enter') savePrice() }}
                                     onBlur={() => { if (!priceEdit.busy) { if (Number(priceEdit.value.replace(',', '.')) === Math.round(rate)) setPriceEdit(null); else savePrice() } }}
                                     aria-label="Price for this night"
-                                    className="rounded border border-[#8fb4ff] bg-[#0a1330] px-0.5 text-center text-[9.5px] font-semibold text-white outline-none disabled:opacity-60"
+                                    className="rounded border border-[#8fb4ff] bg-[#0e1a3d] px-0.5 text-center text-[9.5px] font-semibold text-white outline-none disabled:opacity-60"
                                     style={{ width: Math.max(36, dayW - 14) }}
                                   />
                                 ) : (

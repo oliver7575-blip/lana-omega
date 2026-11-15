@@ -200,7 +200,7 @@ export default function DashviewPage() {
 
   const thc = 'px-3 py-2 text-left text-[10.5px] font-semibold uppercase tracking-[.12em] text-[#9fb3dc]'
   const tdc = 'px-3 py-2 text-[12.5px] text-[#eaf0fb]'
-  const tableWrap = `overflow-x-auto rounded-xl border ${LINE} bg-[#0a1330]/40`
+  const tableWrap = `overflow-x-auto rounded-xl border ${LINE} bg-[#0d1938]/40`
 
   const stats = [
     { n: summary?.arrivals, label: 'Arrivals', color: GREEN },
@@ -297,7 +297,7 @@ export default function DashviewPage() {
                     { v: act?.roomNights ?? '—', l: 'Room nights' },
                     { v: act ? mxn(act.revenue) : '—', l: 'Revenue' },
                   ].map((x) => (
-                    <div key={x.l} className={`rounded-xl border ${LINE} bg-[#0a1330]/40 px-3.5 py-2.5`}>
+                    <div key={x.l} className={`rounded-xl border ${LINE} bg-[#0d1938]/40 px-3.5 py-2.5`}>
                       <p className="text-[20px] font-semibold leading-none tracking-tight text-white">{x.v}</p>
                       <p className="mt-1.5 text-[11.5px] font-medium text-[#9fb3dc]">{x.l}</p>
                     </div>

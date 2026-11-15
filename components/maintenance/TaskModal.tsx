@@ -72,7 +72,7 @@ export default function TaskModal({ task, staff, timezone, followUps = [], onClo
       }
     >
       <div className="space-y-4">
-        <label className="flex items-start gap-2.5 rounded-xl border border-[#8fb4ff]/25 bg-[#0a1330]/40 px-3 py-2.5 text-sm text-navy/85">
+        <label className="flex items-start gap-2.5 rounded-xl border border-[#8fb4ff]/25 bg-[#0d1938]/40 px-3 py-2.5 text-sm text-navy/85">
           <input type="checkbox" checked={f.on_hold} onChange={(e) => set('on_hold', e.target.checked)} className="mt-0.5 h-4 w-4 accent-[#3ccf8a]" />
           <span>
             <span className="font-semibold text-white">Follow-up task</span>
@@ -137,7 +137,7 @@ export default function TaskModal({ task, staff, timezone, followUps = [], onClo
         </div>
 
         {!f.on_hold && f.recurrence_rule === 'interval' && (
-          <div className="grid grid-cols-3 gap-3 rounded-xl border border-[#8fb4ff]/25 bg-[#0a1330]/40 p-3">
+          <div className="grid grid-cols-3 gap-3 rounded-xl border border-[#8fb4ff]/25 bg-[#0d1938]/40 p-3">
             <div>
               <label className={labelCls}>Every (hours)</label>
               <input type="number" min={1} max={24} className={inputCls} value={f.interval_hours} onChange={(e) => set('interval_hours', e.target.value)} />
@@ -154,7 +154,7 @@ export default function TaskModal({ task, staff, timezone, followUps = [], onClo
         )}
 
         {!f.on_hold && f.recurrence_rule === 'seasonal' && (
-          <div className="grid grid-cols-2 gap-3 rounded-xl border border-[#8fb4ff]/25 bg-[#0a1330]/40 p-3">
+          <div className="grid grid-cols-2 gap-3 rounded-xl border border-[#8fb4ff]/25 bg-[#0d1938]/40 p-3">
             <div>
               <label className={labelCls}>Season starts</label>
               <select className={inputCls} value={f.season_start_month} onChange={(e) => set('season_start_month', e.target.value)}>
@@ -188,7 +188,7 @@ export default function TaskModal({ task, staff, timezone, followUps = [], onClo
             Always give this task to the same person
           </label>
         )}
-        <div className="rounded-xl border border-[#8fb4ff]/25 bg-[#0a1330]/40 p-3">
+        <div className="rounded-xl border border-[#8fb4ff]/25 bg-[#0d1938]/40 p-3">
           <label className={labelCls}>When this task is finished, start…</label>
           <select className={inputCls} value={f.next_task_id} onChange={(e) => set('next_task_id', e.target.value)}>
             <option value="">Nothing</option>
@@ -226,7 +226,7 @@ export default function TaskModal({ task, staff, timezone, followUps = [], onClo
         </div>
 
         {!f.on_hold && (
-          <label className="flex items-start gap-2.5 rounded-xl border border-[#8fb4ff]/25 bg-[#0a1330]/40 px-3 py-2.5 text-sm text-navy/85">
+          <label className="flex items-start gap-2.5 rounded-xl border border-[#8fb4ff]/25 bg-[#0d1938]/40 px-3 py-2.5 text-sm text-navy/85">
             <input
               type="checkbox"
               checked={Boolean(f.next_task_id) || f.carry_over}

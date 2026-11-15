@@ -42,7 +42,7 @@ export default function TaskDrawer({ taskId, staff, timezone, onClose, onChanged
   const t = d?.task
   const assignee = t?.assigned_to ? staff.find((s) => s.id === t.assigned_to)?.name ?? '—' : 'Auto-assign'
   const excluded = t?.excluded_staff_id ? staff.find((s) => s.id === t.excluded_staff_id)?.name ?? null : null
-  const box = 'rounded-xl border border-[#8fb4ff]/25 bg-[#0a1330]/40 px-4 py-3'
+  const box = 'rounded-xl border border-[#8fb4ff]/25 bg-[#0d1938]/40 px-4 py-3'
   const boxLabel = 'text-[10px] font-semibold uppercase tracking-[.13em] text-navy/50'
 
   return (
@@ -111,7 +111,7 @@ export default function TaskDrawer({ taskId, staff, timezone, onClose, onChanged
             ) : (
               <div className="space-y-2">
                 {d.messages.map((m) => (
-                  <div key={m.id} className={`rounded-xl px-4 py-3 ${m.direction === 'outbound' ? 'ml-8 bg-[#5b95f5]/10' : 'mr-8 bg-[#0a1330]/60'}`}>
+                  <div key={m.id} className={`rounded-xl px-4 py-3 ${m.direction === 'outbound' ? 'ml-8 bg-[#5b95f5]/10' : 'mr-8 bg-[#0d1938]/60'}`}>
                     <div className="flex justify-between text-[10px] font-semibold uppercase tracking-[.1em] text-navy/45">
                       <span>{m.direction} · WhatsApp</span>
                       <span>{m.delivery_status}</span>

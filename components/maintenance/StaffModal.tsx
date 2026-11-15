@@ -94,7 +94,7 @@ export default function StaffModal({ staff, timezone, onClose, onChanged }: {
     >
       <div className="mb-5 space-y-2">
         {staff.map((s) => (
-          <div key={s.id} className="flex items-center gap-3 rounded-xl border border-[#8fb4ff]/25 bg-[#0a1330]/40 px-4 py-3">
+          <div key={s.id} className="flex items-center gap-3 rounded-xl border border-[#8fb4ff]/25 bg-[#0d1938]/40 px-4 py-3">
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-white">{s.name}</p>
               <p className="text-xs text-navy/55">+{s.phone}</p>

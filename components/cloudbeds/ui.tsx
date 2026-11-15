@@ -91,6 +91,6 @@ export function InlinePanel({
 
 /** The deep Soirée-blue grid background shared by the calendar and the side menu that slides over it. */
 export const HOLO_BG =
-  'repeating-radial-gradient(circle at 92% 8%,transparent 0,transparent 58px,rgba(143,180,255,.021) 58px,rgba(143,180,255,.021) 59px),' +
-  'linear-gradient(rgba(143,180,255,.03) 1px,transparent 1px) 0 0/44px 44px,linear-gradient(90deg,rgba(143,180,255,.03) 1px,transparent 1px) 0 0/44px 44px,' +
-  'radial-gradient(900px 520px at 0% 0%,rgba(70,120,240,.17),transparent 62%),radial-gradient(900px 520px at 100% 100%,rgba(100,80,220,.11),transparent 62%),linear-gradient(180deg,#0c1736,#060d21)'
+  'repeating-radial-gradient(circle at 92% 8%,transparent 0,transparent 58px,rgba(143,180,255,.03) 58px,rgba(143,180,255,.03) 59px),' +
+  'linear-gradient(rgba(143,180,255,.042) 1px,transparent 1px) 0 0/44px 44px,linear-gradient(90deg,rgba(143,180,255,.042) 1px,transparent 1px) 0 0/44px 44px,' +
+  'radial-gradient(900px 520px at 0% 0%,rgba(70,120,240,.24),transparent 62%),radial-gradient(900px 520px at 100% 100%,rgba(100,80,220,.156),transparent 62%),linear-gradient(180deg,#112148,#0a1531)'
