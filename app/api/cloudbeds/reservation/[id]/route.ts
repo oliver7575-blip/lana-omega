@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { cloudbedsForCaller } from '@/lib/cloudbeds-caller'
-import { assignRoom, checkIn, checkOut, cloudbedsLinks, getGuestProfile, getReservationDetail, getReservationGuestContact, getReservationNotes, deleteReservationNote, updateReservationNote, setArrivalTime, setStatus, setStayDates, unassignRoom } from '@/lib/cloudbeds-ops'
+import { assignRoom, checkIn, checkOut, cloudbedsLinks, getGuestProfile, getReservationDetail, getReservationGuestContact, getReservationNotes, addReservationNote, deleteReservationNote, updateReservationNote, setArrivalTime, setStatus, setStayDates, unassignRoom } from '@/lib/cloudbeds-ops'
 
 export const maxDuration = 60
 
@@ -65,6 +65,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     text?: string
   }
   try {
+    if (body.action === 'note_add') {
+      const text = (body.text ?? '').trim()
+      if (!text) return NextResponse.json({ error: 'Write the note first' }, { status: 400 })
+      await addReservationNote(c.cb, id, text)
+      return NextResponse.json({ ok: true, notes: await getReservationNotes(c.cb, id) })
+    }
     if (body.action === 'note_update' || body.action === 'note_delete') {
       if (!body.noteID) return NextResponse.json({ error: 'Missing note' }, { status: 400 })
       if (body.action === 'note_update') {

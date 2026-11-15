@@ -154,6 +154,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
   const [notes, setNotes] = useState<Note[]>([])
   const [noteEdit, setNoteEdit] = useState<{ id: string; text: string } | null>(null)
   const [noteDel, setNoteDel] = useState<string | null>(null)
+  const [noteNew, setNoteNew] = useState<string | null>(null)
   const [noteBusy, setNoteBusy] = useState(false)
   const [noteErr, setNoteErr] = useState<string | null>(null)
   // Quick message bubble opened from the phone number (WhatsApp) or the email address.
@@ -269,6 +270,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
       setNotes(j.notes ?? [])
       setNoteEdit(null)
       setNoteDel(null)
+      setNoteNew(null)
       onChanged?.()
     } catch (e) {
       setNoteErr(e instanceof Error ? e.message : 'Cloudbeds error')
@@ -861,6 +863,18 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                       {noteErr && <p className="text-[12px] text-red-700">{noteErr}</p>}
                     </div>
                   ) : r.specialRequests ? <p className="mt-2 text-xs text-[#8a93a3]">No internal notes yet</p> : null}
+                  {noteNew !== null ? (
+                    <div className="mt-2">
+                      <textarea value={noteNew} onChange={(e) => setNoteNew(e.target.value)} rows={3} autoFocus placeholder="Write a note for this reservation…" className={`${area} !text-[13px]`} />
+                      <div className="mt-1.5 flex justify-end gap-1.5">
+                        <button disabled={noteBusy} onClick={() => { setNoteNew(null); setNoteErr(null) }} className={`${btn} !h-7 !px-3 !text-[11.5px]`}>Cancel</button>
+                        <button disabled={noteBusy || !noteNew.trim()} onClick={() => noteAct({ action: 'note_add', text: noteNew })} className={`${priGreen} !h-7 !px-3 !text-[11.5px]`}>{noteBusy ? 'Saving…' : 'Add note'}</button>
+                      </div>
+                      {noteErr && <p className="mt-1 text-[12px] text-red-700">{noteErr}</p>}
+                    </div>
+                  ) : (
+                    <button onClick={() => { setNoteNew(''); setNoteEdit(null); setNoteDel(null); setNoteErr(null) }} className="mt-2 text-[12px] font-semibold text-[#1d4ed8] hover:underline">+ Add note</button>
+                  )}
                 </div>
               </div>
             )}

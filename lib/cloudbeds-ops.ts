@@ -145,6 +145,11 @@ export async function getReservationNotes(cb: CB, reservationID: string): Promis
     .filter((n) => n.text)
 }
 
+/** Add a staff note to a reservation in Cloudbeds. */
+export async function addReservationNote(cb: CB, reservationID: string, text: string): Promise<void> {
+  await cbPost(cb, 'postReservationNote', { reservationID, reservationNote: text })
+}
+
 /** Rewrite one of the staff notes on a reservation in Cloudbeds. */
 export async function updateReservationNote(cb: CB, reservationID: string, reservationNoteID: string, text: string): Promise<void> {
   await cbPut(cb, 'putReservationNote', { reservationID, reservationNoteID, reservationNote: text })
