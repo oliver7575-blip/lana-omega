@@ -95,9 +95,9 @@ function sourceBadge(src?: string): { t: string; color: string; name: string } |
   return null
 }
 
-function Bar({ start, end, viewStart, totalDays, label, sub, bg, border, text, edge, onClick, onContextMenu, title, dayW, due, src }: {
+function Bar({ start, end, viewStart, totalDays, label, sub, bg, border, text, edge, onClick, onContextMenu, title, dayW, due, note, src }: {
   start: string; end: string; viewStart: string; totalDays: number; label: string; sub?: string; bg: string; border: string; text: string; edge?: string; onClick?: () => void
-  onContextMenu?: (e: React.MouseEvent) => void; title?: string; dayW: number; due?: boolean; src?: string
+  onContextMenu?: (e: React.MouseEvent) => void; title?: string; dayW: number; due?: boolean; note?: boolean; src?: string
 }) {
   const from = diff(viewStart, start) + 0.5
   const to = diff(viewStart, end) + 0.5
@@ -127,6 +127,7 @@ function Bar({ start, end, viewStart, totalDays, label, sub, bg, border, text, e
       style={{ left: left + 1, width: w, top: (ROW_H - barH) / 2, height: barH, color: text, borderColor: 'rgba(255,255,255,.18)', background: `linear-gradient(180deg,${top},${bottom})`, boxShadow: '0 2px 6px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.22)' }}
     >
       {due && <i aria-label="Balance due" title="Balance due" className="absolute left-[3px] top-[3px] h-[6px] w-[6px] rounded-full bg-[#ff4d5a] ring-1 ring-white/70" />}
+      {note && <i aria-label="Has a note or special request" title="Has a note or special request" className={`absolute top-[3px] h-[6px] w-[6px] rounded-full bg-[#ffd23f] ring-1 ring-white/70 ${due ? 'left-[12px]' : 'left-[3px]'}`} />}
       <span className="min-w-0 flex-1 truncate text-[11px] font-bold">
         {label}
         {sub && w >= 80 && <span className="ml-1.5 font-medium opacity-80">· {sub}</span>}
@@ -163,6 +164,39 @@ export default function CalendarPage() {
   // Balance changes made here show at once (Cloudbeds can lag a moment before its list reflects them).
   const dueOverride = useRef<Map<string, { due: boolean; until: number }>>(new Map())
   const [, bumpDue] = useState(0)
+  // Reservations that carry a guest special request or a staff note (yellow dot). Looked up lazily, in small batches.
+  const [noteIds, setNoteIds] = useState<Set<string>>(new Set())
+  const noteChecked = useRef<Map<string, number>>(new Map())
+  useEffect(() => {
+    if (!data) return
+    const today = data.today
+    const ids = [...new Set([...data.bookings, ...data.unassigned]
+      .filter((b) => b.status !== 'checked_out' && (!today || b.end >= today))
+      .map((b) => b.reservationID))]
+      .filter((id) => (noteChecked.current.get(id) ?? 0) < Date.now() - 5 * 60 * 1000)
+    if (!ids.length) return
+    let stop = false
+    ;(async () => {
+      for (let i = 0; i < ids.length && !stop; i += 40) {
+        const batch = ids.slice(i, i + 40)
+        try {
+          const r = await cbApi<{ flagged: string[] }>(`/api/cloudbeds/note-flags?ids=${batch.join(',')}`)
+          if (stop) return
+          const now = Date.now()
+          batch.forEach((id) => noteChecked.current.set(id, now))
+          setNoteIds((prev) => {
+            const next = new Set(prev)
+            batch.forEach((id) => next.delete(id))
+            r.flagged.forEach((id) => next.add(id))
+            return next
+          })
+        } catch {
+          /* the dots are a nicety — try again on the next refresh */
+        }
+      }
+    })()
+    return () => { stop = true }
+  }, [data])
   const [dragType, setDragType] = useState<string | null>(null)
   const [priceEdit, setPriceEdit] = useState<{ typeID: string; day: string; value: string; through: string; x: number; y: number; busy: boolean; err: string | null } | null>(null)
 
@@ -562,6 +596,7 @@ export default function CalendarPage() {
           <span className="flex items-center gap-1.5"><i className="h-3 w-3 rounded-[4px] border" style={{ background: HATCH_BLOCK, borderColor: '#5b6b80' }} />Blocked</span>
           <span className="flex items-center gap-1.5"><i className="h-3 w-3 rounded-[4px] border" style={{ background: HATCH_SERVICE, borderColor: '#b88a2e' }} />Out of service</span>
           <span className="flex items-center gap-1.5"><i className="h-[7px] w-[7px] rounded-full bg-[#ff5d6c]" />Balance due</span>
+          <span className="flex items-center gap-1.5"><i className="h-[7px] w-[7px] rounded-full bg-[#ffd23f]" />Note / special request</span>
         </div>
 
         {error && <p className="mb-2 rounded-md bg-red-500/15 px-4 py-2 text-sm text-red-200">{error}</p>}
@@ -723,7 +758,7 @@ export default function CalendarPage() {
                             })}
                             {stays.map((s) => (
                               <Bar key={`${s.reservationID}-${s.start}`} start={s.start} end={s.end} viewStart={data.start} totalDays={totalDays}
-                                label={s.guestName} sub={`${diff(s.start, s.end)}n`} due={dueOf(s.reservationID, s.due)} src={s.src}
+                                label={s.guestName} sub={`${diff(s.start, s.end)}n`} due={dueOf(s.reservationID, s.due)} note={noteIds.has(s.reservationID)} src={s.src}
                                 edge={statusEdge(s.status)} bg="" border="" text="#fff" onClick={() => setOpen(s.reservationID)} dayW={dayW}
                                 onContextMenu={(e) => {
                                   e.preventDefault()
