@@ -126,7 +126,7 @@ function Bar({ start, end, viewStart, totalDays, label, sub, bg, border, text, e
       onContextMenu={onContextMenu}
       title={title ?? label}
       className="absolute flex items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-[7px] border pl-2.5 pr-1.5 text-left hover:brightness-110"
-      style={{ left: left + 1, width: w, top: (ROW_H - barH) / 2, height: barH, color: text, borderColor: note ? '#ff4d5a' : 'rgba(255,255,255,.18)', borderWidth: note ? 1.5 : undefined, background: `linear-gradient(180deg,${top},${bottom})`, boxShadow: note ? '0 0 0 1px rgba(255,77,90,.35), 0 2px 6px rgba(0,0,0,.35)' : '0 2px 6px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.22)' }}
+      style={{ left: left + 1, width: w, top: (ROW_H - barH) / 2, height: barH, color: text, borderColor: note ? '#f2c94c' : 'rgba(255,255,255,.18)', borderWidth: note ? 1 : undefined, background: `linear-gradient(180deg,${top},${bottom})`, boxShadow: note ? '0 0 0 1px rgba(242,201,76,.22), 0 2px 6px rgba(0,0,0,.35)' : '0 2px 6px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.22)' }}
     >
       {due && <i aria-label="Balance due" title="Balance due" className="absolute left-[3px] top-[3px] h-[6px] w-[6px] rounded-full bg-[#ff4d5a] ring-1 ring-white/70" />}
       <span className="min-w-0 flex-1 truncate text-[11px] font-bold">
@@ -609,7 +609,7 @@ export default function CalendarPage() {
           <span className="flex items-center gap-1.5"><i className="h-3 w-3 rounded-[4px] border" style={{ background: HATCH_BLOCK, borderColor: '#5b6b80' }} />Blocked</span>
           <span className="flex items-center gap-1.5"><i className="h-3 w-3 rounded-[4px] border" style={{ background: HATCH_SERVICE, borderColor: '#b88a2e' }} />Out of service</span>
           <span className="flex items-center gap-1.5"><i className="h-[7px] w-[7px] rounded-full bg-[#ff5d6c]" />Balance due</span>
-          <span className="flex items-center gap-1.5"><i className="h-3 w-3 rounded-[4px] border-[1.5px] border-[#ff4d5a] bg-transparent" />Note / special request</span>
+          <span className="flex items-center gap-1.5"><i className="h-3 w-3 rounded-[4px] border border-[#f2c94c] bg-transparent" />Note / special request</span>
         </div>
 
         {error && <p className="mb-2 rounded-md bg-red-500/15 px-4 py-2 text-sm text-red-200">{error}</p>}
