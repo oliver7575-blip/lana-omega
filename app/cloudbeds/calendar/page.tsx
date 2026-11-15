@@ -626,7 +626,7 @@ export default function CalendarPage() {
               {markDay && data.days.includes(markDay) && (
                 <div className="pointer-events-none absolute bottom-0 top-0 z-[5]" style={{
                   left: LEFT_W + data.days.indexOf(markDay) * dayW, width: dayW,
-                  background: 'rgba(143,180,255,.055)', boxShadow: 'inset 1px 0 0 rgba(143,180,255,.2), inset -1px 0 0 rgba(143,180,255,.2)',
+                  background: 'rgba(143,180,255,.10)', boxShadow: 'inset 1px 0 0 rgba(143,180,255,.38), inset -1px 0 0 rgba(143,180,255,.38)',
                 }} />
               )}
               {data.days.includes(data.today) && (
