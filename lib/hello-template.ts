@@ -6,7 +6,7 @@ import { HELLO_TEXT } from './hello-text'
 /** The approved "hello" templates: first name in {{1}}, one reason sentence in {{2}}. Used for staff messages outside WhatsApp's 24-hour window. */
 export const HELLO_TEMPLATES = {
   es: { name: 'soiree_contacto_template', language: 'es_MX', render: HELLO_TEXT.es },
-  en: { name: 'soiree_contacto_template_en', language: 'en', render: HELLO_TEXT.en },
+  en: { name: 'soiree_contacto_template', language: 'en', render: HELLO_TEXT.en },
 } as const
 
 export type HelloLang = keyof typeof HELLO_TEMPLATES
