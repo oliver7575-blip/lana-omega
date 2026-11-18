@@ -426,7 +426,7 @@ export default function CalendarPage() {
 
   // ---- Drag a reservation to another room / category / date ----
   type DragInfo = { reservationID: string; guestName: string; status: string; start: string; end: string; fromRoomID: string | null; fromTypeID: string; offset: number }
-  type MoveAsk = { drag: DragInfo; toRoomID: string; toTypeID: string; newStart: string; newEnd: string }
+  type MoveAsk = { drag: DragInfo; toRoomID: string; toTypeID: string; newStart: string; newEnd: string; adjustPrice?: boolean }
   const dragRef = useRef<DragInfo | null>(null)
   const [dragging, setDragging] = useState(false)
   const [dragHover, setDragHover] = useState<{ roomID: string; from: string; to: string; ok: boolean } | null>(null)
@@ -492,6 +492,7 @@ export default function CalendarPage() {
         newRoomID: a.toRoomID,
         newRoomTypeID: a.toTypeID,
         ...(datesChanged ? { checkin: a.newStart, checkout: a.newEnd } : {}),
+        adjustPrice: a.adjustPrice !== false,
       })
       setToast({ ok: true, text: `${a.drag.guestName}: moved to ${roomName(a.toRoomID, a.toTypeID)}${datesChanged ? ` · ${a.newStart} → ${a.newEnd}` : ''}.` })
       await refreshVisible()
@@ -1010,7 +1011,18 @@ export default function CalendarPage() {
                   <p className="rounded-xl bg-[#f6f3ec] px-3 py-2"><span className="text-[10px] font-semibold uppercase tracking-wide text-[#7a8394]">Dates</span><br />
                     <span className="text-[#667085] line-through">{a.drag.start} → {a.drag.end}</span><br /><span className="font-semibold">{a.newStart} → {a.newEnd}</span> · {diff(a.newStart, a.newEnd)}n</p>
                 )}
-                {typeChanged && <p className="text-[12px] text-[#667085]">The price is recalculated at the new room&apos;s rate.</p>}
+                {typeChanged && (
+                  <div className="rounded-xl border border-[#e4e8ef] px-3 py-2.5">
+                    <p className="text-[12.5px] font-semibold">Recalculate the price at the new room&apos;s rate?</p>
+                    <div className="mt-2 grid grid-cols-2 gap-1.5">
+                      {([[true, 'Yes, update price'], [false, 'No, keep price']] as const).map(([v, l]) => (
+                        <button key={l} onClick={() => setMoveAsk({ ...a, adjustPrice: v })}
+                          className={`h-8 rounded-full border text-[12px] font-semibold transition ${(a.adjustPrice !== false) === v ? 'border-[#2456b8] bg-[#eaf1fd] text-[#1d3a78]' : 'border-[#dde2ea] bg-white text-[#667085] hover:bg-gray-50'}`}>{l}</button>
+                      ))}
+                    </div>
+                    {datesChanged && <p className="mt-1.5 text-[11px] text-[#98a2b3]">The new dates themselves are priced by Cloudbeds.</p>}
+                  </div>
+                )}
                 {datesChanged && multiIds.has(a.drag.reservationID) && <p className="text-[12px] text-[#b4540a]">This reservation has several rooms: the new dates apply to all of them.</p>}
               </div>
               <div className="flex justify-end gap-2 border-t border-gray-100 px-5 py-3">

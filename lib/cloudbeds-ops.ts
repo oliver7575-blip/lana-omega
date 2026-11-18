@@ -315,7 +315,7 @@ export async function assignRoom(
 export async function moveReservation(
   cb: CB,
   reservationID: string,
-  p: { oldRoomID: string | null; fromTypeID: string; fromStart: string; newRoomID: string; newRoomTypeID: string; checkin?: string; checkout?: string }
+  p: { oldRoomID: string | null; fromTypeID: string; fromStart: string; newRoomID: string; newRoomTypeID: string; checkin?: string; checkout?: string; adjustPrice?: boolean }
 ) {
   const find = (rooms: ReservationDetail['rooms']) =>
     p.oldRoomID
@@ -339,7 +339,7 @@ export async function moveReservation(
     newRoomID: p.newRoomID,
     roomTypeID: p.newRoomTypeID,
     ...(target.roomID ? { oldRoomID: target.roomID } : {}),
-    adjustPrice: p.newRoomTypeID !== target.roomTypeID ? 'true' : 'false',
+    adjustPrice: p.newRoomTypeID !== target.roomTypeID && p.adjustPrice !== false ? 'true' : 'false',
   })
 }
 

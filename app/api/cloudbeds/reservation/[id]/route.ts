@@ -65,6 +65,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     oldRoomID?: string
     fromTypeID?: string
     fromStart?: string
+    adjustPrice?: boolean
     noteID?: string
     text?: string
   }
@@ -107,7 +108,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       }
       await moveReservation(c.cb, id, {
         oldRoomID: body.oldRoomID ?? null, fromTypeID: body.fromTypeID, fromStart: body.fromStart,
-        newRoomID: body.newRoomID, newRoomTypeID: body.newRoomTypeID, checkin: body.checkin, checkout: body.checkout,
+        newRoomID: body.newRoomID, newRoomTypeID: body.newRoomTypeID, checkin: body.checkin, checkout: body.checkout, adjustPrice: body.adjustPrice,
       })
     } else if (body.action === 'arrival_time') {
       if (!/^\d{2}:\d{2}$/.test(body.time ?? '')) return NextResponse.json({ error: 'Enter a time as HH:MM' }, { status: 400 })
