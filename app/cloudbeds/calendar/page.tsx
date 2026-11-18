@@ -481,25 +481,66 @@ export default function CalendarPage() {
 
   async function executeMove(a: MoveAsk) {
     setMoveAsk(null)
-    setBusy(true)
+    const d = a.drag
+    const datesChanged = a.newStart !== d.start
+    const cur = dataRef.current
+    const orig = cur && (d.fromRoomID
+      ? cur.bookings.find((b) => b.reservationID === d.reservationID && b.roomID === d.fromRoomID && b.start === d.start)
+      : cur.unassigned.find((u) => u.reservationID === d.reservationID && u.start === d.start && u.roomTypeID === d.fromTypeID))
+    // Show the move on the calendar straight away; Cloudbeds is told in the background and double-checked afterwards.
+    if (orig) {
+      setData((prev) => prev && ({
+        ...prev,
+        bookings: [
+          ...prev.bookings.filter((b) => !(d.fromRoomID && b.reservationID === d.reservationID && b.roomID === d.fromRoomID && b.start === d.start)),
+          { reservationID: d.reservationID, guestName: orig.guestName, status: orig.status, roomID: a.toRoomID, start: a.newStart, end: a.newEnd, due: orig.due, src: orig.src },
+        ],
+        unassigned: d.fromRoomID ? prev.unassigned : prev.unassigned.filter((u) => !(u.reservationID === d.reservationID && u.start === d.start && u.roomTypeID === d.fromTypeID)),
+      }))
+    }
+    const putBack = () => setData((prev) => {
+      if (!prev || !orig) return prev
+      const bookings = prev.bookings.filter((b) => !(b.reservationID === d.reservationID && b.roomID === a.toRoomID && b.start === a.newStart))
+      if (d.fromRoomID) return { ...prev, bookings: [...bookings, orig as Booking] }
+      return { ...prev, bookings, unassigned: [...prev.unassigned, orig as Unassigned] }
+    })
     try {
-      const datesChanged = a.newStart !== a.drag.start
-      await cbApi(`/api/cloudbeds/reservation/${a.drag.reservationID}`, 'POST', {
+      await cbApi(`/api/cloudbeds/reservation/${d.reservationID}`, 'POST', {
         action: 'move',
-        oldRoomID: a.drag.fromRoomID ?? undefined,
-        fromTypeID: a.drag.fromTypeID,
-        fromStart: a.drag.start,
+        oldRoomID: d.fromRoomID ?? undefined,
+        fromTypeID: d.fromTypeID,
+        fromStart: d.start,
         newRoomID: a.toRoomID,
         newRoomTypeID: a.toTypeID,
         ...(datesChanged ? { checkin: a.newStart, checkout: a.newEnd } : {}),
         adjustPrice: a.adjustPrice !== false,
       })
-      setToast({ ok: true, text: `${a.drag.guestName}: moved to ${roomName(a.toRoomID, a.toTypeID)}${datesChanged ? ` · ${a.newStart} → ${a.newEnd}` : ''}.` })
-      await refreshVisible()
     } catch (e) {
-      setToast({ ok: false, text: e instanceof Error ? e.message : 'Cloudbeds error' })
-    } finally {
-      setBusy(false)
+      putBack()
+      setToast({ ok: false, text: `${d.guestName} was not moved: ${e instanceof Error ? e.message : 'Cloudbeds error'}` })
+      return
+    }
+    setToast({ ok: true, text: `${d.guestName}: moved to ${roomName(a.toRoomID, a.toTypeID)}${datesChanged ? ` · ${a.newStart} → ${a.newEnd}` : ''}.` })
+    // Double-check with Cloudbeds a moment later; if the change is not there, put the reservation back where it was.
+    const from = d.start < a.newStart ? d.start : a.newStart
+    const to = d.end > a.newEnd ? d.end : a.newEnd
+    let confirmed = false
+    for (const wait of [1000, 2000, 3000]) {
+      await new Promise((r) => setTimeout(r, wait))
+      try {
+        const chunk = await fetchRange(addDays(from, -1), diff(from, to) + 3)
+        if (chunk.bookings.some((b) => b.reservationID === d.reservationID && b.roomID === a.toRoomID && b.start === a.newStart)) {
+          confirmed = true
+          setData((prev) => mergeChunk(prev, { ...chunk, days: prev?.days ?? chunk.days, start: prev?.start ?? chunk.start }, addDays(from, -1), addDays(to, 2)))
+          break
+        }
+      } catch {
+        // Try again.
+      }
+    }
+    if (!confirmed) {
+      putBack()
+      setToast({ ok: false, text: `Cloudbeds did not confirm the move, so ${d.guestName} is back where it was. Check the reservation in Cloudbeds.` })
     }
   }
 
