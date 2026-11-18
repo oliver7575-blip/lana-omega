@@ -129,7 +129,7 @@ function Bar({ start, end, viewStart, totalDays, label, sub, bg, border, text, e
       draggable={draggable}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
-      className={`${passive ? 'pointer-events-none ' : ''}${draggable ? 'cursor-grab active:cursor-grabbing ' : ''}absolute flex items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-[7px] border pl-2.5 pr-1.5 text-left hover:brightness-110`}
+      className={`${passive ? 'pointer-events-none ' : ''}${draggable ? 'cursor-grab active:cursor-grabbing ' : ''}absolute flex items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-[7px] border ${due ? 'pl-[17px]' : 'pl-2.5'} pr-1.5 text-left hover:brightness-110`}
       style={{ left: left + 1, width: w, top: (ROW_H - barH) / 2, height: barH, color: text, borderColor: note ? '#f2c94c' : 'rgba(255,255,255,.18)', borderWidth: note ? 1 : undefined, background: `linear-gradient(180deg,${top},${bottom})`, boxShadow: note ? '0 0 0 1px rgba(242,201,76,.22), 0 2px 6px rgba(0,0,0,.35)' : '0 2px 6px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.22)' }}
     >
       {due && <i aria-label="Balance due" title="Balance due" className="absolute left-[3px] top-[3px] h-[6px] w-[6px] rounded-full bg-[#ff4d5a] ring-1 ring-white/70" />}
