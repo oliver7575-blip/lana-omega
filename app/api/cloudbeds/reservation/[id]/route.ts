@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { cloudbedsForCaller } from '@/lib/cloudbeds-caller'
-import { assignRoom, checkIn, checkOut, cloudbedsLinks, getGuestProfile, getReservationDetail, getReservationGuestContact, getReservationNotes, addReservationNote, deleteReservationNote, updateReservationNote, setArrivalTime, setStatus, setStayDates, unassignRoom } from '@/lib/cloudbeds-ops'
+import { assignRoom, checkIn, checkOut, cloudbedsLinks, getGuestProfile, getReservationDetail, getReservationGuestContact, getReservationNotes, moveReservation, addReservationNote, deleteReservationNote, updateReservationNote, setArrivalTime, setStatus, setStayDates, unassignRoom } from '@/lib/cloudbeds-ops'
 
 export const maxDuration = 60
 
@@ -61,6 +61,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     subReservationID?: string
     reservationRoomID?: string
     newRoomID?: string
+    newRoomTypeID?: string
+    oldRoomID?: string
+    fromTypeID?: string
+    fromStart?: string
     noteID?: string
     text?: string
   }
@@ -95,6 +99,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     } else if (body.action === 'assign_room') {
       if (!body.subReservationID || !body.newRoomID) return NextResponse.json({ error: 'Missing room to assign' }, { status: 400 })
       await assignRoom(c.cb, id, body.subReservationID, body.reservationRoomID ?? null, body.newRoomID)
+    } else if (body.action === 'move') {
+      if (!body.newRoomID || !body.newRoomTypeID || !body.fromTypeID || !body.fromStart) return NextResponse.json({ error: 'Missing room to move to' }, { status: 400 })
+      const d = /^\d{4}-\d{2}-\d{2}$/
+      if ((body.checkin || body.checkout) && (!d.test(body.checkin ?? '') || !d.test(body.checkout ?? '') || body.checkout! <= body.checkin!)) {
+        return NextResponse.json({ error: 'Departure must be after arrival' }, { status: 400 })
+      }
+      await moveReservation(c.cb, id, {
+        oldRoomID: body.oldRoomID ?? null, fromTypeID: body.fromTypeID, fromStart: body.fromStart,
+        newRoomID: body.newRoomID, newRoomTypeID: body.newRoomTypeID, checkin: body.checkin, checkout: body.checkout,
+      })
     } else if (body.action === 'arrival_time') {
       if (!/^\d{2}:\d{2}$/.test(body.time ?? '')) return NextResponse.json({ error: 'Enter a time as HH:MM' }, { status: 400 })
       await setArrivalTime(c.cb, id, body.time!)

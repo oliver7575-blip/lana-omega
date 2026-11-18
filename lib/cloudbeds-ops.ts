@@ -307,6 +307,42 @@ export async function assignRoom(
   await cbPost(cb, 'postRoomAssign', { reservationID, subReservationID, reservationRoomID: reservationRoomID ?? '', newRoomID })
 }
 
+/**
+ * Moves one room of a reservation to another physical room — in the same or another room category — and/or to new
+ * dates. A different category is approved with adjustPrice so Cloudbeds re-prices the stay at the new room's rate.
+ * `oldRoomID` is the room it sits in now, or null when it is currently unassigned (the room is then found by type and start date).
+ */
+export async function moveReservation(
+  cb: CB,
+  reservationID: string,
+  p: { oldRoomID: string | null; fromTypeID: string; fromStart: string; newRoomID: string; newRoomTypeID: string; checkin?: string; checkout?: string }
+) {
+  const find = (rooms: ReservationDetail['rooms']) =>
+    p.oldRoomID
+      ? rooms.find((r) => r.roomID === p.oldRoomID)
+      : rooms.find((r) => !r.roomID && r.roomTypeID === p.fromTypeID && r.startDate === p.fromStart) ?? rooms.find((r) => !r.roomID)
+  let detail = await getReservationDetail(cb, reservationID)
+  let target = find(detail.rooms)
+  if (!target) throw new Error('Could not find that room on the reservation. Reload the calendar and try again.')
+  if (p.checkin && p.checkout && (p.checkin !== target.startDate || p.checkout !== target.endDate)) {
+    const sub = target.subReservationID
+    await setStayDates(cb, reservationID, p.checkin, p.checkout)
+    detail = await getReservationDetail(cb, reservationID)
+    target = detail.rooms.find((r) => r.subReservationID === sub) ?? find(detail.rooms)
+    if (!target) throw new Error('The dates changed, but the room could not be found afterwards. Check the reservation in Cloudbeds.')
+  }
+  if (target.roomID === p.newRoomID) return
+  await cbPost(cb, 'postRoomAssign', {
+    reservationID,
+    subReservationID: target.subReservationID,
+    reservationRoomID: target.reservationRoomID ?? '',
+    newRoomID: p.newRoomID,
+    roomTypeID: p.newRoomTypeID,
+    ...(target.roomID ? { oldRoomID: target.roomID } : {}),
+    adjustPrice: p.newRoomTypeID !== target.roomTypeID ? 'true' : 'false',
+  })
+}
+
 export interface AvailableRoom {
   id: string
   name: string

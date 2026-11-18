@@ -97,9 +97,10 @@ function sourceBadge(src?: string): { t: string; color: string; name: string } |
   return null
 }
 
-function Bar({ start, end, viewStart, totalDays, label, sub, bg, border, text, edge, onClick, onContextMenu, title, dayW, due, note, multi, src }: {
+function Bar({ start, end, viewStart, totalDays, label, sub, bg, border, text, edge, onClick, onContextMenu, title, dayW, due, note, multi, src, draggable, onDragStart, onDragEnd, passive }: {
   start: string; end: string; viewStart: string; totalDays: number; label: string; sub?: string; bg: string; border: string; text: string; edge?: string; onClick?: () => void
   onContextMenu?: (e: React.MouseEvent) => void; title?: string; dayW: number; due?: boolean; note?: boolean; multi?: boolean; src?: string
+  draggable?: boolean; onDragStart?: (e: React.DragEvent<HTMLButtonElement>) => void; onDragEnd?: () => void; passive?: boolean
 }) {
   const from = diff(viewStart, start) + 0.5
   const to = diff(viewStart, end) + 0.5
@@ -111,7 +112,7 @@ function Bar({ start, end, viewStart, totalDays, label, sub, bg, border, text, e
     // Blocks and out-of-service periods: flat hatched strip.
     return (
       <button onClick={onClick} onContextMenu={onContextMenu} title={title ?? label}
-        className="absolute top-1 flex items-center overflow-hidden whitespace-nowrap rounded-[10px] border px-2.5 text-left text-[11px] font-semibold leading-none hover:brightness-110"
+        className={`${passive ? 'pointer-events-none ' : ''}absolute top-1 flex items-center overflow-hidden whitespace-nowrap rounded-[10px] border px-2.5 text-left text-[11px] font-semibold leading-none hover:brightness-110`}
         style={{ left: left + 1, width: w, height: ROW_H - 8, background: bg, borderColor: border, color: text }}>
         <span className="truncate">{label}</span>
       </button>
@@ -125,7 +126,10 @@ function Bar({ start, end, viewStart, totalDays, label, sub, bg, border, text, e
       onClick={onClick}
       onContextMenu={onContextMenu}
       title={title ?? label}
-      className="absolute flex items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-[7px] border pl-2.5 pr-1.5 text-left hover:brightness-110"
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      className={`${passive ? 'pointer-events-none ' : ''}${draggable ? 'cursor-grab active:cursor-grabbing ' : ''}absolute flex items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-[7px] border pl-2.5 pr-1.5 text-left hover:brightness-110`}
       style={{ left: left + 1, width: w, top: (ROW_H - barH) / 2, height: barH, color: text, borderColor: note ? '#f2c94c' : 'rgba(255,255,255,.18)', borderWidth: note ? 1 : undefined, background: `linear-gradient(180deg,${top},${bottom})`, boxShadow: note ? '0 0 0 1px rgba(242,201,76,.22), 0 2px 6px rgba(0,0,0,.35)' : '0 2px 6px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.22)' }}
     >
       {due && <i aria-label="Balance due" title="Balance due" className="absolute left-[3px] top-[3px] h-[6px] w-[6px] rounded-full bg-[#ff4d5a] ring-1 ring-white/70" />}
@@ -162,7 +166,7 @@ export default function CalendarPage() {
   useEffect(() => {
     try { const v = Number(localStorage.getItem('calendarSpan')); if (SPANS.some((x) => x.days === v)) setSpan(v) } catch { /* ignore */ }
   }, [])
-  const [menu, setMenu] = useState<{ x: number; y: number; reservationID: string; guestName: string; status: string; roomID: string | null } | null>(null)
+  const [menu, setMenu] = useState<{ x: number; y: number; reservationID: string; guestName: string; status: string; roomID: string | null; assign?: { typeID: string; start: string; end: string } } | null>(null)
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [openBlock, setOpenBlock] = useState<Block | null>(null)
@@ -419,6 +423,93 @@ export default function CalendarPage() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [pick])
+
+  // ---- Drag a reservation to another room / category / date ----
+  type DragInfo = { reservationID: string; guestName: string; status: string; start: string; end: string; fromRoomID: string | null; fromTypeID: string; offset: number }
+  type MoveAsk = { drag: DragInfo; toRoomID: string; toTypeID: string; newStart: string; newEnd: string }
+  const dragRef = useRef<DragInfo | null>(null)
+  const [dragging, setDragging] = useState(false)
+  const [dragHover, setDragHover] = useState<{ roomID: string; from: string; to: string; ok: boolean } | null>(null)
+  const [moveAsk, setMoveAsk] = useState<MoveAsk | null>(null)
+  const roomName = (id: string | null, typeID: string) => {
+    const t = data?.roomTypes.find((x) => x.id === typeID)
+    const r = t?.rooms.find((x) => x.id === id)
+    return r ? `Room ${r.name}` : 'No room yet'
+  }
+
+  function startDrag(e: React.DragEvent<HTMLButtonElement>, s: { reservationID: string; guestName: string; status: string; start: string; end: string }, fromRoomID: string | null, fromTypeID: string) {
+    if (!data) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const gridX = e.clientX - rect.left + Math.max(0, diff(data.start, s.start) + 0.5) * dayW
+    const nights = diff(s.start, s.end)
+    const offset = Math.max(0, Math.min(nights, Math.floor(gridX / dayW) - diff(data.start, s.start)))
+    dragRef.current = { ...s, fromRoomID, fromTypeID, offset }
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', s.reservationID)
+    setMenu(null)
+    setTimeout(() => setDragging(true), 0)
+  }
+
+  /** Why the reservation cannot go there (taken, blocked, in the past), or null when it fits. */
+  function moveProblem(d: DragInfo, roomID: string, newStart: string, newEnd: string): string | null {
+    if (!data) return 'Calendar not loaded'
+    if (newStart !== d.start && newStart < data.today) return "A reservation can't be moved to dates in the past."
+    if (newStart !== d.start && d.status === 'checked_in') return 'This guest is checked in: change the stay dates in the reservation window.'
+    const taken = data.bookings.find((b) => b.roomID === roomID && b.reservationID !== d.reservationID && b.start < newEnd && newStart < b.end)
+    if (taken) return `That room is taken by ${taken.guestName} on those dates.`
+    const blocked = data.blocks.find((b) => b.roomID === roomID && b.start < newEnd && newStart <= b.end)
+    if (blocked) return `That room is blocked on those dates (${blocked.reason || 'blocked'}).`
+    return null
+  }
+
+  function dropOn(room: { id: string }, toTypeID: string, day: string) {
+    const d = dragRef.current
+    dragRef.current = null
+    setDragHover(null)
+    setDragging(false)
+    if (!d || !data) return
+    const newStart = addDays(day, -d.offset)
+    const newEnd = addDays(newStart, diff(d.start, d.end))
+    const datesChanged = newStart !== d.start
+    if (!datesChanged && room.id === d.fromRoomID) return
+    const problem = moveProblem(d, room.id, newStart, newEnd)
+    if (problem) { setToast({ ok: false, text: problem }); return }
+    const ask: MoveAsk = { drag: d, toRoomID: room.id, toTypeID, newStart, newEnd }
+    if (toTypeID === d.fromTypeID && !datesChanged) void executeMove(ask)
+    else setMoveAsk(ask)
+  }
+
+  async function executeMove(a: MoveAsk) {
+    setMoveAsk(null)
+    setBusy(true)
+    try {
+      const datesChanged = a.newStart !== a.drag.start
+      await cbApi(`/api/cloudbeds/reservation/${a.drag.reservationID}`, 'POST', {
+        action: 'move',
+        oldRoomID: a.drag.fromRoomID ?? undefined,
+        fromTypeID: a.drag.fromTypeID,
+        fromStart: a.drag.start,
+        newRoomID: a.toRoomID,
+        newRoomTypeID: a.toTypeID,
+        ...(datesChanged ? { checkin: a.newStart, checkout: a.newEnd } : {}),
+      })
+      setToast({ ok: true, text: `${a.drag.guestName}: moved to ${roomName(a.toRoomID, a.toTypeID)}${datesChanged ? ` · ${a.newStart} → ${a.newEnd}` : ''}.` })
+      await refreshVisible()
+    } catch (e) {
+      setToast({ ok: false, text: e instanceof Error ? e.message : 'Cloudbeds error' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** Rooms of one category that are free for [start, end). */
+  function freeRooms(typeID: string, start: string, end: string, reservationID: string) {
+    const t = data?.roomTypes.find((x) => x.id === typeID)
+    if (!data || !t) return []
+    return t.rooms.filter((r) =>
+      !data.bookings.some((b) => b.roomID === r.id && b.reservationID !== reservationID && b.start < end && start < b.end) &&
+      !data.blocks.some((b) => b.roomID === r.id && b.start < end && start <= b.end))
+  }
 
   function clickDay(room: { id: string }, roomTypeID: string, day: string) {
     if (!data || day < data.today) return
@@ -777,7 +868,8 @@ export default function CalendarPage() {
                                 ? d >= (pick.hover < pick.start ? pick.hover : pick.start) && d <= (pick.hover < pick.start ? pick.start : pick.hover)
                                 : pick?.roomID === room.id && d === pick.start
                               const dow = new Date(`${d}T12:00:00Z`).getUTCDay()
-                              const bg = inRange ? 'bg-[#3ccf8a]/30' : d === hoverDay ? 'bg-white/[.06]' : d === data.today ? 'bg-[#8fb4ff]/[.035]' : dow === 0 || dow === 6 ? 'bg-white/[.025]' : ''
+                              const dh = dragHover && dragHover.roomID === room.id && d >= dragHover.from && d < dragHover.to ? dragHover : null
+                              const bg = dh ? (dh.ok ? 'bg-[#8fb4ff]/25' : 'bg-[#ff4d5a]/20') : inRange ? 'bg-[#3ccf8a]/30' : d === hoverDay ? 'bg-white/[.06]' : d === data.today ? 'bg-[#8fb4ff]/[.035]' : dow === 0 || dow === 6 ? 'bg-white/[.025]' : ''
                               return (
                                 <div key={d}
                                   onClick={canPick ? () => clickDay(room, t.id, d) : undefined}
@@ -785,6 +877,15 @@ export default function CalendarPage() {
                                     setHoverDay(d)
                                     if (pick && pick.roomID === room.id) setPick((p) => (p ? { ...p, hover: d } : p))
                                   }}
+                                  onDragOver={isUnassigned ? undefined : (e) => {
+                                    const dr = dragRef.current
+                                    if (!dr) return
+                                    e.preventDefault()
+                                    const ns = addDays(d, -dr.offset)
+                                    const ne = addDays(ns, diff(dr.start, dr.end))
+                                    if (!dragHover || dragHover.roomID !== room.id || dragHover.from !== ns) setDragHover({ roomID: room.id, from: ns, to: ne, ok: moveProblem(dr, room.id, ns, ne) === null })
+                                  }}
+                                  onDrop={isUnassigned ? undefined : (e) => { e.preventDefault(); dropOn(room, t.id, d) }}
                                   className={`${canPick ? 'cursor-pointer hover:bg-[#3ccf8a]/20' : ''} ${bg}`}
                                   style={{ width: dayW, minWidth: dayW }} />
                               )
@@ -798,17 +899,21 @@ export default function CalendarPage() {
                               return (
                                 <Bar key={`b${i}`} start={b.start} end={addDays(b.end, 1)} viewStart={data.start} totalDays={totalDays} label={b.reason}
                                   bg={service ? HATCH_SERVICE : HATCH_BLOCK} border={service ? '#b88a2e' : '#5b6b80'} text={service ? '#ffd9a0' : '#cdd6e2'}
-                                  title={`${service ? 'Out of service' : 'Blocked'}: ${b.reason} (click to open)`} dayW={dayW} onClick={() => setOpenBlock(b)} />
+                                  title={`${service ? 'Out of service' : 'Blocked'}: ${b.reason} (click to open)`} dayW={dayW} passive={dragging} onClick={() => setOpenBlock(b)} />
                               )
                             })}
                             {stays.map((s) => (
                               <Bar key={`${s.reservationID}-${s.start}`} start={s.start} end={s.end} viewStart={data.start} totalDays={totalDays}
                                 label={s.guestName} sub={`${diff(s.start, s.end)}n`} due={dueOf(s.reservationID, s.due)} note={noteIds.has(s.reservationID)} multi={multiIds.has(s.reservationID)} src={s.src}
                                 edge={statusEdge(s.status)} bg="" border="" text="#fff" onClick={() => setOpen(s.reservationID)} dayW={dayW}
+                                draggable={!['checked_out', 'canceled', 'cancelled', 'no_show'].includes(s.status)}
+                                onDragStart={(e) => startDrag(e, s, isUnassigned ? null : room.id, t.id)}
+                                onDragEnd={() => { dragRef.current = null; setDragHover(null); setDragging(false) }}
+                                passive={dragging}
                                 onContextMenu={(e) => {
                                   e.preventDefault()
                                   e.stopPropagation()
-                                  setMenu({ x: e.clientX, y: e.clientY, reservationID: s.reservationID, guestName: s.guestName, status: s.status, roomID: isUnassigned ? null : room.id })
+                                  setMenu({ x: e.clientX, y: e.clientY, reservationID: s.reservationID, guestName: s.guestName, status: s.status, roomID: isUnassigned ? null : room.id, assign: isUnassigned ? { typeID: t.id, start: s.start, end: s.end } : undefined })
                                 }}
                                 title={`${s.guestName} · ${s.status.replace(/_/g, ' ')} · ${s.start} → ${s.end}${s.due ? ' · balance due' : ''}`} />
                             ))}
@@ -854,8 +959,68 @@ export default function CalendarPage() {
                 {i.label}
               </button>
             ))}
+          {menu.assign && menu.status !== 'checked_out' && (
+            <div className="border-t border-gray-100 pt-1">
+              <p className="px-3 py-1 text-[10.5px] font-semibold uppercase tracking-wide text-gray-400">Assign to room</p>
+              {(() => {
+                const m = menu
+                const free = freeRooms(m.assign!.typeID, m.assign!.start, m.assign!.end, m.reservationID)
+                if (free.length === 0) return <p className="px-3 py-1.5 text-gray-400">No free room in this category</p>
+                return free.map((r) => (
+                  <button key={r.id} disabled={busy} className="block w-full px-3 py-1.5 text-left hover:bg-gray-100 disabled:opacity-50"
+                    onClick={() => {
+                      setMenu(null)
+                      void executeMove({
+                        drag: { reservationID: m.reservationID, guestName: m.guestName, status: m.status, start: m.assign!.start, end: m.assign!.end, fromRoomID: null, fromTypeID: m.assign!.typeID, offset: 0 },
+                        toRoomID: r.id, toTypeID: m.assign!.typeID, newStart: m.assign!.start, newEnd: m.assign!.end,
+                      })
+                    }}>
+                    Room {r.name}
+                  </button>
+                ))
+              })()}
+            </div>
+          )}
         </div>
       )}
+
+      {moveAsk && data && (() => {
+        const a = moveAsk
+        const rate = (typeID: string, day: string) => data.roomTypes.find((x) => x.id === typeID)?.rates[day]
+        const fromRate = rate(a.drag.fromTypeID, a.newStart), toRate = rate(a.toTypeID, a.newStart)
+        const typeChanged = a.toTypeID !== a.drag.fromTypeID
+        const datesChanged = a.newStart !== a.drag.start
+        const kind = typeChanged ? (fromRate != null && toRate != null ? (toRate > fromRate ? 'Upgrade' : toRate < fromRate ? 'Downgrade' : 'Change') : 'Change') : 'Move'
+        const title = typeChanged ? (kind === 'Change' ? 'Change room category?' : `${kind} this reservation?`) : 'Change the dates?'
+        const typeName = (id: string) => data.roomTypes.find((x) => x.id === id)?.name ?? ''
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setMoveAsk(null)}>
+            <div className="w-full max-w-[360px] overflow-hidden rounded-2xl bg-white text-[#14213d] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="bg-gradient-to-r from-[#2a4f9c] via-[#1d3a78] to-[#16305f] px-5 py-3.5 text-white">
+                <p className="text-[15px] font-bold tracking-tight">{title}</p>
+                <p className="mt-px text-xs text-white/70">{a.drag.guestName}</p>
+              </div>
+              <div className="space-y-2.5 px-5 py-4 text-[13px]">
+                <div className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1 rounded-xl bg-[#f6f3ec] px-3 py-2"><p className="text-[10px] font-semibold uppercase tracking-wide text-[#7a8394]">From</p><p className="truncate font-semibold">{roomName(a.drag.fromRoomID, a.drag.fromTypeID)}</p><p className="truncate text-[11px] text-[#667085]">{typeName(a.drag.fromTypeID)}</p></div>
+                  <span className="text-[#98a2b3]">→</span>
+                  <div className="min-w-0 flex-1 rounded-xl bg-[#eaf1fd] px-3 py-2"><p className="text-[10px] font-semibold uppercase tracking-wide text-[#5b6b8c]">To</p><p className="truncate font-semibold">{roomName(a.toRoomID, a.toTypeID)}</p><p className="truncate text-[11px] text-[#667085]">{typeName(a.toTypeID)}</p></div>
+                </div>
+                {datesChanged && (
+                  <p className="rounded-xl bg-[#f6f3ec] px-3 py-2"><span className="text-[10px] font-semibold uppercase tracking-wide text-[#7a8394]">Dates</span><br />
+                    <span className="text-[#667085] line-through">{a.drag.start} → {a.drag.end}</span><br /><span className="font-semibold">{a.newStart} → {a.newEnd}</span> · {diff(a.newStart, a.newEnd)}n</p>
+                )}
+                {typeChanged && <p className="text-[12px] text-[#667085]">The price is recalculated at the new room&apos;s rate.</p>}
+                {datesChanged && multiIds.has(a.drag.reservationID) && <p className="text-[12px] text-[#b4540a]">This reservation has several rooms: the new dates apply to all of them.</p>}
+              </div>
+              <div className="flex justify-end gap-2 border-t border-gray-100 px-5 py-3">
+                <button onClick={() => setMoveAsk(null)} className="h-9 rounded-full border border-[#dde2ea] px-4 text-[12.5px] font-medium hover:bg-gray-50">Cancel</button>
+                <button onClick={() => void executeMove(a)} className="h-9 rounded-full bg-gradient-to-b from-[#3b78e6] to-[#2456b8] px-5 text-[12.5px] font-semibold text-white hover:brightness-95">Confirm</button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {toast && (
         <div className={`fixed bottom-5 left-1/2 z-50 flex max-w-lg -translate-x-1/2 items-start gap-3 rounded-lg px-4 py-2.5 text-sm shadow-xl ${toast.ok ? 'bg-[#14213d] text-white' : 'bg-red-600 text-white'}`}>
