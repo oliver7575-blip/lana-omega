@@ -544,6 +544,47 @@ export default function CalendarPage() {
     }
   }
 
+  /** Takes a reservation out of its room (back to "Unassigned"): shown at once, sent to Cloudbeds, double-checked, reverted if it fails. */
+  async function doUnassign(reservationID: string, guestName: string, roomID: string) {
+    const cur = dataRef.current
+    const orig = cur?.bookings.find((b) => b.reservationID === reservationID && b.roomID === roomID)
+    const typeID = roomTypeOf[roomID]
+    if (!cur || !orig || !typeID) return
+    const row: Unassigned = { reservationID, guestName, roomTypeID: typeID, start: orig.start, end: orig.end, status: orig.status, due: orig.due, src: orig.src }
+    setData((prev) => prev && ({ ...prev, bookings: prev.bookings.filter((b) => b !== orig), unassigned: [...prev.unassigned, row] }))
+    const putBack = () => setData((prev) => prev && ({
+      ...prev,
+      bookings: [...prev.bookings.filter((b) => !(b.reservationID === reservationID && b.roomID === roomID && b.start === orig.start)), orig],
+      unassigned: prev.unassigned.filter((u) => !(u.reservationID === reservationID && u.start === orig.start && u.roomTypeID === typeID)),
+    }))
+    try {
+      await cbApi(`/api/cloudbeds/reservation/${reservationID}`, 'POST', { action: 'unassign', roomID })
+    } catch (e) {
+      putBack()
+      setToast({ ok: false, text: `${guestName} was not unassigned: ${e instanceof Error ? e.message : 'Cloudbeds error'}` })
+      return
+    }
+    setToast({ ok: true, text: `${guestName}: room unassigned.` })
+    let confirmed = false
+    for (const wait of [1000, 2000, 3000]) {
+      await new Promise((r) => setTimeout(r, wait))
+      try {
+        const chunk = await fetchRange(addDays(orig.start, -1), diff(orig.start, orig.end) + 3)
+        if (!chunk.bookings.some((b) => b.reservationID === reservationID && b.roomID === roomID && b.start === orig.start)) {
+          confirmed = true
+          setData((prev) => mergeChunk(prev, { ...chunk, days: prev?.days ?? chunk.days, start: prev?.start ?? chunk.start }, addDays(orig.start, -1), addDays(orig.end, 2)))
+          break
+        }
+      } catch {
+        // Try again.
+      }
+    }
+    if (!confirmed) {
+      putBack()
+      setToast({ ok: false, text: `Cloudbeds did not confirm it, so ${guestName} is back in the room. Check the reservation in Cloudbeds.` })
+    }
+  }
+
   /** Rooms of one category that are free for [start, end). */
   function freeRooms(typeID: string, start: string, end: string, reservationID: string) {
     const t = data?.roomTypes.find((x) => x.id === typeID)
@@ -588,6 +629,7 @@ export default function CalendarPage() {
       }
     }
     if (action === 'unassign' && !confirm(`Remove ${m.guestName} from this room? The reservation stays, but without a room.`)) return
+    if (action === 'unassign' && m.roomID) { void doUnassign(m.reservationID, m.guestName, m.roomID); return }
     setBusy(true)
     try {
       await cbApi(`/api/cloudbeds/reservation/${m.reservationID}`, 'POST', { action, roomID: m.roomID ?? undefined })
@@ -893,7 +935,7 @@ export default function CalendarPage() {
                       })}
                     </div>
 
-                    {!isCollapsed && [...t.rooms, ...(unassigned.length ? [{ id: `unassigned-${t.id}`, name: 'Unassigned' }] : [])].map((room) => {
+                    {!isCollapsed && [...t.rooms, ...(unassigned.length || (dragging && dragRef.current?.fromRoomID && dragRef.current.fromTypeID === t.id) ? [{ id: `unassigned-${t.id}`, name: 'Unassigned' }] : [])].map((room) => {
                       const isUnassigned = room.id.startsWith('unassigned-')
                       const stays = isUnassigned ? unassigned.map((u) => ({ ...u, roomID: room.id })) : data.bookings.filter((b) => b.roomID === room.id)
                       const blocks = data.blocks.filter((b) => b.roomID === room.id)
@@ -919,7 +961,10 @@ export default function CalendarPage() {
                                     setHoverDay(d)
                                     if (pick && pick.roomID === room.id) setPick((p) => (p ? { ...p, hover: d } : p))
                                   }}
-                                  onDragOver={isUnassigned ? undefined : (e) => {
+                                  onDragOver={isUnassigned ? (e) => {
+                                    const dr = dragRef.current
+                                    if (dr && dr.fromRoomID && dr.fromTypeID === t.id) { e.preventDefault(); if (!dragHover || dragHover.roomID !== room.id) setDragHover({ roomID: room.id, from: dr.start, to: dr.end, ok: true }) }
+                                  } : (e) => {
                                     const dr = dragRef.current
                                     if (!dr) return
                                     e.preventDefault()
@@ -927,7 +972,12 @@ export default function CalendarPage() {
                                     const ne = addDays(ns, diff(dr.start, dr.end))
                                     if (!dragHover || dragHover.roomID !== room.id || dragHover.from !== ns) setDragHover({ roomID: room.id, from: ns, to: ne, ok: moveProblem(dr, room.id, ns, ne) === null })
                                   }}
-                                  onDrop={isUnassigned ? undefined : (e) => { e.preventDefault(); dropOn(room, t.id, d) }}
+                                  onDrop={isUnassigned ? (e) => {
+                                    e.preventDefault()
+                                    const dr = dragRef.current
+                                    dragRef.current = null; setDragHover(null); setDragging(false)
+                                    if (dr && dr.fromRoomID && dr.fromTypeID === t.id && confirm(`Remove ${dr.guestName} from this room? The reservation stays, but without a room.`)) void doUnassign(dr.reservationID, dr.guestName, dr.fromRoomID)
+                                  } : (e) => { e.preventDefault(); dropOn(room, t.id, d) }}
                                   className={`${canPick ? 'cursor-pointer hover:bg-[#3ccf8a]/20' : ''} ${bg}`}
                                   style={{ width: dayW, minWidth: dayW }} />
                               )
