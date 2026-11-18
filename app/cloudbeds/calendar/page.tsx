@@ -1018,7 +1018,8 @@ export default function CalendarPage() {
                       const nights = Array.from({ length: Math.max(0, diff(a.newStart, a.newEnd)) }, (_, i) => addDays(a.newStart, i))
                       const fr = nights.map((n) => rate(a.drag.fromTypeID, n)), to = nights.map((n) => rate(a.toTypeID, n))
                       if (!nights.length || fr.some((x) => x == null) || to.some((x) => x == null)) return null
-                      const delta = to.reduce((t, x) => t + (x as number), 0) - fr.reduce((t, x) => t + (x as number), 0)
+                      const sum = (a: (number | undefined)[]) => a.reduce<number>((t, x) => t + (x ?? 0), 0)
+                      const delta = sum(to) - sum(fr)
                       const per = Math.round(delta / nights.length)
                       const fmt = (n: number) => `${n > 0 ? '+' : n < 0 ? '−' : ''}MXN ${Math.abs(Math.round(n)).toLocaleString('en-US')}`
                       return (
