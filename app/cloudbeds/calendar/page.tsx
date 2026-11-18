@@ -1014,6 +1014,20 @@ export default function CalendarPage() {
                 {typeChanged && (
                   <div className="rounded-xl border border-[#e4e8ef] px-3 py-2.5">
                     <p className="text-[12.5px] font-semibold">Recalculate the price at the new room&apos;s rate?</p>
+                    {(() => {
+                      const nights = Array.from({ length: Math.max(0, diff(a.newStart, a.newEnd)) }, (_, i) => addDays(a.newStart, i))
+                      const fr = nights.map((n) => rate(a.drag.fromTypeID, n)), to = nights.map((n) => rate(a.toTypeID, n))
+                      if (!nights.length || fr.some((x) => x == null) || to.some((x) => x == null)) return null
+                      const delta = to.reduce((t, x) => t + (x as number), 0) - fr.reduce((t, x) => t + (x as number), 0)
+                      const per = Math.round(delta / nights.length)
+                      const fmt = (n: number) => `${n > 0 ? '+' : n < 0 ? '−' : ''}MXN ${Math.abs(Math.round(n)).toLocaleString('en-US')}`
+                      return (
+                        <p className={`mt-1 text-[13px] font-bold ${delta > 0 ? 'text-[#b4540a]' : delta < 0 ? 'text-[#0e7a56]' : 'text-[#667085]'}`}>
+                          {delta === 0 ? 'No difference in price' : `${fmt(delta)} in total`}
+                          {delta !== 0 && <span className="ml-1.5 text-[11.5px] font-medium opacity-80">({fmt(per)} per night · {nights.length}n)</span>}
+                        </p>
+                      )
+                    })()}
                     <div className="mt-2 grid grid-cols-2 gap-1.5">
                       {([[true, 'Yes, update price'], [false, 'No, keep price']] as const).map(([v, l]) => (
                         <button key={l} onClick={() => setMoveAsk({ ...a, adjustPrice: v })}
