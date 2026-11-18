@@ -97,9 +97,9 @@ function sourceBadge(src?: string): { t: string; color: string; name: string } |
   return null
 }
 
-function Bar({ start, end, viewStart, totalDays, label, sub, bg, border, text, edge, onClick, onContextMenu, title, dayW, due, note, src }: {
+function Bar({ start, end, viewStart, totalDays, label, sub, bg, border, text, edge, onClick, onContextMenu, title, dayW, due, note, multi, src }: {
   start: string; end: string; viewStart: string; totalDays: number; label: string; sub?: string; bg: string; border: string; text: string; edge?: string; onClick?: () => void
-  onContextMenu?: (e: React.MouseEvent) => void; title?: string; dayW: number; due?: boolean; note?: boolean; src?: string
+  onContextMenu?: (e: React.MouseEvent) => void; title?: string; dayW: number; due?: boolean; note?: boolean; multi?: boolean; src?: string
 }) {
   const from = diff(viewStart, start) + 0.5
   const to = diff(viewStart, end) + 0.5
@@ -130,7 +130,7 @@ function Bar({ start, end, viewStart, totalDays, label, sub, bg, border, text, e
     >
       {due && <i aria-label="Balance due" title="Balance due" className="absolute left-[3px] top-[3px] h-[6px] w-[6px] rounded-full bg-[#ff4d5a] ring-1 ring-white/70" />}
       <span className="min-w-0 flex-1 truncate text-[11px] font-bold">
-        {label}
+        {multi && <b title="Several rooms in this reservation" className="mr-1 font-black">+</b>}{label}
         {sub && w >= 80 && <span className="ml-1.5 font-medium opacity-80">· {sub}</span>}
       </span>
       {badge && w >= 60 && (
@@ -302,6 +302,22 @@ export default function CalendarPage() {
     else if (el.scrollLeft + el.clientWidth > el.scrollWidth - EDGE_PX) loadMore('future')
   }
 
+  // Reservations holding more than one room at the same time (rooms whose dates overlap) get a "+" before the name.
+  const multiIds = useMemo(() => {
+    const by = new Map<string, { start: string; end: string }[]>()
+    for (const b of [...(data?.bookings ?? []), ...(data?.unassigned ?? [])]) {
+      if (b.status === 'canceled' || b.status === 'cancelled' || b.status === 'no_show') continue
+      const a = by.get(b.reservationID) ?? []
+      a.push({ start: b.start, end: b.end })
+      by.set(b.reservationID, a)
+    }
+    const out = new Set<string>()
+    for (const [id, a] of by) {
+      if (a.length < 2) continue
+      if (a.some((x, i) => a.some((y, j) => j > i && x.start < y.end && y.start < x.end))) out.add(id)
+    }
+    return out
+  }, [data])
   const dueOf = (id: string, due?: boolean) => {
     const o = dueOverride.current.get(id)
     return o && o.until > Date.now() ? o.due : due
@@ -787,7 +803,7 @@ export default function CalendarPage() {
                             })}
                             {stays.map((s) => (
                               <Bar key={`${s.reservationID}-${s.start}`} start={s.start} end={s.end} viewStart={data.start} totalDays={totalDays}
-                                label={s.guestName} sub={`${diff(s.start, s.end)}n`} due={dueOf(s.reservationID, s.due)} note={noteIds.has(s.reservationID)} src={s.src}
+                                label={s.guestName} sub={`${diff(s.start, s.end)}n`} due={dueOf(s.reservationID, s.due)} note={noteIds.has(s.reservationID)} multi={multiIds.has(s.reservationID)} src={s.src}
                                 edge={statusEdge(s.status)} bg="" border="" text="#fff" onClick={() => setOpen(s.reservationID)} dayW={dayW}
                                 onContextMenu={(e) => {
                                   e.preventDefault()
