@@ -761,7 +761,7 @@ export default function CalendarPage() {
             </div>
             <span className="mr-4 h-9 w-px bg-white/25" />
             <div className="leading-none">
-              <div className="flex items-center gap-2.5"><h1 className="text-[19px] font-semibold tracking-tight text-[#c9d3e0]">Calendar</h1><PropertyClock /></div>
+              <div className="flex items-center gap-2.5"><h1 className="text-[20px] font-semibold leading-tight tracking-tight text-white">Calendar</h1><PropertyClock /></div>
               <p className="mt-1.5 flex items-center gap-1.5 whitespace-nowrap text-[10.5px] text-[#8a9bb0]">
                 {roomCount} rooms
                 <span className="h-1.5 w-1.5 rounded-full bg-[#3ccf8a]" /> Updates automatically
