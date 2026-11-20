@@ -149,18 +149,18 @@ export default function MaintenancePage() {
 
   return (
     <main className="min-w-0 overflow-x-hidden p-2 md:p-3">
-      <div className="min-h-[calc(100vh-1.5rem)] min-w-0 rounded-2xl p-3 text-[#eaf0fb] antialiased sm:p-4" style={{ background: HOLO_BG }}>
+      <div className="min-h-[calc(100vh-1.5rem)] min-w-0 rounded-2xl p-3 text-[#eaf0fb] antialiased" style={{ background: HOLO_BG }}>
       <LiveRefresh tables={['maintenance_tasks', 'maintenance_task_events']} onChange={load} pollMs={30000} />
-      <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div className="mb-4 flex min-h-[56px] flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex h-[26px] items-center gap-3">
             <h1 className="text-[20px] font-semibold leading-tight tracking-tight text-white">Maintenance</h1>
             <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[.18em] text-emerald-300">
               WhatsApp automation
             </span>
             <PropertyClock />
           </div>
-          <p className="mt-1 text-[12px] text-[#9fb3dc]">Assign maintenance tasks, send reminders, and track WhatsApp replies.</p>
+          <p className="mt-0.5 h-4 text-[11.5px] leading-4 text-[#9fb3dc]">Assign maintenance tasks, send reminders, and track WhatsApp replies.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button onClick={() => setShowPreview(true)} className="h-8 rounded-full border border-[#f0b548]/40 bg-[#f0b548]/15 px-3.5 text-[12.5px] font-semibold text-[#f5d58a] hover:bg-[#f0b548]/25">

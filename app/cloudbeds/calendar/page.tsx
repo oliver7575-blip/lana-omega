@@ -753,16 +753,16 @@ export default function CalendarPage() {
   return (
     <div className="p-2 md:p-3">
       <div className="min-h-[calc(100vh-1.5rem)] rounded-2xl p-3 text-[#eaf0fb] antialiased" style={{ background: HOLO_BG }}>
-        <div className="mb-2.5 flex flex-wrap items-center gap-2 pb-0.5 pt-1">
+        <div className="mb-2.5 flex min-h-[56px] flex-wrap items-center gap-2">
           <div className="mr-6 flex items-center">
             {/* The wordmark is centred over the room column below it (same width), and the title starts after it. */}
             <div className="flex shrink-0 items-center justify-center" style={{ width: LEFT_W + 1 }}>
               <Link href="/cloudbeds" title="Back to the dashboard" className="font-display text-[40px] font-semibold italic leading-none tracking-tight text-white hover:opacity-90">Soirée</Link>
             </div>
-            <span className="mr-4 h-9 w-px bg-white/25" />
+            <span className="mr-[35px] h-9 w-px bg-white/25" />
             <div className="leading-none">
-              <div className="flex items-center gap-2.5"><h1 className="text-[20px] font-semibold leading-tight tracking-tight text-white">Calendar</h1><PropertyClock /></div>
-              <p className="mt-1.5 flex items-center gap-1.5 whitespace-nowrap text-[10.5px] text-[#8a9bb0]">
+              <div className="flex h-[26px] items-center gap-2.5"><h1 className="text-[20px] font-semibold leading-tight tracking-tight text-white">Calendar</h1><PropertyClock /></div>
+              <p className="mt-0.5 flex h-4 items-center gap-1.5 whitespace-nowrap text-[11.5px] leading-4 text-[#9fb3dc]">
                 {roomCount} rooms
                 <span className="h-1.5 w-1.5 rounded-full bg-[#3ccf8a]" /> Updates automatically
               </p>

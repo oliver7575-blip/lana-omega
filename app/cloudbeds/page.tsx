@@ -215,10 +215,10 @@ export default function DashviewPage() {
     <div className="p-2 md:p-3">
       <div className="min-h-[calc(100vh-1.5rem)] min-w-0 rounded-2xl p-3 text-[#eaf0fb] antialiased" style={{ background: HOLO_BG }}>
         {/* Header — the pinned side panel carries the wordmark */}
-        <div className="mb-3 flex flex-wrap items-center gap-3">
+        <div className="mb-3 flex min-h-[56px] flex-wrap items-center gap-3">
           <div className="mr-2 min-w-0">
-            <div className="flex items-center gap-2.5"><h1 className="text-[20px] font-semibold leading-tight tracking-tight text-white">Dashboard</h1><PropertyClock /></div>
-            <p className="text-[11.5px] text-[#9fb3dc]">{todayLabel || 'Today'} • Updates automatically</p>
+            <div className="flex h-[26px] items-center gap-2.5"><h1 className="text-[20px] font-semibold leading-tight tracking-tight text-white">Dashboard</h1><PropertyClock /></div>
+            <p className="mt-0.5 h-4 text-[11.5px] leading-4 text-[#9fb3dc]">{todayLabel || 'Today'} • Updates automatically</p>
           </div>
           <div className="flex-1" />
           <Link href="/cloudbeds/calendar" className={`flex h-8 items-center gap-2 rounded-full border ${LINE} bg-white/[0.06] px-3.5 text-[12.5px] font-semibold text-[#eaf0fb] hover:bg-white/[0.12]`}>
