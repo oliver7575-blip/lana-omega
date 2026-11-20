@@ -3,6 +3,7 @@ import { simpleParser } from 'mailparser'
 import { createServiceClient } from './supabase/service'
 import { decryptCredentials, type EncryptedPayload } from './crypto'
 import { handleArrivalEmail, type ArrivalInfo } from './arrival-email'
+import { storeAttachments } from './email-attachments'
 import { answerGeneralEmail, canReplyToAddress, REPLY_TENANT_COLUMNS, type ReplyMail, type ReplyTenant } from './email-reply'
 
 /**
@@ -124,7 +125,12 @@ export async function pollInbox(tenantId: string): Promise<PollResult> {
           })
           .select('id')
           .single()
-        if (row && sorted.category !== 'automated') filed++
+        if (row && sorted.category !== 'automated') {
+          filed++
+          await storeAttachments(db, tenantId, row.id as string, parsed)
+        } else if (row) {
+          await db.from('inbound_emails').update({ attachments_checked: true }).eq('id', row.id)
+        }
         // Guest emails: save an arrival time if they gave one, and answer them when the knowledge base covers it.
         // (handleArrivalEmail/answerGeneralEmail each re-check the reply address themselves and degrade
         // gracefully — e.g. an arrival time still gets saved to Cloudbeds even with no way to email back.)
@@ -250,4 +256,51 @@ async function sortEmail(fromEmail: string, fromName: string, subject: string, t
     // If sorting fails, keep the email visible rather than hiding it.
     return { category: 'other', summary: 'Could not sort this email automatically.' }
   }
+}
+
+
+/** Emails that arrived before attachments were saved: fetch them again and store what they carried (a few per run). */
+export async function backfillAttachments(tenantId: string, max = 4): Promise<number> {
+  const db = createServiceClient()
+  const { data: rows } = await db
+    .from('inbound_emails')
+    .select('id, imap_uid, message_id')
+    .eq('tenant_id', tenantId)
+    .eq('attachments_checked', false)
+    .not('imap_uid', 'is', null)
+    .order('received_at', { ascending: false })
+    .limit(max)
+  if (!rows?.length) return 0
+  const { data: integ } = await db.from('tenant_integrations').select('status, credentials, config').eq('tenant_id', tenantId).eq('integration_type', 'email').maybeSingle()
+  if (integ?.status !== 'connected' || !integ.credentials) return 0
+  const config = (integ.config ?? {}) as { smtp_host?: string; smtp_user?: string; imap_host?: string }
+  const host = config.imap_host?.trim() || (config.smtp_host ?? '').replace(/^smtp\./i, 'imap.')
+  if (!host || !config.smtp_user) return 0
+  const { smtp_password } = decryptCredentials<{ smtp_password: string }>(integ.credentials as EncryptedPayload)
+  const { data: state } = await db.from('email_poll_state').select('uid_validity').eq('tenant_id', tenantId).maybeSingle()
+  const client = new ImapFlow({ host, port: 993, secure: true, auth: { user: config.smtp_user, pass: smtp_password }, logger: false })
+  let done = 0
+  try {
+    await client.connect()
+    const lock = await client.getMailboxLock('INBOX', { readOnly: true })
+    try {
+      const sameBox = Number((client.mailbox as { uidValidity?: bigint | number }).uidValidity ?? 0) === Number(state?.uid_validity ?? -1)
+      for (const r of rows) {
+        if (!sameBox) { await db.from('inbound_emails').update({ attachments_checked: true }).eq('id', r.id); continue }
+        const msg = await client.fetchOne(String(r.imap_uid), { source: true }, { uid: true })
+        if (!msg || !msg.source) { await db.from('inbound_emails').update({ attachments_checked: true }).eq('id', r.id); continue }
+        const parsed = await simpleParser(msg.source)
+        if (parsed.messageId && r.message_id && parsed.messageId !== r.message_id) { await db.from('inbound_emails').update({ attachments_checked: true }).eq('id', r.id); continue }
+        await storeAttachments(db, tenantId, r.id as string, parsed)
+        done++
+      }
+    } finally {
+      lock.release()
+    }
+    await client.logout()
+  } catch (err) {
+    console.error('[email-inbox] attachment backfill failed', err)
+    try { await client.logout() } catch { /* already closed */ }
+  }
+  return done
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { pollInbox } from '@/lib/email-inbox'
+import { pollInbox, backfillAttachments } from '@/lib/email-inbox'
 
 export const maxDuration = 60
 
@@ -15,6 +15,9 @@ export async function GET(request: Request) {
     .eq('integration_type', 'email')
     .eq('status', 'connected')
   const results = []
-  for (const i of integrations ?? []) results.push(await pollInbox(i.tenant_id as string))
+  for (const i of integrations ?? []) {
+    results.push(await pollInbox(i.tenant_id as string))
+    await backfillAttachments(i.tenant_id as string)
+  }
   return NextResponse.json({ results })
 }

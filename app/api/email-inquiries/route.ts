@@ -24,7 +24,18 @@ export async function GET(request: Request) {
     staff ? readIds(supabase, staff.id as string, 'email') : Promise.resolve(new Set<string>()),
   ])
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  const emails = (data ?? []).map((e) => ({ ...e, read: reads.has(e.id as string) }))
+  const { data: atts } = (data ?? []).length
+    ? await supabase.from('inbound_email_attachments').select('id, email_id, filename, content_type, size_bytes, inline').in('email_id', (data ?? []).map((e) => e.id as string))
+    : { data: [] }
+  const byEmail = new Map<string, { id: string; filename: string; content_type: string | null; size_bytes: number | null }[]>()
+  for (const a of atts ?? []) {
+    // Small inline pictures are signature logos and tracking pixels: not worth listing.
+    if (a.inline && (a.size_bytes ?? 0) < 30_000) continue
+    const list = byEmail.get(a.email_id as string) ?? []
+    list.push({ id: a.id as string, filename: a.filename as string, content_type: a.content_type as string | null, size_bytes: a.size_bytes as number | null })
+    byEmail.set(a.email_id as string, list)
+  }
+  const emails = (data ?? []).map((e) => ({ ...e, read: reads.has(e.id as string), attachments: byEmail.get(e.id as string) ?? [] }))
   return NextResponse.json({ emails, lastChecked: state?.last_polled_at ?? null, lastError: state?.last_error ?? null })
 }
 

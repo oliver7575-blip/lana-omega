@@ -18,7 +18,11 @@ interface Email {
   reply_status: 'sent' | 'not_sent' | 'failed' | null
   reply_detail: string | null
   read: boolean
+  attachments: { id: string; filename: string; content_type: string | null; size_bytes: number | null }[]
 }
+
+const isImage = (t: string | null) => /^image\/(png|jpe?g|gif|webp|avif)$/i.test(t ?? '')
+const fmtSize = (n: number | null) => (n == null ? '' : n >= 1_048_576 ? `${(n / 1_048_576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`)
 
 const LABEL: Record<string, string> = {
   inquiry: 'Inquiry',
@@ -227,7 +231,7 @@ export default function EmailInquiriesPage() {
                       <span className={`truncate text-sm text-white ${e.read ? 'font-medium' : 'font-bold'}`}>{e.from_name || e.from_email || 'Unknown sender'}</span>
                       <span className="shrink-0 text-[11px] text-navy/45">{new Date(e.received_at).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
                     </span>
-                    <span className="block truncate text-sm text-navy/85">{e.subject}</span>
+                    <span className="block truncate text-sm text-navy/85">{e.attachments?.length > 0 && <span title={`${e.attachments.length} attachment(s)`} className="mr-1.5">📎</span>}{e.subject}</span>
                     {e.summary && <span className="mt-0.5 block text-xs text-navy/55">{e.summary}</span>}
                     {e.action && (
                       <span className={`mt-1.5 block rounded-md px-2 py-1 text-xs ${e.action === 'arrival_saved' ? 'bg-emerald-500/10 text-emerald-200' : 'bg-amber-500/10 text-amber-200'}`}>
@@ -255,6 +259,33 @@ export default function EmailInquiriesPage() {
                     </div>
                   )}
                   <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-black/20 p-3 font-sans text-sm text-navy/85">{e.body_text || '(empty)'}</pre>
+                  {e.attachments?.length > 0 && (
+                    <div className="mt-3">
+                      <p className="mb-1.5 text-[11px] uppercase tracking-wide text-navy/50">Attachments ({e.attachments.length})</p>
+                      <div className="flex flex-wrap gap-2">
+                        {e.attachments.map((a) => (
+                          <div key={a.id} className="flex max-w-full items-center gap-2 rounded-lg border border-line bg-surface/60 p-2">
+                            {isImage(a.content_type) ? (
+                              <a href={`/api/email-inquiries/attachments/${a.id}`} target="_blank" rel="noopener noreferrer">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={`/api/email-inquiries/attachments/${a.id}`} alt={a.filename} className="h-14 w-14 rounded-md object-cover" />
+                              </a>
+                            ) : (
+                              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-black/20 text-xl">{a.content_type === 'application/pdf' ? '📄' : '📎'}</span>
+                            )}
+                            <div className="min-w-0">
+                              <a href={`/api/email-inquiries/attachments/${a.id}`} target="_blank" rel="noopener noreferrer" className="block max-w-[240px] truncate text-sm font-medium text-white hover:underline">{a.filename}</a>
+                              <p className="text-[11px] text-navy/50">{fmtSize(a.size_bytes)}</p>
+                              <div className="mt-0.5 flex gap-3 text-xs">
+                                <a href={`/api/email-inquiries/attachments/${a.id}`} target="_blank" rel="noopener noreferrer" className="text-sky-300 hover:underline">Open</a>
+                                <a href={`/api/email-inquiries/attachments/${a.id}?download=1`} className="text-sky-300 hover:underline">Download</a>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     {e.from_email && (
                       <a
