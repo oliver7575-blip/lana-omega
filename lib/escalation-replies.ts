@@ -139,14 +139,16 @@ export async function processEscalationReply(
     .select('escalation_contacts, ai_persona_prompt, knowledge_base')
     .eq('id', tenantId)
     .single()
-  const contact = parseEscalationContacts(tenant?.escalation_contacts).find((c) => samePhone(c.phone, fromPhone))
-  if (!contact || !tenant) return { handled: false }
+  // One phone can be the contact for several categories (e.g. billing, cleaning and "oliver"): look at all of them.
+  const mine = parseEscalationContacts(tenant?.escalation_contacts).filter((c) => samePhone(c.phone, fromPhone))
+  if (mine.length === 0 || !tenant) return { handled: false }
+  const keys = mine.map((c) => c.key)
 
   const { data: escs } = await db
     .from('escalations')
-    .select('id, conversation_id, guest_id, room, summary, created_at, staff_reply')
+    .select('id, conversation_id, guest_id, room, summary, created_at, staff_reply, category')
     .eq('tenant_id', tenantId)
-    .eq('category', contact.key)
+    .in('category', keys)
     .gte('created_at', new Date(Date.now() - 48 * 3600_000).toISOString())
     .order('created_at', { ascending: false })
     .limit(6)
@@ -163,15 +165,15 @@ export async function processEscalationReply(
   const list = escs
     .map((e, i) => {
       const g = guestOf(convById.get(e.conversation_id as string))
-      return `${i + 1}. ${e.room ? `Room ${e.room}` : 'no room'}${g?.name ? ` · guest ${g.name}` : ''} · ${String(e.created_at).slice(0, 16)} UTC · ${String(e.summary).slice(0, 220)}${e.staff_reply ? ' [already answered]' : ''}`
+      return `${i + 1}. ${e.room ? `Room ${e.room}` : 'no room'} · ${e.category}${g?.name ? ` · guest ${g.name}` : ''} · ${String(e.created_at).slice(0, 16)} UTC · ${String(e.summary).slice(0, 220)}${e.staff_reply ? ' [already answered]' : ''}`
     })
     .join('\n')
 
-  const r = await interpret(contact.key, text, list)
+  const r = await interpret(keys.join(', '), text, list)
   if (!r || r.intent === 'unrelated') return { handled: false }
 
   const esc = r.escalation ? escs[r.escalation - 1] : escs.length === 1 ? escs[0] : null
-  const who = contact.key
+  const who = (esc?.category as string | undefined) ?? keys[0]
 
   if (esc) {
     await db
