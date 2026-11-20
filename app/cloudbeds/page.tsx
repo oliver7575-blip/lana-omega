@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import PropertyClock from '@/components/PropertyClock'
 import ReservationModal from '@/components/cloudbeds/ReservationModal'
 import SearchBar from '@/components/cloudbeds/SearchBar'
 import NewReservationModal from '@/components/cloudbeds/NewReservationModal'
@@ -216,7 +217,7 @@ export default function DashviewPage() {
         {/* Header — the pinned side panel carries the wordmark */}
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <div className="mr-2 min-w-0">
-            <h1 className="text-[20px] font-semibold leading-tight tracking-tight text-white">Dashboard</h1>
+            <div className="flex items-center gap-2.5"><h1 className="text-[20px] font-semibold leading-tight tracking-tight text-white">Dashboard</h1><PropertyClock /></div>
             <p className="text-[11.5px] text-[#9fb3dc]">{todayLabel || 'Today'} • Updates automatically</p>
           </div>
           <div className="flex-1" />

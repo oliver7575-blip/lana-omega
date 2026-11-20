@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import PropertyClock from '@/components/PropertyClock'
 import StaffModal from '@/components/maintenance/StaffModal'
 import TaskModal from '@/components/maintenance/TaskModal'
 import TaskDrawer from '@/components/maintenance/TaskDrawer'
@@ -157,6 +158,7 @@ export default function MaintenancePage() {
             <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[.18em] text-emerald-300">
               WhatsApp automation
             </span>
+            <PropertyClock />
           </div>
           <p className="mt-1 text-[12px] text-[#9fb3dc]">Assign maintenance tasks, send reminders, and track WhatsApp replies.</p>
         </div>
