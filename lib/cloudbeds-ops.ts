@@ -243,10 +243,13 @@ export async function checkIn(cb: CB, reservationID: string) {
   const r = await getReservationDetail(cb, reservationID)
   for (const room of r.rooms) {
     if (!room.roomID) continue
-    const occupants = await listReservations(cb, { roomID: room.roomID, status: 'checked_in' })
+    const occupants = await listReservations(cb, { roomID: room.roomID, status: 'checked_in', includeAllRooms: true })
     let other: (typeof occupants)[number] | undefined
     for (const o of occupants.filter((x) => String(x.reservationID) !== reservationID)) {
       // A multi-room stay stays "checked in" while any room is; only block if THIS room is still in use.
+      // Same room-level status the calendar uses (list response), then the detail record as a second opinion.
+      const listed = ((o.rooms as Json[]) ?? []).find((x) => String(x.roomID ?? '') === room.roomID)
+      if (listed && stayStatus(listed.roomStatus, '') === 'checked_out') continue
       const od = await getReservationDetail(cb, String(o.reservationID)).catch(() => null)
       const there = od?.rooms.find((x) => x.roomID === room.roomID)
       if (!od || !there || stayStatus(there.roomStatus, od.status) !== 'checked_out') { other = o; break }
