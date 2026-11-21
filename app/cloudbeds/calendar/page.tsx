@@ -772,14 +772,19 @@ export default function CalendarPage() {
             <button onClick={() => scrollBy(-7)} className={`${pill} w-8 !px-0 text-base`} aria-label="Back a week">‹</button>
             <button onClick={() => { if (data) { jumpTo(data.today); setMarkDay(data.today) } }} className={`${pill} font-bold !text-[#8fb4ff]`}>Today</button>
             <button onClick={() => scrollBy(7)} className={`${pill} w-8 !px-0 text-base`} aria-label="Forward a week">›</button>
-            <div className="ml-1 flex rounded-full border border-white/10 bg-white/[.06] p-[3px]" role="group" aria-label="Days shown">
+            <div className="ml-1 hidden rounded-full border border-white/10 bg-white/[.06] p-[3px] md:flex" role="group" aria-label="Days shown">
               {SPANS.map((o) => (
                 <button key={o.days} onClick={() => changeSpan(o.days)} aria-pressed={span === o.days}
                   className={`h-[26px] rounded-full border px-2.5 text-[12px] font-semibold ${span === o.days ? 'border-[#8fb4ff]/50 bg-white/15 text-white' : 'border-transparent text-[#9aa8bb] hover:text-white'}`}>{o.label}</button>
               ))}
             </div>
+            <div className="ml-1 flex items-center gap-1.5 text-[13px] md:hidden">
+            <input type="date" value={goTo} onChange={(e) => setGoTo(e.target.value)} aria-label="Go to date"
+              className="h-8 rounded-full border border-white/10 bg-white/[.06] px-3 text-[12px] text-[#eaf0fb] outline-none [color-scheme:dark] focus:border-[#8fb4ff]/60" />
+            <button onClick={() => goTo && jumpTo(goTo)} className={pill}>Go</button>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 text-[13px]">
+          <div className="hidden items-center gap-1.5 text-[13px] md:flex">
             <input type="date" value={goTo} onChange={(e) => setGoTo(e.target.value)} aria-label="Go to date"
               className="h-8 rounded-full border border-white/10 bg-white/[.06] px-3 text-[12px] text-[#eaf0fb] outline-none [color-scheme:dark] focus:border-[#8fb4ff]/60" />
             <button onClick={() => goTo && jumpTo(goTo)} className={pill}>Go</button>
