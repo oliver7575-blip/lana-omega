@@ -114,7 +114,7 @@ export interface ReservationDetail {
   endDate: string
   adults: number
   children: number
-  rooms: { subReservationID: string; reservationRoomID: string | null; roomID: string | null; roomTypeID: string; roomTypeName: string; roomName: string | null; startDate: string; endDate: string; adults: number; children: number }[]
+  rooms: { subReservationID: string; reservationRoomID: string | null; roomID: string | null; roomTypeID: string; roomTypeName: string; roomName: string | null; roomStatus: string | null; startDate: string; endDate: string; adults: number; children: number }[]
   total: number | null
   balance: number | null
   estimatedArrivalTime: string | null
@@ -184,6 +184,7 @@ export async function getReservationDetail(cb: CB, reservationID: string): Promi
     roomTypeID: String(r.roomTypeID ?? ''),
     roomTypeName: String(r.roomTypeName ?? ''),
     roomName: (r.roomName as string) ?? null,
+    roomStatus: (r.roomStatus as string) ?? null,
     startDate: String(r.startDate ?? d.startDate ?? ''),
     endDate: String(r.endDate ?? d.endDate ?? ''),
     adults: Number(r.adults ?? 0),
@@ -196,6 +197,7 @@ export async function getReservationDetail(cb: CB, reservationID: string): Promi
     roomTypeID: String(r.roomTypeID ?? ''),
     roomTypeName: String(r.roomTypeName ?? ''),
     roomName: null,
+    roomStatus: null,
     startDate: String(r.startDate ?? d.startDate ?? ''),
     endDate: String(r.endDate ?? d.endDate ?? ''),
     adults: Number(r.adults ?? 0),
@@ -242,7 +244,13 @@ export async function checkIn(cb: CB, reservationID: string) {
   for (const room of r.rooms) {
     if (!room.roomID) continue
     const occupants = await listReservations(cb, { roomID: room.roomID, status: 'checked_in' })
-    const other = occupants.find((o) => String(o.reservationID) !== reservationID)
+    let other: (typeof occupants)[number] | undefined
+    for (const o of occupants.filter((x) => String(x.reservationID) !== reservationID)) {
+      // A multi-room stay stays "checked in" while any room is; only block if THIS room is still in use.
+      const od = await getReservationDetail(cb, String(o.reservationID)).catch(() => null)
+      const there = od?.rooms.find((x) => x.roomID === room.roomID)
+      if (!od || !there || stayStatus(there.roomStatus, od.status) !== 'checked_out') { other = o; break }
+    }
     if (other) {
       throw new Error(
         `Room ${room.roomName ?? room.roomID} still has ${other.guestName ?? 'another guest'} checked in (#${other.reservationID}). Check them out first.`
@@ -279,6 +287,17 @@ export async function checkOut(cb: CB, reservationID: string) {
       throw first
     }
   }
+}
+
+/** Checks out a single room of a (multi-room) reservation. */
+export async function checkOutRoom(cb: CB, reservationID: string, roomID: string) {
+  const r = await getReservationDetail(cb, reservationID)
+  const room = r.rooms.find((x) => x.roomID === roomID)
+  if (!room) throw new Error('That room is not on this reservation')
+  await cbPost(cb, 'postRoomCheckOut', {
+    reservationID,
+    ...(room.subReservationID ? { subReservationID: room.subReservationID } : { roomID }),
+  })
 }
 
 /** Takes the reservation out of one room (or all its rooms), back to "unassigned". */

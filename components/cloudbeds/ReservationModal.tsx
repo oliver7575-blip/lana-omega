@@ -64,7 +64,7 @@ interface Detail {
   endDate: string
   adults: number
   children: number
-  rooms: { roomName: string | null; roomTypeName: string; adults?: number; children?: number }[]
+  rooms: { roomID?: string | null; roomStatus?: string | null; roomName: string | null; roomTypeName: string; adults?: number; children?: number }[]
   total: number | null
   balance: number | null
   estimatedArrivalTime: string | null
@@ -773,8 +773,15 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                           {x.roomName && (x.roomName.match(/\d+/)?.[0] ?? x.roomName.slice(0, 3)) !== x.roomName && <span className="font-bold">{x.roomName} · </span>}
                           <span className="text-[#667085]">{x.roomTypeName}</span>
                         </p>
+                        {r.rooms.length > 1 && x.roomID && (
+                          /checked.?out/i.test(String(x.roomStatus ?? '')) ? (
+                            <span className="ml-auto shrink-0 text-[11px] font-semibold text-[#667085]">Checked out</span>
+                          ) : r.status === 'checked_in' ? (
+                            <button disabled={busy} onClick={() => act({ action: 'check_out_room', roomID: x.roomID ?? '' }, `Room ${x.roomName ?? ''} checked out.`)} className="ml-auto shrink-0 rounded-full border border-[#f3cfcb] px-2 py-0.5 text-[11px] font-semibold text-[#b42318] hover:bg-[#fff5f4]">Check out room</button>
+                          ) : null
+                        )}
                         {r.rooms.length > 1 && (
-                          <p className="ml-auto shrink-0 whitespace-nowrap rounded-full bg-[#f3f5f8] px-2 py-0.5 text-[11px] font-semibold text-[#475467]">
+                          <p className={`${x.roomID && r.status === 'checked_in' ? '' : 'ml-auto '}shrink-0 whitespace-nowrap rounded-full bg-[#f3f5f8] px-2 py-0.5 text-[11px] font-semibold text-[#475467]`}>
                             {(x.adults ?? 0) + (x.children ?? 0)} guest{(x.adults ?? 0) + (x.children ?? 0) === 1 ? '' : 's'}
                             {(x.children ?? 0) > 0 ? ` · ${x.adults ?? 0}A ${x.children}C` : ''}
                           </p>

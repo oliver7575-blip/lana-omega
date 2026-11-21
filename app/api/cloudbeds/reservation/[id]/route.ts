@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { cloudbedsForCaller } from '@/lib/cloudbeds-caller'
-import { assignRoom, checkIn, checkOut, cloudbedsLinks, getGuestProfile, getReservationDetail, getReservationGuestContact, getReservationNotes, moveReservation, addReservationNote, deleteReservationNote, updateReservationNote, setArrivalTime, setStatus, setStayDates, unassignRoom } from '@/lib/cloudbeds-ops'
+import { assignRoom, checkIn, checkOut, checkOutRoom, cloudbedsLinks, getGuestProfile, getReservationDetail, getReservationGuestContact, getReservationNotes, moveReservation, addReservationNote, deleteReservationNote, updateReservationNote, setArrivalTime, setStatus, setStayDates, unassignRoom } from '@/lib/cloudbeds-ops'
 
 export const maxDuration = 60
 
@@ -91,6 +91,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       await checkIn(c.cb, id)
     } else if (body.action === 'check_out') {
       await checkOut(c.cb, id)
+    } else if (body.action === 'check_out_room') {
+      await checkOutRoom(c.cb, id, String(body.roomID))
     } else if (body.action === 'confirm') {
       await setStatus(c.cb, id, 'confirmed')
     } else if (body.action === 'cancel') {
