@@ -204,6 +204,17 @@ export async function getReservationDetail(cb: CB, reservationID: string): Promi
     children: Number(r.children ?? 0),
   }))
   const rooms = [...assigned, ...unassigned]
+  // getReservation doesn't report per-room status; the list response does (it's what the calendar reads).
+  if (rooms.some((x) => !x.roomStatus) && rooms.length > 1) {
+    try {
+      const listed = await listReservations(cb, { reservationID, includeAllRooms: true }, 1)
+      const lr = ((listed.find((x) => String(x.reservationID) === reservationID)?.rooms as Json[]) ?? [])
+      for (const x of rooms) {
+        const m = lr.find((y) => String(y.roomID ?? '') === (x.roomID ?? '\0'))
+        if (m?.roomStatus) x.roomStatus = String(m.roomStatus)
+      }
+    } catch {}
+  }
   // Contact details live on the guest entry of guestList, not at the top level.
   const guestEntry = (d.guestList as Record<string, Json> | undefined)?.[String(d.guestID ?? '')] ?? {}
   const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
