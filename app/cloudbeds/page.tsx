@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import PropertyClock from '@/components/PropertyClock'
+import WeatherCard from '@/components/cloudbeds/WeatherCard'
 import ReservationModal from '@/components/cloudbeds/ReservationModal'
 import SearchBar from '@/components/cloudbeds/SearchBar'
 import NewReservationModal from '@/components/cloudbeds/NewReservationModal'
@@ -108,6 +109,32 @@ function SrcChip({ src }: { src?: string }) {
   return <span title={b.name} className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[5px] px-1 text-[10px] font-bold text-white" style={{ background: b.color }}>{b.t}</span>
 }
 
+const DEFAULT_ORDER = ['tiles', 'weather', 'reservations', 'activity', 'nights', 'coming', 'sources']
+
+function DashBlock({ id, span, first, last, dragId, setDragId, onMove, onStep, children }: {
+  id: string; span: boolean; first: boolean; last: boolean; dragId: string | null; setDragId: (v: string | null) => void
+  onMove: (from: string, to: string) => void; onStep: (id: string, dir: -1 | 1) => void; children: React.ReactNode
+}) {
+  const [over, setOver] = useState(false)
+  const btn = 'flex h-4 w-4 items-center justify-center rounded text-[10px] leading-none text-[#9fb3dc] hover:bg-white/15 hover:text-white disabled:opacity-25'
+  return (
+    <div
+      className={`group relative min-w-0 rounded-2xl ${span ? 'xl:col-span-2' : ''} ${dragId === id ? 'opacity-50' : ''} ${over && dragId && dragId !== id ? 'ring-2 ring-[#8fb4ff]/60' : ''} [&>section]:h-full`}
+      onDragOver={(e) => { if (dragId) { e.preventDefault(); setOver(true) } }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => { e.preventDefault(); setOver(false); if (dragId) onMove(dragId, id); setDragId(null) }}
+    >
+      <div className="absolute left-1/2 top-0 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 rounded-full border border-[#8fb4ff]/30 bg-[#0e1a3d] px-1.5 py-0.5 opacity-60 shadow transition group-hover:opacity-100">
+        <button disabled={first} onClick={() => onStep(id, -1)} className={btn} aria-label="Move up">▲</button>
+        <span draggable onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', id); setDragId(id) }} onDragEnd={() => setDragId(null)}
+          title="Drag to re-order" className="cursor-grab select-none px-0.5 text-[11px] leading-none text-white/60 hover:text-white active:cursor-grabbing" aria-hidden="true">⋮⋮</span>
+        <button disabled={last} onClick={() => onStep(id, 1)} className={btn} aria-label="Move down">▼</button>
+      </div>
+      {children}
+    </div>
+  )
+}
+
 export default function DashviewPage() {
   const [summary, setSummary] = useState<Summary | null>(null)
   const [summaryError, setSummaryError] = useState<string | null>(null)
@@ -211,30 +238,42 @@ export default function DashviewPage() {
     { n: ins?.freeTonight, label: 'Free tonight', color: '#7fd6ff' },
   ]
 
-  return (
-    <div className="p-2 md:p-3">
-      <div className="min-h-[calc(100vh-1.5rem)] min-w-0 rounded-2xl p-3 text-[#eaf0fb] antialiased" style={{ background: HOLO_BG }}>
-        {/* Header — the pinned side panel carries the wordmark */}
-        <div className="mb-3 flex min-h-[56px] flex-wrap items-center gap-3">
-          <div className="mr-2 min-w-0">
-            <div className="flex h-[26px] items-center gap-2.5"><h1 className="text-[20px] font-semibold leading-tight tracking-tight text-white">Dashboard</h1><PropertyClock /></div>
-            <p className="mt-0.5 h-4 text-[11.5px] leading-4 text-[#9fb3dc]">{todayLabel || 'Today'} • Updates automatically</p>
-          </div>
-          <div className="flex-1" />
-          <Link href="/cloudbeds/calendar" className={`flex h-8 items-center gap-2 rounded-full border ${LINE} bg-white/[0.06] px-3.5 text-[12.5px] font-semibold text-[#eaf0fb] hover:bg-white/[0.12]`}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M3 9h18M8 2v4M16 2v4" /></svg>
-            Calendar
-          </Link>
-          <button onClick={refreshAll} title="Refresh (also updates automatically)" className={`h-8 w-8 rounded-full border ${LINE} bg-white/[0.06] text-[13px] text-[#eaf0fb] hover:bg-white/[0.12]`}>↻</button>
-          {summary && (
-            <button onClick={() => setCreating(true)} className={`${priGreen} !h-8 !rounded-full !px-4 !text-[12.5px]`}>+ New reservation</button>
-          )}
-        </div>
+  const [order, setOrder] = useState<string[]>(DEFAULT_ORDER)
+  const [dragId, setDragId] = useState<string | null>(null)
+  useEffect(() => {
+    try { const l = JSON.parse(localStorage.getItem('dashboard-order') ?? '[]'); if (Array.isArray(l) && l.length) setOrder(l.map(String)) } catch {}
+    cbApi<{ preferences: Record<string, unknown> }>('/api/preferences').then((j) => {
+      const r = j.preferences?.dashboard_order
+      if (Array.isArray(r) && r.length) setOrder(r.map(String))
+    }).catch(() => {})
+  }, [])
+  function saveOrder(ids: string[]) {
+    setOrder(ids)
+    try { localStorage.setItem('dashboard-order', JSON.stringify(ids)) } catch {}
+    cbApi('/api/preferences', 'PUT', { key: 'dashboard_order', value: ids }).catch(() => {})
+  }
+  function currentIds() { return [...order.filter((id) => DEFAULT_ORDER.includes(id)), ...DEFAULT_ORDER.filter((id) => !order.includes(id))] }
+  function moveBlock(from: string, to: string) {
+    if (from === to) return
+    const ids = currentIds().filter((x) => x !== from)
+    const at = ids.indexOf(to)
+    const fromIdx = currentIds().indexOf(from), toIdx = currentIds().indexOf(to)
+    ids.splice(fromIdx < toIdx ? at + 1 : at, 0, from)
+    saveOrder(ids)
+  }
+  function stepBlock(id: string, dir: -1 | 1) {
+    const ids = currentIds(); const i = ids.indexOf(id); const j = i + dir
+    if (j < 0 || j >= ids.length) return
+    ;[ids[i], ids[j]] = [ids[j], ids[i]]
+    saveOrder(ids)
+  }
 
-        {summaryError && <p className="mb-3 rounded-xl border border-[#ff6b75]/40 bg-[#ff6b75]/15 px-4 py-2 text-sm text-[#ffd0d4]">{summaryError}</p>}
-
-        {/* Top tiles */}
-        <div className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+  const blocks: Record<string, { span: boolean; node: React.ReactNode }> = {
+    weather: { span: true, node: (
+      <WeatherCard />
+    ) },
+    tiles: { span: true, node: (
+<div className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
           {stats.map((c) => (
             <div key={c.label} className={`flex items-center justify-between gap-2 rounded-2xl border ${LINE} px-4 py-3`} style={{ background: CARD_BG }}>
               <div className="min-w-0">
@@ -247,10 +286,9 @@ export default function DashviewPage() {
             </div>
           ))}
         </div>
-
-        {/* Reservations + activity */}
-        <div className="mb-3 grid gap-3 xl:grid-cols-2">
-          <Card title="Reservations" onRefresh={loadList}>
+    ) },
+    reservations: { span: false, node: (
+<Card title="Reservations" onRefresh={loadList}>
             <Segmented items={TABS} value={tab} onChange={setTab} />
             <div className="mb-3 mt-3 flex flex-wrap items-center gap-3">
               <Segmented items={[{ key: 'today', label: 'Today' }, { key: 'tomorrow', label: 'Tomorrow' }]} value={day} onChange={(k) => setDay(k as 'today' | 'tomorrow')} />
@@ -283,8 +321,9 @@ export default function DashviewPage() {
               </table>
             </div>
           </Card>
-
-          <Card title="Today's activity" onRefresh={refreshAll}>
+    ) },
+    activity: { span: false, node: (
+<Card title="Today's activity" onRefresh={refreshAll}>
             <Segmented
               items={[{ key: 'sales', label: 'Sales' }, { key: 'cancellations', label: 'Cancellations' }, { key: 'overbookings', label: 'Overbookings' }]}
               value={activity}
@@ -336,11 +375,9 @@ export default function DashviewPage() {
               </div>
             )}
           </Card>
-        </div>
-
-        {/* Insights */}
-        <div className="mb-3 grid gap-3 xl:grid-cols-2">
-          <Card title="Next 14 nights" sub={ins ? `${ins.totalRooms} rooms • avg rate ${ins.avgRate ? mxn(ins.avgRate) : '—'} / night` : undefined}>
+    ) },
+    nights: { span: false, node: (
+<Card title="Next 14 nights" sub={ins ? `${ins.totalRooms} rooms • avg rate ${ins.avgRate ? mxn(ins.avgRate) : '—'} / night` : undefined}>
             {!ins ? <p className="py-6 text-center text-[12.5px] text-[#9fb3dc]">Loading…</p> : (
               <div className="flex h-[150px] items-end gap-1.5">
                 {ins.next14.map((x, i) => (
@@ -355,8 +392,9 @@ export default function DashviewPage() {
               </div>
             )}
           </Card>
-
-          <Card title="Coming up" sub="Arrivals in the next two weeks">
+    ) },
+    coming: { span: false, node: (
+<Card title="Coming up" sub="Arrivals in the next two weeks">
             {!ins ? <p className="py-6 text-center text-[12.5px] text-[#9fb3dc]">Loading…</p> : ins.upcoming.length === 0 ? (
               <p className="py-6 text-center text-[12.5px] text-[#9fb3dc]">None available</p>
             ) : (
@@ -375,11 +413,9 @@ export default function DashviewPage() {
               </ul>
             )}
           </Card>
-
-        </div>
-
-        <div className="mb-3 grid gap-3">
-          <Card title="Where bookings come from" sub="Active and upcoming stays, next 30 days">
+    ) },
+    sources: { span: true, node: (
+<Card title="Where bookings come from" sub="Active and upcoming stays, next 30 days">
             {!ins ? <p className="py-6 text-center text-[12.5px] text-[#9fb3dc]">Loading…</p> : ins.srcList.length === 0 ? (
               <p className="py-6 text-center text-[12.5px] text-[#9fb3dc]">None available</p>
             ) : (
@@ -397,6 +433,40 @@ export default function DashviewPage() {
               </ul>
             )}
           </Card>
+    ) },
+  }
+  const shownOrder = [...order.filter((id) => id in blocks), ...DEFAULT_ORDER.filter((id) => !order.includes(id))]
+
+  return (
+    <div className="p-2 md:p-3">
+      <div className="min-h-[calc(100vh-1.5rem)] min-w-0 rounded-2xl p-3 text-[#eaf0fb] antialiased" style={{ background: HOLO_BG }}>
+        {/* Header — the pinned side panel carries the wordmark */}
+        <div className="mb-3 flex min-h-[56px] flex-wrap items-center gap-3">
+          <div className="mr-2 min-w-0">
+            <div className="flex h-[26px] items-center gap-2.5"><h1 className="text-[20px] font-semibold leading-tight tracking-tight text-white">Dashboard</h1><PropertyClock /></div>
+            <p className="mt-0.5 h-4 text-[11.5px] leading-4 text-[#9fb3dc]">{todayLabel || 'Today'} • Updates automatically</p>
+          </div>
+          <div className="flex-1" />
+          <Link href="/cloudbeds/calendar" className={`flex h-8 items-center gap-2 rounded-full border ${LINE} bg-white/[0.06] px-3.5 text-[12.5px] font-semibold text-[#eaf0fb] hover:bg-white/[0.12]`}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M3 9h18M8 2v4M16 2v4" /></svg>
+            Calendar
+          </Link>
+          <button onClick={refreshAll} title="Refresh (also updates automatically)" className={`h-8 w-8 rounded-full border ${LINE} bg-white/[0.06] text-[13px] text-[#eaf0fb] hover:bg-white/[0.12]`}>↻</button>
+          {summary && (
+            <button onClick={() => setCreating(true)} className={`${priGreen} !h-8 !rounded-full !px-4 !text-[12.5px]`}>+ New reservation</button>
+          )}
+        </div>
+
+        {summaryError && <p className="mb-3 rounded-xl border border-[#ff6b75]/40 bg-[#ff6b75]/15 px-4 py-2 text-sm text-[#ffd0d4]">{summaryError}</p>}
+
+                {/* Everything below can be rearranged: drag the little handle on a block, or use its arrows. */}
+        <div className="mb-3 grid gap-3 pt-2 xl:grid-cols-2">
+          {shownOrder.map((id) => (
+            <DashBlock key={id} id={id} span={blocks[id].span} first={shownOrder[0] === id} last={shownOrder[shownOrder.length - 1] === id}
+              dragId={dragId} setDragId={setDragId} onMove={moveBlock} onStep={stepBlock}>
+              {blocks[id].node}
+            </DashBlock>
+          ))}
         </div>
 
         <div className="flex justify-center pb-1">

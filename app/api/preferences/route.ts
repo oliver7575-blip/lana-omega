@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 // Per-user view preferences, kept on the staff member's own record so they follow them across browsers.
-const KEYS = new Set(['calendar_room_type_order'])
+const KEYS = new Set(['calendar_room_type_order', 'dashboard_order'])
 
 async function me() {
   const supabase = await createClient()
@@ -26,7 +26,7 @@ export async function PUT(request: Request) {
   if ('error' in c) return c.error
   const { key, value } = (await request.json().catch(() => ({}))) as { key?: string; value?: unknown }
   if (!key || !KEYS.has(key)) return NextResponse.json({ error: 'Unknown preference' }, { status: 400 })
-  if (key === 'calendar_room_type_order' && !(Array.isArray(value) && value.length <= 100 && value.every((v) => typeof v === 'string' && v.length < 64))) {
+  if (!(Array.isArray(value) && value.length <= 100 && value.every((v) => typeof v === 'string' && v.length < 64))) {
     return NextResponse.json({ error: 'Invalid value' }, { status: 400 })
   }
   const { error } = await c.supabase.from('staff_users').update({ preferences: { ...c.preferences, [key]: value } }).eq('id', c.id)
