@@ -5,12 +5,13 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        paper: '#0b1633', // page background
-        surface: '#101d47', // cards and panels
-        line: '#2c4785', // borders
-        navy: '#e7e9f0', // main text (light on dark)
-        clay: '#6aa2ff', // accent
-        ink: '#1d3a78', // dark buttons
+        // Theme colours live in app/globals.css (dark by default, [data-theme=light] for the off-white look).
+        paper: 'rgb(var(--paper) / <alpha-value>)', // page background
+        surface: 'rgb(var(--surface) / <alpha-value>)', // cards and panels
+        line: 'rgb(var(--line) / <alpha-value>)', // borders
+        navy: 'rgb(var(--navy) / <alpha-value>)', // main text
+        clay: 'rgb(var(--clay) / <alpha-value>)', // accent
+        ink: 'rgb(var(--ink) / <alpha-value>)', // dark buttons
       },
       fontFamily: {
         body: ['var(--font-inter)', 'sans-serif'],

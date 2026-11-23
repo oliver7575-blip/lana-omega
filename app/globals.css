@@ -2,13 +2,55 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Colour themes. Dark is the original Soirée blue; light is an off-white version of the same layout. */
+:root {
+  --paper: 11 22 51;
+  --surface: 16 29 71;
+  --line: 44 71 133;
+  --navy: 231 233 240;
+  --clay: 106 162 255;
+  --ink: 29 58 120;
+  --body-bg: #0a1230;
+  --holo-bg: repeating-radial-gradient(circle at 92% 8%, transparent 0, transparent 58px, rgba(143, 180, 255, 0.03) 58px, rgba(143, 180, 255, 0.03) 59px), linear-gradient(rgba(143, 180, 255, 0.042) 1px, transparent 1px) 0 0 / 44px 44px, linear-gradient(90deg, rgba(143, 180, 255, 0.042) 1px, transparent 1px) 0 0 / 44px 44px, radial-gradient(900px 520px at 0% 0%, rgba(70, 120, 240, 0.24), transparent 62%), radial-gradient(900px 520px at 100% 100%, rgba(100, 80, 220, 0.156), transparent 62%), linear-gradient(180deg, #112148, #0a1531);
+  --card-bg: rgba(22, 40, 92, 0.5);
+  --cal-head: #0e1a3d;
+  --cal-room: #142350;
+  --ov-a: rgba(255, 255, 255, 0.09);
+  --ov-b: rgba(255, 255, 255, 0.02);
+  --ov-c: rgba(255, 255, 255, 0.07);
+  --mark-a: rgba(143, 180, 255, 0.1);
+  --mark-b: rgba(143, 180, 255, 0.38);
+  --mark-c: rgba(143, 180, 255, 0.03);
+  color-scheme: dark;
+}
+html[data-theme='light'] {
+  --paper: 238 234 225;
+  --surface: 249 247 242;
+  --line: 214 208 195;
+  --navy: 31 42 68;
+  --clay: 47 98 201;
+  --ink: 42 74 143;
+  --body-bg: #e9e5da;
+  --holo-bg: repeating-radial-gradient(circle at 92% 8%, transparent 0, transparent 58px, rgba(60, 80, 130, 0.035) 58px, rgba(60, 80, 130, 0.035) 59px), linear-gradient(rgba(60, 80, 130, 0.045) 1px, transparent 1px) 0 0 / 44px 44px, linear-gradient(90deg, rgba(60, 80, 130, 0.045) 1px, transparent 1px) 0 0 / 44px 44px, radial-gradient(900px 520px at 0% 0%, rgba(120, 160, 240, 0.16), transparent 62%), radial-gradient(900px 520px at 100% 100%, rgba(200, 170, 120, 0.14), transparent 62%), linear-gradient(180deg, #f9f7f1, #f1ede3);
+  --card-bg: rgba(255, 255, 255, 0.72);
+  --cal-head: #efebe1;
+  --cal-room: #f5f2ea;
+  --ov-a: rgba(40, 55, 90, 0.07);
+  --ov-b: rgba(40, 55, 90, 0.015);
+  --ov-c: rgba(40, 55, 90, 0.05);
+  --mark-a: rgba(47, 98, 201, 0.09);
+  --mark-b: rgba(47, 98, 201, 0.35);
+  --mark-c: rgba(47, 98, 201, 0.03);
+  color-scheme: light;
+}
+
 html {
   /* Denser than the browser default, like Beta's panel. */
   font-size: 14px;
 }
 body {
-  background: #0a1230;
-  color: #e7e9f0;
+  background: var(--body-bg);
+  color: rgb(var(--navy));
 }
 ::selection {
   background: #c0574a;

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import PropertyClock from '@/components/PropertyClock'
+import { tone, useTheme } from '@/lib/theme'
 import WeatherCard from '@/components/cloudbeds/WeatherCard'
 import ReservationModal from '@/components/cloudbeds/ReservationModal'
 import SearchBar from '@/components/cloudbeds/SearchBar'
@@ -39,7 +40,7 @@ const TABS = [
   { key: 'inhouse', label: 'In-House Guests' },
 ]
 
-const CARD_BG = 'rgba(22,40,92,.5)'
+const CARD_BG = 'var(--card-bg)'
 const LINE = 'border-[#8fb4ff]/25'
 const BLUE = '#5b95f5'
 const GREEN = '#3ccf8a'
@@ -90,13 +91,15 @@ function Segmented({ items, value, onChange }: { items: { key: string; label: st
 }
 
 function StatusPill({ label, status }: { label: string; status: string }) {
+  const theme = useTheme()
   const k = status.toLowerCase()
-  const c =
+  const c0 =
     k === 'checked_in' || k === 'in_house' ? GREEN
     : k === 'checked_out' ? GREY
     : k === 'not_confirmed' ? AMBER
     : k === 'canceled' || k === 'cancelled' ? '#ff6b75'
     : BLUE
+  const c = tone(c0, theme)
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold capitalize" style={{ borderColor: `${c}66`, background: `${c}22`, color: c }}>
       <span className="h-1.5 w-1.5 rounded-full" style={{ background: c }} />{label}
@@ -136,6 +139,7 @@ function DashBlock({ id, span, first, last, dragId, setDragId, onMove, onStep, c
 }
 
 export default function DashviewPage() {
+  const theme = useTheme()
   const [summary, setSummary] = useState<Summary | null>(null)
   const [summaryError, setSummaryError] = useState<string | null>(null)
   const [tab, setTab] = useState('arrivals')
@@ -231,11 +235,11 @@ export default function DashviewPage() {
   const tableWrap = `overflow-x-auto rounded-xl border ${LINE} bg-[#0d1938]/40`
 
   const stats = [
-    { n: summary?.arrivals, label: 'Arrivals', color: GREEN },
-    { n: summary?.departures, label: 'Departures', color: AMBER },
-    { n: summary?.stayovers, label: 'Stay overs', color: '#a58cff' },
-    { n: summary?.roomsOccupied, label: 'Accommodations booked', color: BLUE, pct: summary?.percentageOccupied },
-    { n: ins?.freeTonight, label: 'Free tonight', color: '#7fd6ff' },
+    { n: summary?.arrivals, label: 'Arrivals', color: tone(GREEN, theme) },
+    { n: summary?.departures, label: 'Departures', color: tone(AMBER, theme) },
+    { n: summary?.stayovers, label: 'Stay overs', color: tone('#a58cff', theme) },
+    { n: summary?.roomsOccupied, label: 'Accommodations booked', color: tone(BLUE, theme), pct: summary?.percentageOccupied },
+    { n: ins?.freeTonight, label: 'Free tonight', color: tone('#7fd6ff', theme) },
   ]
 
   const [order, setOrder] = useState<string[]>(DEFAULT_ORDER)

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { setTheme, useTheme } from '@/lib/theme'
 
 const STARTER_TEMPLATE = [
   'You are the AI concierge for [HOTEL NAME], a [TYPE OF PROPERTY] in [CITY, COUNTRY].',
@@ -36,6 +37,26 @@ const STARTER_TEMPLATE = [
 interface PlaygroundMessage {
   role: 'user' | 'assistant'
   content: string
+}
+
+function ThemeToggle() {
+  const theme = useTheme()
+  const opt = (value: 'dark' | 'light', label: string) => (
+    <button
+      type="button"
+      onClick={() => setTheme(value)}
+      aria-pressed={theme === value}
+      style={{ borderRadius: 999, padding: '6px 16px', fontWeight: theme === value ? 600 : 400, outline: theme === value ? '2px solid #6aa2ff' : 'none' }}
+    >
+      {label}
+    </button>
+  )
+  return (
+    <div style={{ display: 'flex', gap: 8 }} role="group" aria-label="Theme">
+      {opt('dark', '🌙 Dark')}
+      {opt('light', '☀️ Light')}
+    </div>
+  )
 }
 
 export default function SettingsPage() {
@@ -347,6 +368,14 @@ export default function SettingsPage() {
       </p>
       <h1>Settings</h1>
       <p style={{ color: 'rgba(231,233,240,0.55)' }}>Status: {status}</p>
+
+      <div style={{ marginTop: 16, border: '1px solid #34508f', borderRadius: 8, padding: 16 }}>
+        <h2 style={{ marginTop: 0 }}>Appearance</h2>
+        <p style={{ fontSize: 13, color: 'rgba(231,233,240,0.55)', marginTop: 0 }}>
+          Switch the whole panel between the blue dark look and an off-white light look. Saved on your account, so it follows you to other devices.
+        </p>
+        <ThemeToggle />
+      </div>
 
       {status === 'onboarding' && canEdit && (
         <div

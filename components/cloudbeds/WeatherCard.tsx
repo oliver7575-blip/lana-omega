@@ -37,7 +37,7 @@ export default function WeatherCard() {
   }, [])
 
   const shell = `rounded-2xl border ${LINE} p-4`
-  const bg = { background: 'rgba(22,40,92,.5)' }
+  const bg = { background: 'var(--card-bg)' }
   if (!w) return <div className={shell} style={bg}><p className="py-3 text-center text-[12.5px] text-[#9fb3dc]">{err ? `Weather unavailable right now (${err})` : 'Loading weather…'}</p></div>
 
   const now = describe(w.now.code)

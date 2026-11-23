@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import LiveRefresh from './LiveRefresh'
+import { syncThemeFromAccount } from '@/lib/theme'
 import { HOLO_BG } from '@/components/cloudbeds/ui'
 import {
   AlertIcon,
@@ -70,6 +71,7 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
   }, [bare, pathname, tick])
 
   useEffect(() => setOpen(false), [pathname])
+  useEffect(() => { if (!bare) syncThemeFromAccount() }, [bare])
 
   // Full-screen calendar: the side menu slides out when the pointer touches the left edge of the window
   // and tucks away again once the pointer moves off it. It is a rounded panel inset like the calendar card, covering just the strip the calendar's

@@ -52,8 +52,8 @@ const BAR_FILL: Record<string, [string, string]> = {
   [EDGE.checked_in]: ['#5fa386', '#4a8a6f'],
   [EDGE.checked_out]: ['#7e8a9f', '#6a768b'],
 }
-const HEAD_BG = '#0e1a3d'
-const ROOM_BG = '#142350'
+const HEAD_BG = 'var(--cal-head)'
+const ROOM_BG = 'var(--cal-room)'
 
 function addDays(d: string, n: number) {
   const x = new Date(`${d}T12:00:00Z`)
@@ -813,7 +813,7 @@ export default function CalendarPage() {
         {!data && !error && <p className="py-10 text-center text-sm text-[#8a9bb0]">Loading the calendar…</p>}
 
         {data && (
-          <div ref={scroller} onScroll={onScroll} onMouseLeave={() => setHoverDay(null)} className="relative overflow-x-auto rounded-3xl border border-[#8fb4ff]/25 shadow-[0_0_40px_rgba(143,180,255,.08),0_24px_60px_rgba(0,0,0,.45)]" style={{ background: 'rgba(22,40,92,.5)' }}>
+          <div ref={scroller} onScroll={onScroll} onMouseLeave={() => setHoverDay(null)} className="relative overflow-x-auto rounded-3xl border border-[#8fb4ff]/25 shadow-[0_0_40px_rgba(143,180,255,.08),0_24px_60px_rgba(0,0,0,.45)]" style={{ background: 'var(--card-bg)' }}>
             {loading && (
               <div className="pointer-events-none sticky top-0 left-0 z-30 h-0">
                 <span className="absolute left-2 top-1 rounded bg-[#0e1a3d] px-2 py-0.5 text-[10px] text-[#9aa8bb] shadow">Loading {loading === 'past' ? 'earlier' : 'later'} days…</span>
@@ -823,13 +823,13 @@ export default function CalendarPage() {
               {markDay && data.days.includes(markDay) && (
                 <div className="pointer-events-none absolute bottom-0 top-0 z-[5]" style={{
                   left: LEFT_W + data.days.indexOf(markDay) * dayW, width: dayW,
-                  background: 'rgba(143,180,255,.10)', boxShadow: 'inset 1px 0 0 rgba(143,180,255,.38), inset -1px 0 0 rgba(143,180,255,.38)',
+                  background: 'var(--mark-a)', boxShadow: 'inset 1px 0 0 var(--mark-b), inset -1px 0 0 var(--mark-b)',
                 }} />
               )}
               {data.days.includes(data.today) && (
                 <div className="pointer-events-none absolute bottom-0 z-[5] w-px" style={{
                   left: LEFT_W + data.days.indexOf(data.today) * dayW + dayW / 2 - 0.5, top: MONTH_ROW_H + PCT_ROW_H + DAY_ROW_H,
-                  background: 'linear-gradient(180deg,rgba(143,180,255,.38),rgba(143,180,255,.03))',
+                  background: 'linear-gradient(180deg,var(--mark-b),var(--mark-c))',
                 }} />
               )}
               <div className="sticky top-0 z-20 flex border-b border-white/10 text-[9px] font-semibold text-[#6f7f94]" style={{ background: HEAD_BG }}>
@@ -849,7 +849,7 @@ export default function CalendarPage() {
                   return (
                     <div key={d} className={`relative flex items-center justify-center border-r border-white/[.06] ${isToday ? 'text-[#8fb4ff]' : ''}`} style={{ width: dayW, minWidth: dayW, height: PCT_ROW_H }}>
                       {pct.toFixed(0)}%
-                      <i className="absolute bottom-0 left-1/2 h-[2px] -translate-x-1/2 rounded-full" style={{ width: dayW * 0.55, background: `linear-gradient(90deg,#8fb4ff ${pct}%,rgba(255,255,255,.1) ${pct}%)` }} />
+                      <i className="absolute bottom-0 left-1/2 h-[2px] -translate-x-1/2 rounded-full" style={{ width: dayW * 0.55, background: `linear-gradient(90deg,#8fb4ff ${pct}%,var(--ov-a) ${pct}%)` }} />
                     </div>
                   )
                 })}
@@ -865,7 +865,7 @@ export default function CalendarPage() {
                       onClick={() => setMarkDay((m) => (m === d ? null : d))}
                       title={markDay === d ? 'Click to unmark this day' : 'Click to mark this whole day'}
                       className={`flex cursor-pointer flex-col items-center justify-center border-r border-white/[.06] text-center leading-tight ${dt.getUTCDate() === 1 ? 'border-l-2 border-l-[#8fb4ff]/30' : ''} ${d === hoverDay ? 'bg-white/[.06]' : ''}`}
-                      style={{ width: dayW, minWidth: dayW, height: DAY_ROW_H, backgroundImage: isToday ? 'linear-gradient(180deg,rgba(143,180,255,.10),rgba(143,180,255,0))' : undefined }}>
+                      style={{ width: dayW, minWidth: dayW, height: DAY_ROW_H, backgroundImage: isToday ? 'linear-gradient(180deg,var(--mark-a),transparent)' : undefined }}>
                       <span className="text-[9.5px] font-medium text-[#8a9bb0]">{dt.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })}</span>
                       <span className={`mt-px flex h-5 min-w-5 items-center justify-center rounded-full text-[11.5px] font-bold ${isToday ? 'border border-[#8fb4ff]/50 bg-[#8fb4ff]/15 text-[#8fb4ff]' : markDay === d ? 'bg-white/15 text-white' : 'text-white'}`}>{dt.getUTCDate()}</span>
                     </div>
@@ -878,7 +878,7 @@ export default function CalendarPage() {
                 const unassigned = data.unassigned.filter((u) => u.roomTypeID === t.id)
                                 return (
                   <div key={t.id} className="border-b border-white/10">
-                    <div className="flex border-t border-white/[.12] text-[9px]" style={{ backgroundImage: 'linear-gradient(90deg,rgba(255,255,255,.09),rgba(255,255,255,.02))' }}>
+                    <div className="flex border-t border-white/[.12] text-[9px]" style={{ backgroundImage: 'linear-gradient(90deg,var(--ov-a),var(--ov-b))' }}>
                       <div
                         draggable
                         onDragStart={() => setDragType(t.id)}
@@ -886,7 +886,7 @@ export default function CalendarPage() {
                         onDrop={() => { if (dragType) moveType(dragType, t.id); setDragType(null) }}
                         onDragEnd={() => setDragType(null)}
                         className={`sticky left-0 z-10 flex items-center border-r border-white/10 pr-1 ${dragType === t.id ? 'opacity-50' : ''} ${dragType && dragType !== t.id ? 'outline-dashed outline-1 -outline-offset-2 outline-[#8fb4ff]/50' : ''}`}
-                        style={{ width: LEFT_W, minWidth: LEFT_W, height: TYPE_ROW_H, backgroundColor: HEAD_BG, backgroundImage: 'linear-gradient(rgba(255,255,255,.07),rgba(255,255,255,.07))' }}
+                        style={{ width: LEFT_W, minWidth: LEFT_W, height: TYPE_ROW_H, backgroundColor: HEAD_BG, backgroundImage: 'linear-gradient(var(--ov-c),var(--ov-c))' }}
                       >
                                                 <span title="Drag to re-order" className="cursor-grab select-none px-0.5 text-[11px] leading-none text-white/30 hover:text-white/70" aria-hidden="true">⋮⋮</span>
                         <button
@@ -989,7 +989,7 @@ export default function CalendarPage() {
                               )
                             })}
                             <div className="pointer-events-none absolute inset-0" style={{
-                              backgroundImage: 'linear-gradient(to left, rgba(143,180,255,.09) 1px, transparent 1px)',
+                              backgroundImage: 'linear-gradient(to left, var(--mark-a) 1px, transparent 1px)',
                               backgroundSize: `${dayW}px 100%`,
                             }} />
                             {blocks.map((b, i) => {

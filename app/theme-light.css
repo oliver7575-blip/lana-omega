@@ -1,0 +1,195 @@
+/*
+ * Light theme (off-white). The colour tokens (paper, surface, line, navy, clay, ink) and the page backgrounds
+ * switch through CSS variables in globals.css; this file flips the dark-only utility classes and inline colours
+ * that are hard-coded on the dark pages. Everything is scoped to html[data-theme="light"], so dark mode is untouched.
+ */
+html[data-theme="light"] .text-\[\#9fb3dc\]:not([class*="bg-gradient"] *) { color:#5f6f8f !important }
+html[data-theme="light"] .hover\:text-\[\#9fb3dc\]:not([class*="bg-gradient"] *):hover { color:#5f6f8f !important }
+html[data-theme="light"] .placeholder\:text-\[\#9fb3dc\]:not([class*="bg-gradient"] *)::placeholder { color:#5f6f8f !important }
+html[data-theme="light"] .text-\[\#eaf0fb\]:not([class*="bg-gradient"] *) { color:#1f2a44 !important }
+html[data-theme="light"] .hover\:text-\[\#eaf0fb\]:not([class*="bg-gradient"] *):hover { color:#1f2a44 !important }
+html[data-theme="light"] .placeholder\:text-\[\#eaf0fb\]:not([class*="bg-gradient"] *)::placeholder { color:#1f2a44 !important }
+html[data-theme="light"] .text-\[\#8fb4ff\]:not([class*="bg-gradient"] *) { color:#2f62c9 !important }
+html[data-theme="light"] .hover\:text-\[\#8fb4ff\]:not([class*="bg-gradient"] *):hover { color:#2f62c9 !important }
+html[data-theme="light"] .placeholder\:text-\[\#8fb4ff\]:not([class*="bg-gradient"] *)::placeholder { color:#2f62c9 !important }
+html[data-theme="light"] .text-\[\#cfdcff\]:not([class*="bg-gradient"] *) { color:#33466e !important }
+html[data-theme="light"] .hover\:text-\[\#cfdcff\]:not([class*="bg-gradient"] *):hover { color:#33466e !important }
+html[data-theme="light"] .placeholder\:text-\[\#cfdcff\]:not([class*="bg-gradient"] *)::placeholder { color:#33466e !important }
+html[data-theme="light"] .text-\[\#b9c9ee\]:not([class*="bg-gradient"] *) { color:#46587d !important }
+html[data-theme="light"] .hover\:text-\[\#b9c9ee\]:not([class*="bg-gradient"] *):hover { color:#46587d !important }
+html[data-theme="light"] .placeholder\:text-\[\#b9c9ee\]:not([class*="bg-gradient"] *)::placeholder { color:#46587d !important }
+html[data-theme="light"] .text-\[\#8ea3cf\]:not([class*="bg-gradient"] *) { color:#7585a5 !important }
+html[data-theme="light"] .hover\:text-\[\#8ea3cf\]:not([class*="bg-gradient"] *):hover { color:#7585a5 !important }
+html[data-theme="light"] .placeholder\:text-\[\#8ea3cf\]:not([class*="bg-gradient"] *)::placeholder { color:#7585a5 !important }
+html[data-theme="light"] .text-\[\#7b8aa8\]:not([class*="bg-gradient"] *) { color:#6a7893 !important }
+html[data-theme="light"] .hover\:text-\[\#7b8aa8\]:not([class*="bg-gradient"] *):hover { color:#6a7893 !important }
+html[data-theme="light"] .placeholder\:text-\[\#7b8aa8\]:not([class*="bg-gradient"] *)::placeholder { color:#6a7893 !important }
+html[data-theme="light"] .text-\[\#7b8494\]:not([class*="bg-gradient"] *) { color:#6a7893 !important }
+html[data-theme="light"] .hover\:text-\[\#7b8494\]:not([class*="bg-gradient"] *):hover { color:#6a7893 !important }
+html[data-theme="light"] .placeholder\:text-\[\#7b8494\]:not([class*="bg-gradient"] *)::placeholder { color:#6a7893 !important }
+html[data-theme="light"] .text-\[\#9aa8bb\]:not([class*="bg-gradient"] *) { color:#6a7893 !important }
+html[data-theme="light"] .hover\:text-\[\#9aa8bb\]:not([class*="bg-gradient"] *):hover { color:#6a7893 !important }
+html[data-theme="light"] .placeholder\:text-\[\#9aa8bb\]:not([class*="bg-gradient"] *)::placeholder { color:#6a7893 !important }
+html[data-theme="light"] .text-\[\#9fb8ca\]:not([class*="bg-gradient"] *) { color:#62768c !important }
+html[data-theme="light"] .hover\:text-\[\#9fb8ca\]:not([class*="bg-gradient"] *):hover { color:#62768c !important }
+html[data-theme="light"] .placeholder\:text-\[\#9fb8ca\]:not([class*="bg-gradient"] *)::placeholder { color:#62768c !important }
+html[data-theme="light"] .text-\[\#b7c9d8\]:not([class*="bg-gradient"] *) { color:#55697d !important }
+html[data-theme="light"] .hover\:text-\[\#b7c9d8\]:not([class*="bg-gradient"] *):hover { color:#55697d !important }
+html[data-theme="light"] .placeholder\:text-\[\#b7c9d8\]:not([class*="bg-gradient"] *)::placeholder { color:#55697d !important }
+html[data-theme="light"] .text-\[\#dbe5f1\]:not([class*="bg-gradient"] *) { color:#2b3a55 !important }
+html[data-theme="light"] .hover\:text-\[\#dbe5f1\]:not([class*="bg-gradient"] *):hover { color:#2b3a55 !important }
+html[data-theme="light"] .placeholder\:text-\[\#dbe5f1\]:not([class*="bg-gradient"] *)::placeholder { color:#2b3a55 !important }
+html[data-theme="light"] .text-\[\#c9d6f0\]:not([class*="bg-gradient"] *) { color:#3a4b6e !important }
+html[data-theme="light"] .hover\:text-\[\#c9d6f0\]:not([class*="bg-gradient"] *):hover { color:#3a4b6e !important }
+html[data-theme="light"] .placeholder\:text-\[\#c9d6f0\]:not([class*="bg-gradient"] *)::placeholder { color:#3a4b6e !important }
+html[data-theme="light"] .text-\[\#f1f4f9\]:not([class*="bg-gradient"] *) { color:#1f2a44 !important }
+html[data-theme="light"] .hover\:text-\[\#f1f4f9\]:not([class*="bg-gradient"] *):hover { color:#1f2a44 !important }
+html[data-theme="light"] .placeholder\:text-\[\#f1f4f9\]:not([class*="bg-gradient"] *)::placeholder { color:#1f2a44 !important }
+html[data-theme="light"] .text-\[\#8dacff\]:not([class*="bg-gradient"] *) { color:#2f62c9 !important }
+html[data-theme="light"] .hover\:text-\[\#8dacff\]:not([class*="bg-gradient"] *):hover { color:#2f62c9 !important }
+html[data-theme="light"] .placeholder\:text-\[\#8dacff\]:not([class*="bg-gradient"] *)::placeholder { color:#2f62c9 !important }
+html[data-theme="light"] .text-\[\#5ec2ff\]:not([class*="bg-gradient"] *) { color:#1b7fb5 !important }
+html[data-theme="light"] .hover\:text-\[\#5ec2ff\]:not([class*="bg-gradient"] *):hover { color:#1b7fb5 !important }
+html[data-theme="light"] .placeholder\:text-\[\#5ec2ff\]:not([class*="bg-gradient"] *)::placeholder { color:#1b7fb5 !important }
+html[data-theme="light"] .text-\[\#ffd0d4\]:not([class*="bg-gradient"] *) { color:#a3362b !important }
+html[data-theme="light"] .hover\:text-\[\#ffd0d4\]:not([class*="bg-gradient"] *):hover { color:#a3362b !important }
+html[data-theme="light"] .placeholder\:text-\[\#ffd0d4\]:not([class*="bg-gradient"] *)::placeholder { color:#a3362b !important }
+html[data-theme="light"] .text-\[\#ffb3ab\]:not([class*="bg-gradient"] *) { color:#b54434 !important }
+html[data-theme="light"] .hover\:text-\[\#ffb3ab\]:not([class*="bg-gradient"] *):hover { color:#b54434 !important }
+html[data-theme="light"] .placeholder\:text-\[\#ffb3ab\]:not([class*="bg-gradient"] *)::placeholder { color:#b54434 !important }
+html[data-theme="light"] .text-\[\#f5d58a\]:not([class*="bg-gradient"] *) { color:#8a5a00 !important }
+html[data-theme="light"] .hover\:text-\[\#f5d58a\]:not([class*="bg-gradient"] *):hover { color:#8a5a00 !important }
+html[data-theme="light"] .placeholder\:text-\[\#f5d58a\]:not([class*="bg-gradient"] *)::placeholder { color:#8a5a00 !important }
+html[data-theme="light"] .text-\[\#ffcf80\]:not([class*="bg-gradient"] *) { color:#9a5a00 !important }
+html[data-theme="light"] .hover\:text-\[\#ffcf80\]:not([class*="bg-gradient"] *):hover { color:#9a5a00 !important }
+html[data-theme="light"] .placeholder\:text-\[\#ffcf80\]:not([class*="bg-gradient"] *)::placeholder { color:#9a5a00 !important }
+html[data-theme="light"] .text-\[\#7be8b4\]:not([class*="bg-gradient"] *) { color:#0e7a56 !important }
+html[data-theme="light"] .hover\:text-\[\#7be8b4\]:not([class*="bg-gradient"] *):hover { color:#0e7a56 !important }
+html[data-theme="light"] .placeholder\:text-\[\#7be8b4\]:not([class*="bg-gradient"] *)::placeholder { color:#0e7a56 !important }
+html[data-theme="light"] .text-\[\#c9b8ff\]:not([class*="bg-gradient"] *) { color:#5b2ea6 !important }
+html[data-theme="light"] .hover\:text-\[\#c9b8ff\]:not([class*="bg-gradient"] *):hover { color:#5b2ea6 !important }
+html[data-theme="light"] .placeholder\:text-\[\#c9b8ff\]:not([class*="bg-gradient"] *)::placeholder { color:#5b2ea6 !important }
+html[data-theme="light"] .text-\[\#f0b548\]:not([class*="bg-gradient"] *) { color:#a8741c !important }
+html[data-theme="light"] .hover\:text-\[\#f0b548\]:not([class*="bg-gradient"] *):hover { color:#a8741c !important }
+html[data-theme="light"] .placeholder\:text-\[\#f0b548\]:not([class*="bg-gradient"] *)::placeholder { color:#a8741c !important }
+html[data-theme="light"] .text-\[\#3ccf8a\]:not([class*="bg-gradient"] *) { color:#1a8f6c !important }
+html[data-theme="light"] .hover\:text-\[\#3ccf8a\]:not([class*="bg-gradient"] *):hover { color:#1a8f6c !important }
+html[data-theme="light"] .placeholder\:text-\[\#3ccf8a\]:not([class*="bg-gradient"] *)::placeholder { color:#1a8f6c !important }
+html[data-theme="light"] .text-\[\#8a9bb0\]:not([class*="bg-gradient"] *) { color:#6a7893 !important }
+html[data-theme="light"] .hover\:text-\[\#8a9bb0\]:not([class*="bg-gradient"] *):hover { color:#6a7893 !important }
+html[data-theme="light"] .placeholder\:text-\[\#8a9bb0\]:not([class*="bg-gradient"] *)::placeholder { color:#6a7893 !important }
+html[data-theme="light"] .text-\[\#6f7f94\]:not([class*="bg-gradient"] *) { color:#6a7893 !important }
+html[data-theme="light"] .hover\:text-\[\#6f7f94\]:not([class*="bg-gradient"] *):hover { color:#6a7893 !important }
+html[data-theme="light"] .placeholder\:text-\[\#6f7f94\]:not([class*="bg-gradient"] *)::placeholder { color:#6a7893 !important }
+html[data-theme="light"] .text-\[\#8a93a3\]:not([class*="bg-gradient"] *) { color:#6a7893 !important }
+html[data-theme="light"] .hover\:text-\[\#8a93a3\]:not([class*="bg-gradient"] *):hover { color:#6a7893 !important }
+html[data-theme="light"] .placeholder\:text-\[\#8a93a3\]:not([class*="bg-gradient"] *)::placeholder { color:#6a7893 !important }
+html[data-theme="light"] .text-\[\#5b95f5\]:not([class*="bg-gradient"] *) { color:#2f62c9 !important }
+html[data-theme="light"] .hover\:text-\[\#5b95f5\]:not([class*="bg-gradient"] *):hover { color:#2f62c9 !important }
+html[data-theme="light"] .placeholder\:text-\[\#5b95f5\]:not([class*="bg-gradient"] *)::placeholder { color:#2f62c9 !important }
+html[data-theme="light"] .text-white:not([class*="bg-[#0e5f47]"]):not([class*="bg-[#128c7e]"]):not([class*="bg-[#14213d]"]):not([class*="bg-[#14213d]/40"]):not([class*="bg-[#14213d]/45"]):not([class*="bg-[#16285c]/50"]):not([class*="bg-[#188a69]"]):not([class*="bg-[#1b2340]"]):not([class*="bg-[#1d3a78]"]):not([class*="bg-[#1f2848]"]):not([class*="bg-[#1f9d78]"]):not([class*="bg-[#2456b8]"]):not([class*="bg-[#2a2147]"]):not([class*="bg-[#35b876]"]):not([class*="bg-[#3ccf8a]"]):not([class*="bg-[#3ccf8a]/30"]):not([class*="bg-[#4a1a1a]"]):not([class*="bg-[#4ade9f]"]):not([class*="bg-[#5b95f5]/10"]):not([class*="bg-[#8fb4ff]"]):not([class*="bg-[#8fb4ff]/15"]):not([class*="bg-[#8fb4ff]/25"]):not([class*="bg-[#c0574a]"]):not([class*="bg-[#cbd5e1]"]):not([class*="bg-[#d7f0e6]"]):not([class*="bg-[#d9f0ea]"]):not([class*="bg-[#dfe5e3]"]):not([class*="bg-[#e0f3ec]"]):not([class*="bg-[#e3e8f4]"]):not([class*="bg-[#e3edff]"]):not([class*="bg-[#e6f5f0]"]):not([class*="bg-[#e8eef0]"]):not([class*="bg-[#e9f5ef]"]):not([class*="bg-[#eaf1fd]"]):not([class*="bg-[#eaf8f2]"]):not([class*="bg-[#eef0f4]"]):not([class*="bg-[#eefaf5]"]):not([class*="bg-[#ef4d3f]"]):not([class*="bg-[#efe6fb]"]):not([class*="bg-[#f0b548]"]):not([class*="bg-[#f0b548]/15"]):not([class*="bg-[#f0b548]/25"]):not([class*="bg-[#f0faf6]"]):not([class*="bg-[#f3d9d5]"]):not([class*="bg-[#f3f5f8]"]):not([class*="bg-[#f3f7ff]"]):not([class*="bg-[#f6f3ec]"]):not([class*="bg-[#f6f8f9]"]):not([class*="bg-[#f6f8fb]"]):not([class*="bg-[#fbfbfc]"]):not([class*="bg-[#ff4d5a]"]):not([class*="bg-[#ff4d5a]/20"]):not([class*="bg-[#ff5d6c]"]):not([class*="bg-[#ff6b75]/15"]):not([class*="bg-[#fff0ed]"]):not([class*="bg-[#fff0ee]"]):not([class*="bg-[#fff4f2]"]):not([class*="bg-[#fff5f4]"]):not([class*="bg-[#fff9e8]"]):not([class*="bg-[#fffafa]"]):not([class*="bg-gradient"]):not([class*="bg-ink"]):not([class*="bg-clay"]):not([class*="bg-gradient"] *):not(.keep-white):not(.keep-white *) { color:rgba(27,37,64,1) !important }
+html[data-theme="light"] .text-white\/70:not([class*="bg-[#0e5f47]"]):not([class*="bg-[#128c7e]"]):not([class*="bg-[#14213d]"]):not([class*="bg-[#14213d]/40"]):not([class*="bg-[#14213d]/45"]):not([class*="bg-[#16285c]/50"]):not([class*="bg-[#188a69]"]):not([class*="bg-[#1b2340]"]):not([class*="bg-[#1d3a78]"]):not([class*="bg-[#1f2848]"]):not([class*="bg-[#1f9d78]"]):not([class*="bg-[#2456b8]"]):not([class*="bg-[#2a2147]"]):not([class*="bg-[#35b876]"]):not([class*="bg-[#3ccf8a]"]):not([class*="bg-[#3ccf8a]/30"]):not([class*="bg-[#4a1a1a]"]):not([class*="bg-[#4ade9f]"]):not([class*="bg-[#5b95f5]/10"]):not([class*="bg-[#8fb4ff]"]):not([class*="bg-[#8fb4ff]/15"]):not([class*="bg-[#8fb4ff]/25"]):not([class*="bg-[#c0574a]"]):not([class*="bg-[#cbd5e1]"]):not([class*="bg-[#d7f0e6]"]):not([class*="bg-[#d9f0ea]"]):not([class*="bg-[#dfe5e3]"]):not([class*="bg-[#e0f3ec]"]):not([class*="bg-[#e3e8f4]"]):not([class*="bg-[#e3edff]"]):not([class*="bg-[#e6f5f0]"]):not([class*="bg-[#e8eef0]"]):not([class*="bg-[#e9f5ef]"]):not([class*="bg-[#eaf1fd]"]):not([class*="bg-[#eaf8f2]"]):not([class*="bg-[#eef0f4]"]):not([class*="bg-[#eefaf5]"]):not([class*="bg-[#ef4d3f]"]):not([class*="bg-[#efe6fb]"]):not([class*="bg-[#f0b548]"]):not([class*="bg-[#f0b548]/15"]):not([class*="bg-[#f0b548]/25"]):not([class*="bg-[#f0faf6]"]):not([class*="bg-[#f3d9d5]"]):not([class*="bg-[#f3f5f8]"]):not([class*="bg-[#f3f7ff]"]):not([class*="bg-[#f6f3ec]"]):not([class*="bg-[#f6f8f9]"]):not([class*="bg-[#f6f8fb]"]):not([class*="bg-[#fbfbfc]"]):not([class*="bg-[#ff4d5a]"]):not([class*="bg-[#ff4d5a]/20"]):not([class*="bg-[#ff5d6c]"]):not([class*="bg-[#ff6b75]/15"]):not([class*="bg-[#fff0ed]"]):not([class*="bg-[#fff0ee]"]):not([class*="bg-[#fff4f2]"]):not([class*="bg-[#fff5f4]"]):not([class*="bg-[#fff9e8]"]):not([class*="bg-[#fffafa]"]):not([class*="bg-gradient"]):not([class*="bg-ink"]):not([class*="bg-clay"]):not([class*="bg-gradient"] *):not(.keep-white):not(.keep-white *) { color:rgba(27,37,64,0.7) !important }
+html[data-theme="light"] .text-white\/60:not([class*="bg-[#0e5f47]"]):not([class*="bg-[#128c7e]"]):not([class*="bg-[#14213d]"]):not([class*="bg-[#14213d]/40"]):not([class*="bg-[#14213d]/45"]):not([class*="bg-[#16285c]/50"]):not([class*="bg-[#188a69]"]):not([class*="bg-[#1b2340]"]):not([class*="bg-[#1d3a78]"]):not([class*="bg-[#1f2848]"]):not([class*="bg-[#1f9d78]"]):not([class*="bg-[#2456b8]"]):not([class*="bg-[#2a2147]"]):not([class*="bg-[#35b876]"]):not([class*="bg-[#3ccf8a]"]):not([class*="bg-[#3ccf8a]/30"]):not([class*="bg-[#4a1a1a]"]):not([class*="bg-[#4ade9f]"]):not([class*="bg-[#5b95f5]/10"]):not([class*="bg-[#8fb4ff]"]):not([class*="bg-[#8fb4ff]/15"]):not([class*="bg-[#8fb4ff]/25"]):not([class*="bg-[#c0574a]"]):not([class*="bg-[#cbd5e1]"]):not([class*="bg-[#d7f0e6]"]):not([class*="bg-[#d9f0ea]"]):not([class*="bg-[#dfe5e3]"]):not([class*="bg-[#e0f3ec]"]):not([class*="bg-[#e3e8f4]"]):not([class*="bg-[#e3edff]"]):not([class*="bg-[#e6f5f0]"]):not([class*="bg-[#e8eef0]"]):not([class*="bg-[#e9f5ef]"]):not([class*="bg-[#eaf1fd]"]):not([class*="bg-[#eaf8f2]"]):not([class*="bg-[#eef0f4]"]):not([class*="bg-[#eefaf5]"]):not([class*="bg-[#ef4d3f]"]):not([class*="bg-[#efe6fb]"]):not([class*="bg-[#f0b548]"]):not([class*="bg-[#f0b548]/15"]):not([class*="bg-[#f0b548]/25"]):not([class*="bg-[#f0faf6]"]):not([class*="bg-[#f3d9d5]"]):not([class*="bg-[#f3f5f8]"]):not([class*="bg-[#f3f7ff]"]):not([class*="bg-[#f6f3ec]"]):not([class*="bg-[#f6f8f9]"]):not([class*="bg-[#f6f8fb]"]):not([class*="bg-[#fbfbfc]"]):not([class*="bg-[#ff4d5a]"]):not([class*="bg-[#ff4d5a]/20"]):not([class*="bg-[#ff5d6c]"]):not([class*="bg-[#ff6b75]/15"]):not([class*="bg-[#fff0ed]"]):not([class*="bg-[#fff0ee]"]):not([class*="bg-[#fff4f2]"]):not([class*="bg-[#fff5f4]"]):not([class*="bg-[#fff9e8]"]):not([class*="bg-[#fffafa]"]):not([class*="bg-gradient"]):not([class*="bg-ink"]):not([class*="bg-clay"]):not([class*="bg-gradient"] *):not(.keep-white):not(.keep-white *) { color:rgba(27,37,64,0.6) !important }
+html[data-theme="light"] .text-white\/30:not([class*="bg-[#0e5f47]"]):not([class*="bg-[#128c7e]"]):not([class*="bg-[#14213d]"]):not([class*="bg-[#14213d]/40"]):not([class*="bg-[#14213d]/45"]):not([class*="bg-[#16285c]/50"]):not([class*="bg-[#188a69]"]):not([class*="bg-[#1b2340]"]):not([class*="bg-[#1d3a78]"]):not([class*="bg-[#1f2848]"]):not([class*="bg-[#1f9d78]"]):not([class*="bg-[#2456b8]"]):not([class*="bg-[#2a2147]"]):not([class*="bg-[#35b876]"]):not([class*="bg-[#3ccf8a]"]):not([class*="bg-[#3ccf8a]/30"]):not([class*="bg-[#4a1a1a]"]):not([class*="bg-[#4ade9f]"]):not([class*="bg-[#5b95f5]/10"]):not([class*="bg-[#8fb4ff]"]):not([class*="bg-[#8fb4ff]/15"]):not([class*="bg-[#8fb4ff]/25"]):not([class*="bg-[#c0574a]"]):not([class*="bg-[#cbd5e1]"]):not([class*="bg-[#d7f0e6]"]):not([class*="bg-[#d9f0ea]"]):not([class*="bg-[#dfe5e3]"]):not([class*="bg-[#e0f3ec]"]):not([class*="bg-[#e3e8f4]"]):not([class*="bg-[#e3edff]"]):not([class*="bg-[#e6f5f0]"]):not([class*="bg-[#e8eef0]"]):not([class*="bg-[#e9f5ef]"]):not([class*="bg-[#eaf1fd]"]):not([class*="bg-[#eaf8f2]"]):not([class*="bg-[#eef0f4]"]):not([class*="bg-[#eefaf5]"]):not([class*="bg-[#ef4d3f]"]):not([class*="bg-[#efe6fb]"]):not([class*="bg-[#f0b548]"]):not([class*="bg-[#f0b548]/15"]):not([class*="bg-[#f0b548]/25"]):not([class*="bg-[#f0faf6]"]):not([class*="bg-[#f3d9d5]"]):not([class*="bg-[#f3f5f8]"]):not([class*="bg-[#f3f7ff]"]):not([class*="bg-[#f6f3ec]"]):not([class*="bg-[#f6f8f9]"]):not([class*="bg-[#f6f8fb]"]):not([class*="bg-[#fbfbfc]"]):not([class*="bg-[#ff4d5a]"]):not([class*="bg-[#ff4d5a]/20"]):not([class*="bg-[#ff5d6c]"]):not([class*="bg-[#ff6b75]/15"]):not([class*="bg-[#fff0ed]"]):not([class*="bg-[#fff0ee]"]):not([class*="bg-[#fff4f2]"]):not([class*="bg-[#fff5f4]"]):not([class*="bg-[#fff9e8]"]):not([class*="bg-[#fffafa]"]):not([class*="bg-gradient"]):not([class*="bg-ink"]):not([class*="bg-clay"]):not([class*="bg-gradient"] *):not(.keep-white):not(.keep-white *) { color:rgba(27,37,64,0.4) !important }
+html[data-theme="light"] .text-white\/15:not([class*="bg-[#0e5f47]"]):not([class*="bg-[#128c7e]"]):not([class*="bg-[#14213d]"]):not([class*="bg-[#14213d]/40"]):not([class*="bg-[#14213d]/45"]):not([class*="bg-[#16285c]/50"]):not([class*="bg-[#188a69]"]):not([class*="bg-[#1b2340]"]):not([class*="bg-[#1d3a78]"]):not([class*="bg-[#1f2848]"]):not([class*="bg-[#1f9d78]"]):not([class*="bg-[#2456b8]"]):not([class*="bg-[#2a2147]"]):not([class*="bg-[#35b876]"]):not([class*="bg-[#3ccf8a]"]):not([class*="bg-[#3ccf8a]/30"]):not([class*="bg-[#4a1a1a]"]):not([class*="bg-[#4ade9f]"]):not([class*="bg-[#5b95f5]/10"]):not([class*="bg-[#8fb4ff]"]):not([class*="bg-[#8fb4ff]/15"]):not([class*="bg-[#8fb4ff]/25"]):not([class*="bg-[#c0574a]"]):not([class*="bg-[#cbd5e1]"]):not([class*="bg-[#d7f0e6]"]):not([class*="bg-[#d9f0ea]"]):not([class*="bg-[#dfe5e3]"]):not([class*="bg-[#e0f3ec]"]):not([class*="bg-[#e3e8f4]"]):not([class*="bg-[#e3edff]"]):not([class*="bg-[#e6f5f0]"]):not([class*="bg-[#e8eef0]"]):not([class*="bg-[#e9f5ef]"]):not([class*="bg-[#eaf1fd]"]):not([class*="bg-[#eaf8f2]"]):not([class*="bg-[#eef0f4]"]):not([class*="bg-[#eefaf5]"]):not([class*="bg-[#ef4d3f]"]):not([class*="bg-[#efe6fb]"]):not([class*="bg-[#f0b548]"]):not([class*="bg-[#f0b548]/15"]):not([class*="bg-[#f0b548]/25"]):not([class*="bg-[#f0faf6]"]):not([class*="bg-[#f3d9d5]"]):not([class*="bg-[#f3f5f8]"]):not([class*="bg-[#f3f7ff]"]):not([class*="bg-[#f6f3ec]"]):not([class*="bg-[#f6f8f9]"]):not([class*="bg-[#f6f8fb]"]):not([class*="bg-[#fbfbfc]"]):not([class*="bg-[#ff4d5a]"]):not([class*="bg-[#ff4d5a]/20"]):not([class*="bg-[#ff5d6c]"]):not([class*="bg-[#ff6b75]/15"]):not([class*="bg-[#fff0ed]"]):not([class*="bg-[#fff0ee]"]):not([class*="bg-[#fff4f2]"]):not([class*="bg-[#fff5f4]"]):not([class*="bg-[#fff9e8]"]):not([class*="bg-[#fffafa]"]):not([class*="bg-gradient"]):not([class*="bg-ink"]):not([class*="bg-clay"]):not([class*="bg-gradient"] *):not(.keep-white):not(.keep-white *) { color:rgba(27,37,64,0.2) !important }
+html[data-theme="light"] .hover\:text-white:hover:not([class*="bg-[#0e5f47]"]):not([class*="bg-[#128c7e]"]):not([class*="bg-[#14213d]"]):not([class*="bg-[#14213d]/40"]):not([class*="bg-[#14213d]/45"]):not([class*="bg-[#16285c]/50"]):not([class*="bg-[#188a69]"]):not([class*="bg-[#1b2340]"]):not([class*="bg-[#1d3a78]"]):not([class*="bg-[#1f2848]"]):not([class*="bg-[#1f9d78]"]):not([class*="bg-[#2456b8]"]):not([class*="bg-[#2a2147]"]):not([class*="bg-[#35b876]"]):not([class*="bg-[#3ccf8a]"]):not([class*="bg-[#3ccf8a]/30"]):not([class*="bg-[#4a1a1a]"]):not([class*="bg-[#4ade9f]"]):not([class*="bg-[#5b95f5]/10"]):not([class*="bg-[#8fb4ff]"]):not([class*="bg-[#8fb4ff]/15"]):not([class*="bg-[#8fb4ff]/25"]):not([class*="bg-[#c0574a]"]):not([class*="bg-[#cbd5e1]"]):not([class*="bg-[#d7f0e6]"]):not([class*="bg-[#d9f0ea]"]):not([class*="bg-[#dfe5e3]"]):not([class*="bg-[#e0f3ec]"]):not([class*="bg-[#e3e8f4]"]):not([class*="bg-[#e3edff]"]):not([class*="bg-[#e6f5f0]"]):not([class*="bg-[#e8eef0]"]):not([class*="bg-[#e9f5ef]"]):not([class*="bg-[#eaf1fd]"]):not([class*="bg-[#eaf8f2]"]):not([class*="bg-[#eef0f4]"]):not([class*="bg-[#eefaf5]"]):not([class*="bg-[#ef4d3f]"]):not([class*="bg-[#efe6fb]"]):not([class*="bg-[#f0b548]"]):not([class*="bg-[#f0b548]/15"]):not([class*="bg-[#f0b548]/25"]):not([class*="bg-[#f0faf6]"]):not([class*="bg-[#f3d9d5]"]):not([class*="bg-[#f3f5f8]"]):not([class*="bg-[#f3f7ff]"]):not([class*="bg-[#f6f3ec]"]):not([class*="bg-[#f6f8f9]"]):not([class*="bg-[#f6f8fb]"]):not([class*="bg-[#fbfbfc]"]):not([class*="bg-[#ff4d5a]"]):not([class*="bg-[#ff4d5a]/20"]):not([class*="bg-[#ff5d6c]"]):not([class*="bg-[#ff6b75]/15"]):not([class*="bg-[#fff0ed]"]):not([class*="bg-[#fff0ee]"]):not([class*="bg-[#fff4f2]"]):not([class*="bg-[#fff5f4]"]):not([class*="bg-[#fff9e8]"]):not([class*="bg-[#fffafa]"]):not([class*="bg-gradient"]):not([class*="bg-ink"]):not([class*="bg-clay"]):not([class*="bg-gradient"] *):not(.keep-white *) { color:rgb(27,37,64) !important }
+html[data-theme="light"] .placeholder\:text-white\/50:not([class*="bg-gradient"] *)::placeholder { color:rgba(27,37,64,.4) !important }
+html[data-theme="light"] .border-\[\#8fb4ff\]\/25:not([class*="bg-gradient"] *) { border-color:rgba(40,55,90,0.18) !important }
+html[data-theme="light"] .border-\[\#8fb4ff\]\/10:not([class*="bg-gradient"] *) { border-color:rgba(40,55,90,0.09) !important }
+html[data-theme="light"] .border-\[\#8fb4ff\]\/30:not([class*="bg-gradient"] *) { border-color:rgba(40,55,90,0.22) !important }
+html[data-theme="light"] .border-\[\#8fb4ff\]\/50:not([class*="bg-gradient"] *) { border-color:rgba(47,98,201,0.45) !important }
+html[data-theme="light"] .border-\[\#8fb4ff\]\/60:not([class*="bg-gradient"] *) { border-color:rgba(47,98,201,0.6) !important }
+html[data-theme="light"] .hover\:border-\[\#8fb4ff\]\/50:not([class*="bg-gradient"] *):hover { border-color:rgba(47,98,201,.5) !important }
+html[data-theme="light"] .focus\:border-\[\#8fb4ff\]\/60:not([class*="bg-gradient"] *):focus { border-color:rgba(47,98,201,.6) !important }
+html[data-theme="light"] .ring-\[\#8fb4ff\]\/60:not([class*="bg-gradient"] *) { --tw-ring-color:rgba(47,98,201,.5) !important }
+html[data-theme="light"] .divide-\[\#8fb4ff\]\/10:not([class*="bg-gradient"] *) > :not([hidden]) ~ :not([hidden]) { border-color:rgba(40,55,90,.09) !important }
+html[data-theme="light"] .border-white\/10:not([class*="bg-gradient"] *) { border-color:rgba(40,55,90,0.12) !important }
+html[data-theme="light"] .border-white\/15:not([class*="bg-gradient"] *) { border-color:rgba(40,55,90,0.16) !important }
+html[data-theme="light"] .border-white\/30:not([class*="bg-gradient"] *) { border-color:rgba(40,55,90,0.25) !important }
+html[data-theme="light"] .border-white\/\[\.06\]:not([class*="bg-gradient"] *) { border-color:rgba(40,55,90,0.08) !important }
+html[data-theme="light"] .border-white\/\[\.12\]:not([class*="bg-gradient"] *) { border-color:rgba(40,55,90,0.14) !important }
+html[data-theme="light"] .bg-white\/\[0\.06\]:not([class*="bg-gradient"] *) { background-color:rgba(40,55,90,0.05) !important }
+html[data-theme="light"] .bg-white\/\[\.06\]:not([class*="bg-gradient"] *) { background-color:rgba(40,55,90,0.05) !important }
+html[data-theme="light"] .bg-white\/10:not([class*="bg-gradient"] *) { background-color:rgba(40,55,90,0.07) !important }
+html[data-theme="light"] .bg-white\/15:not([class*="bg-gradient"] *) { background-color:rgba(40,55,90,0.09) !important }
+html[data-theme="light"] .bg-white\/5:not([class*="bg-gradient"] *) { background-color:rgba(40,55,90,0.035) !important }
+html[data-theme="light"] .bg-white\/\[0\.05\]:not([class*="bg-gradient"] *) { background-color:rgba(40,55,90,0.04) !important }
+html[data-theme="light"] .bg-white\/30:not([class*="bg-gradient"] *) { background-color:rgba(40,55,90,0.14) !important }
+html[data-theme="light"] .hover\:bg-white\/\[0\.12\]:not([class*="bg-gradient"] *):hover { background-color:rgba(40,55,90,0.1) !important }
+html[data-theme="light"] .hover\:bg-white\/10:not([class*="bg-gradient"] *):hover { background-color:rgba(40,55,90,0.08) !important }
+html[data-theme="light"] .hover\:bg-white\/\[0\.03\]:not([class*="bg-gradient"] *):hover { background-color:rgba(40,55,90,0.04) !important }
+html[data-theme="light"] .hover\:bg-white\/\[0\.05\]:not([class*="bg-gradient"] *):hover { background-color:rgba(40,55,90,0.05) !important }
+html[data-theme="light"] .hover\:bg-white\/\[0\.06\]:not([class*="bg-gradient"] *):hover { background-color:rgba(40,55,90,0.06) !important }
+html[data-theme="light"] .bg-\[\#0d1938\]\/40:not([class*="bg-gradient"] *) { background-color:rgba(255,255,255,.6) !important }
+html[data-theme="light"] .bg-\[\#0d1938\]\/60:not([class*="bg-gradient"] *) { background-color:rgba(255,255,255,.75) !important }
+html[data-theme="light"] .bg-\[\#16285c\]\/50:not([class*="bg-gradient"] *) { background-color:rgba(255,255,255,.7) !important }
+html[data-theme="light"] .hover\:bg-\[\#0d1938\]\/60:not([class*="bg-gradient"] *):hover { background-color:rgba(255,255,255,.9) !important }
+html[data-theme="light"] .bg-\[\#1d3a78\]:not([class*="bg-gradient"] *) { background-color:#dfe8fb !important }
+html[data-theme="light"] .bg-\[\#0e1a3d\]:not([class*="bg-gradient"] *) { background-color:#fbfaf6 !important }
+html[data-theme="light"] .bg-\[\#16285c\]\/60:not([class*="bg-gradient"] *) { background-color:rgba(255,255,255,.75) !important }
+html[data-theme="light"] .bg-\[\#3a2a0c\]:not([class*="bg-gradient"] *) { background-color:#fff3d4 !important }
+html[data-theme="light"] .bg-\[\#5b95f5\]\/20:not([class*="bg-gradient"] *) { background-color:rgba(47,98,201,.12) !important }
+html[data-theme="light"] .bg-\[\#3ccf8a\]\/20:not([class*="bg-gradient"] *) { background-color:rgba(26,143,108,.14) !important }
+html[data-theme="light"] .text-red-300:not([class*="bg-gradient"] *) { color:#b4372c !important }
+html[data-theme="light"] .hover\:text-red-300:not([class*="bg-gradient"] *):hover { color:#b4372c !important }
+html[data-theme="light"] .text-red-200:not([class*="bg-gradient"] *) { color:#a3362b !important }
+html[data-theme="light"] .hover\:text-red-200:not([class*="bg-gradient"] *):hover { color:#a3362b !important }
+html[data-theme="light"] .text-amber-200:not([class*="bg-gradient"] *) { color:#8a5a00 !important }
+html[data-theme="light"] .hover\:text-amber-200:not([class*="bg-gradient"] *):hover { color:#8a5a00 !important }
+html[data-theme="light"] .text-amber-300:not([class*="bg-gradient"] *) { color:#9a6200 !important }
+html[data-theme="light"] .hover\:text-amber-300:not([class*="bg-gradient"] *):hover { color:#9a6200 !important }
+html[data-theme="light"] .text-emerald-200:not([class*="bg-gradient"] *) { color:#0e7a56 !important }
+html[data-theme="light"] .hover\:text-emerald-200:not([class*="bg-gradient"] *):hover { color:#0e7a56 !important }
+html[data-theme="light"] .text-emerald-300:not([class*="bg-gradient"] *) { color:#0e7a56 !important }
+html[data-theme="light"] .hover\:text-emerald-300:not([class*="bg-gradient"] *):hover { color:#0e7a56 !important }
+html[data-theme="light"] .text-sky-200:not([class*="bg-gradient"] *) { color:#1b6fa0 !important }
+html[data-theme="light"] .hover\:text-sky-200:not([class*="bg-gradient"] *):hover { color:#1b6fa0 !important }
+html[data-theme="light"] .text-sky-300:not([class*="bg-gradient"] *) { color:#1b6fa0 !important }
+html[data-theme="light"] .hover\:text-sky-300:not([class*="bg-gradient"] *):hover { color:#1b6fa0 !important }
+html[data-theme="light"] .text-purple-300:not([class*="bg-gradient"] *) { color:#6a3fc0 !important }
+html[data-theme="light"] .hover\:text-purple-300:not([class*="bg-gradient"] *):hover { color:#6a3fc0 !important }
+html[data-theme="light"] .text-violet-200:not([class*="bg-gradient"] *) { color:#5b2ea6 !important }
+html[data-theme="light"] .hover\:text-violet-200:not([class*="bg-gradient"] *):hover { color:#5b2ea6 !important }
+html[data-theme="light"] .text-pink-200:not([class*="bg-gradient"] *) { color:#b02a64 !important }
+html[data-theme="light"] .hover\:text-pink-200:not([class*="bg-gradient"] *):hover { color:#b02a64 !important }
+
+/* ---- Page basics ---- */
+html[data-theme="light"] ::selection { background: #b9cdf5; color: #14213d; }
+html[data-theme="light"] :focus-visible { outline-color: #2f62c9; }
+
+/* ---- Older pages (Settings, Staff, Waitlist, Integrations, Templates) ---- */
+html[data-theme="light"] .legacy-dark { color: #1f2a44; }
+html[data-theme="light"] .legacy-dark h1,
+html[data-theme="light"] .legacy-dark h2,
+html[data-theme="light"] .legacy-dark h3 { color: #14213d; }
+html[data-theme="light"] .legacy-dark a { color: #2f62c9; }
+html[data-theme="light"] .legacy-dark label { color: rgba(31, 42, 68, 0.8); }
+html[data-theme="light"] .legacy-dark [style*='border: 1px solid'],
+html[data-theme="light"] .legacy-dark [style*='border-radius: 8'] { background-color: rgba(255, 255, 255, 0.7); border-color: #d6d0c3 !important; }
+html[data-theme="light"] .legacy-dark input:not([type='checkbox']):not([type='radio']),
+html[data-theme="light"] .legacy-dark textarea,
+html[data-theme="light"] .legacy-dark select { background: #fff !important; color: #1f2a44 !important; border: 1px solid #cfc9bb !important; }
+html[data-theme="light"] .legacy-dark input:focus,
+html[data-theme="light"] .legacy-dark textarea:focus,
+html[data-theme="light"] .legacy-dark select:focus { border-color: #2f62c9 !important; }
+html[data-theme="light"] .legacy-dark input::placeholder,
+html[data-theme="light"] .legacy-dark textarea::placeholder { color: rgba(31, 42, 68, 0.4); }
+html[data-theme="light"] .legacy-dark input[type='checkbox'],
+html[data-theme="light"] .legacy-dark input[type='radio'] { accent-color: #2f62c9; }
+html[data-theme="light"] .legacy-dark button { background: #fff; color: #1f2a44; border: 1px solid #cfc9bb; }
+html[data-theme="light"] .legacy-dark button:hover:not(:disabled) { background: #2f62c9; border-color: #2f62c9; color: #fff; }
+html[data-theme="light"] .legacy-dark th,
+html[data-theme="light"] .legacy-dark td { border-bottom-color: #ddd8cb; }
+html[data-theme="light"] .legacy-dark pre,
+html[data-theme="light"] .legacy-dark code { background: #f1eee5; color: #1f2a44; }
+
+/* ---- Inline colours written for the dark look (Settings, Staff, Integrations, Templates) ---- */
+html[data-theme="light"] [style*="color: rgba(231, 233, 240"] { color: rgba(31, 42, 68, 0.6) !important; }
+html[data-theme="light"] [style*="border: 1px solid rgba(231, 233, 240"] { border-color: rgba(31, 42, 68, 0.3) !important; }
+html[data-theme="light"] [style*="rgb(52, 80, 143)"] { border-color: #d6d0c3 !important; }
+html[data-theme="light"] [style*="color: rgb(252, 165, 165)"] { color: #b42318 !important; }
+html[data-theme="light"] [style*="color: rgb(252, 211, 77)"] { color: #8a5a00 !important; }
+html[data-theme="light"] [style*="color: rgb(110, 231, 183)"] { color: #0e7a56 !important; }
+html[data-theme="light"] [style*="color: rgb(147, 197, 253)"] { color: #2456b8 !important; }
+html[data-theme="light"] [style*="background: rgb(22, 40, 92)"] { background: rgba(255, 255, 255, 0.75) !important; }
+html[data-theme="light"] [style*="background: rgb(31, 59, 45)"] { background: #e6f5f0 !important; }

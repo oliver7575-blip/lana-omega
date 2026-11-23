@@ -1,4 +1,5 @@
 import './globals.css'
+import './theme-light.css'
 import { Inter, Playfair_Display } from 'next/font/google'
 import AppFrame from '@/components/AppFrame'
 
@@ -16,7 +17,11 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Apply the saved theme before the first paint so there is no flash. */}
+        <script dangerouslySetInnerHTML={{ __html: "try{var t=localStorage.getItem('theme');if(t==='light')document.documentElement.dataset.theme='light'}catch(e){}" }} />
+      </head>
       <body className={`${inter.variable} ${playfair.variable} font-body`}>
         <AppFrame>{children}</AppFrame>
       </body>
