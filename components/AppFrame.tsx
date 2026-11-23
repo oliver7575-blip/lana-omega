@@ -242,12 +242,12 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
         {item('/staff', 'Staff', UsersIcon, pathname.startsWith('/staff'))}
         {item('/costs', 'Costs', DollarIcon, pathname.startsWith('/costs'))}
         {item('/settings', 'Settings', SettingsIcon, pathname.startsWith('/settings'))}
-        <div className="ml-8 pb-2 pl-2 pt-1" role="group" aria-label="Theme">
+        <div className="flex justify-center pb-2 pt-2" role="group" aria-label="Theme">
           <div className="inline-flex rounded-full border border-line p-[2px]">
-            {([['dark', '🌙', 'Dark'], ['light', '☀️', 'Light']] as const).map(([v, icon, label]) => (
+            {([['dark', 'Dark'], ['light', 'Light']] as const).map(([v, label]) => (
               <button key={v} onClick={() => setTheme(v)} aria-pressed={theme === v} title={`${label} mode`}
-                className={`flex h-[22px] items-center gap-1 rounded-full px-2 text-[11px] transition ${theme === v ? 'bg-white/10 font-semibold text-white' : 'text-navy/60 hover:text-navy'}`}>
-                <span aria-hidden="true">{icon}</span>{label}
+                className={`flex h-[22px] items-center rounded-full px-3 text-[11px] transition ${theme === v ? 'bg-white/10 font-semibold text-white' : 'text-navy/60 hover:text-navy'}`}>
+                {label}
               </button>
             ))}
           </div>
