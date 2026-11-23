@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import LiveRefresh from './LiveRefresh'
-import { syncThemeFromAccount } from '@/lib/theme'
+import { setTheme, syncThemeFromAccount, useTheme } from '@/lib/theme'
 import { HOLO_BG } from '@/components/cloudbeds/ui'
 import {
   AlertIcon,
@@ -47,6 +47,7 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
   const [tick, setTick] = useState(0)
   const [switching, setSwitching] = useState(false)
+  const theme = useTheme()
   const [peek, setPeek] = useState(false) // calendar full-screen: side menu slid out by hovering the left edge
 
   const bare = BARE.some((p) => pathname.startsWith(p))
@@ -241,6 +242,16 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
         {item('/staff', 'Staff', UsersIcon, pathname.startsWith('/staff'))}
         {item('/costs', 'Costs', DollarIcon, pathname.startsWith('/costs'))}
         {item('/settings', 'Settings', SettingsIcon, pathname.startsWith('/settings'))}
+        <div className="ml-8 pb-2 pl-2 pt-1" role="group" aria-label="Theme">
+          <div className="inline-flex rounded-full border border-line p-[2px]">
+            {([['dark', '🌙', 'Dark'], ['light', '☀️', 'Light']] as const).map(([v, icon, label]) => (
+              <button key={v} onClick={() => setTheme(v)} aria-pressed={theme === v} title={`${label} mode`}
+                className={`flex h-[22px] items-center gap-1 rounded-full px-2 text-[11px] transition ${theme === v ? 'bg-white/10 font-semibold text-white' : 'text-navy/60 hover:text-navy'}`}>
+                <span aria-hidden="true">{icon}</span>{label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="mt-auto border-t border-line pt-5">
