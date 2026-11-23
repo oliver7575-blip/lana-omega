@@ -19,7 +19,7 @@ export async function GET() {
   if (cache && Date.now() - cache.at < 30 * 60 * 1000) return NextResponse.json(cache.data)
   try {
     const res = await fetch(URL_, { signal: AbortSignal.timeout(10000) })
-    if (!res.ok) throw new Error(`Weather service said ${res.status}`)
+    if (!res.ok) throw new Error(`Weather service said ${res.status}: ${(await res.text()).slice(0, 120)}`)
     const j = await res.json()
     const d = j.daily
     const days: WeatherDay[] = (d.time as string[]).map((date, i) => ({
@@ -33,6 +33,7 @@ export async function GET() {
     cache = { at: Date.now(), data: out }
     return NextResponse.json(out)
   } catch (e) {
+    console.error('weather failed', e)
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Weather unavailable' }, { status: 502 })
   }
 }

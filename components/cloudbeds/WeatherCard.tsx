@@ -22,12 +22,15 @@ const dayName = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString
 /** Current weather and the next five days for Zipolite. */
 export default function WeatherCard() {
   const [w, setW] = useState<WeatherData | null>(null)
-  const [err, setErr] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true
     const load = () =>
-      fetch('/api/weather').then((r) => (r.ok ? r.json() : Promise.reject())).then((j) => { if (alive) { setW(j); setErr(false) } }).catch(() => { if (alive) setErr(true) })
+      fetch('/api/weather')
+        .then(async (r) => { const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(`${r.status} ${j.error ?? ''}`.trim()); return j })
+        .then((j) => { if (alive) { setW(j); setErr(null) } })
+        .catch((e) => { if (alive) setErr(e instanceof Error ? e.message : 'unknown') })
     load()
     const t = setInterval(load, 30 * 60 * 1000)
     return () => { alive = false; clearInterval(t) }
@@ -35,7 +38,7 @@ export default function WeatherCard() {
 
   const shell = `rounded-2xl border ${LINE} p-4`
   const bg = { background: 'rgba(22,40,92,.5)' }
-  if (!w) return <div className={shell} style={bg}><p className="py-3 text-center text-[12.5px] text-[#9fb3dc]">{err ? 'Weather unavailable right now' : 'Loading weather…'}</p></div>
+  if (!w) return <div className={shell} style={bg}><p className="py-3 text-center text-[12.5px] text-[#9fb3dc]">{err ? `Weather unavailable right now (${err})` : 'Loading weather…'}</p></div>
 
   const now = describe(w.now.code)
   const today = w.days[0]
