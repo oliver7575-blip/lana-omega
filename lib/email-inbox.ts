@@ -4,6 +4,7 @@ import { createServiceClient } from './supabase/service'
 import { decryptCredentials, type EncryptedPayload } from './crypto'
 import { handleArrivalEmail, type ArrivalInfo } from './arrival-email'
 import { storeAttachments } from './email-attachments'
+import { alertStaffOfComplaint } from './email-alerts'
 import { answerGeneralEmail, canReplyToAddress, REPLY_TENANT_COLUMNS, type ReplyMail, type ReplyTenant } from './email-reply'
 
 /**
@@ -23,6 +24,7 @@ interface Sorted {
   category: EmailCategory
   summary: string
   arrival?: ArrivalInfo | null
+  complaint?: boolean
   review?: {
     platform?: string | null
     guest_name?: string | null
@@ -154,6 +156,15 @@ export async function pollInbox(tenantId: string): Promise<PollResult> {
             tenantRow ??= (await db.from('tenants').select(REPLY_TENANT_COLUMNS).eq('id', tenantId).single<ReplyTenant>()).data
             if (tenantRow) await answerGeneralEmail(db, tenantId, tenantRow, mail, text, sorted.category)
           }
+          if (sorted.complaint && !mail.auto) {
+            tenantRow ??= (await db.from('tenants').select(REPLY_TENANT_COLUMNS).eq('id', tenantId).single<ReplyTenant>()).data
+            if (tenantRow) {
+              const number = text.match(/confirmation number:?\s*(\d{6,})/i)?.[1] ?? null
+              const note = await alertStaffOfComplaint(db, tenantId, tenantRow, mail, { guestName: from?.name, summary: sorted.summary, bookingNumber: number })
+              const { data: cur } = await db.from('inbound_emails').select('action, action_detail').eq('id', row.id).maybeSingle()
+              await db.from('inbound_emails').update({ action: cur?.action ?? 'complaint_alerted', action_detail: [cur?.action_detail, note].filter(Boolean).join(' · ') }).eq('id', row.id)
+            }
+          }
         }
         if (row && sorted.category === 'review') {
           const r = sorted.review ?? {}
@@ -207,7 +218,9 @@ function htmlToText(html: string): string {
 }
 
 const SORT_PROMPT = `You sort incoming emails for a small boutique hotel. Reply with ONLY a JSON object, no other text:
-{"category": "...", "summary": "...", "review": {...} or null, "arrival": {...} or null}
+{"category": "...", "summary": "...", "complaint": true or false, "review": {...} or null, "arrival": {...} or null}
+
+complaint — true ONLY when a guest (or someone writing about a stay) complains, reports a problem or expresses dissatisfaction that the hotel should act on: a dirty or broken room, noise, a bad experience, rude service, a wrong charge they dispute, something that was promised and not delivered. False for neutral questions, thanks, ordinary requests, and for automated mail. A negative review notification from a platform is "review", not a complaint. When true, "summary" must say in one short English sentence what the problem is.
 
 category — exactly one of:
 - "review": a guest review or feedback about a stay, written directly by a guest OR a notification from Booking.com, Airbnb, Google, TripAdvisor, Expedia etc. that a guest left a review / rating.
@@ -250,6 +263,7 @@ async function sortEmail(fromEmail: string, fromName: string, subject: string, t
       category: valid.includes(json.category) ? json.category : 'other',
       summary: String(json.summary ?? '').slice(0, 400),
       review: json.category === 'review' ? json.review ?? null : null,
+      complaint: json.complaint === true && !['automated', 'review', 'job', 'sales'].includes(json.category),
       arrival: json.category !== 'automated' && json.category !== 'review' ? json.arrival ?? null : null,
     }
   } catch (err) {

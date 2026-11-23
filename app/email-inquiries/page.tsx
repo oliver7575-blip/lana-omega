@@ -12,7 +12,7 @@ interface Email {
   category: string
   summary: string | null
   status: 'new' | 'done'
-  action: 'arrival_saved' | 'arrival_not_saved' | null
+  action: 'arrival_saved' | 'arrival_not_saved' | 'complaint_alerted' | null
   action_detail: string | null
   reply_text: string | null
   reply_status: 'sent' | 'not_sent' | 'failed' | null
