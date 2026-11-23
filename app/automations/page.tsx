@@ -482,6 +482,7 @@ export default function AutomationsPage() {
   const categories: { key: string; label: string; help: string; wa?: string; email?: string; maintenance?: boolean }[] = [
     { key: 'new_reservation', label: 'New reservation', help: 'Sent as soon as a new booking arrives from Cloudbeds.', wa: 'new_reservation', email: 'new_reservation' },
     { key: 'arrival', label: 'Arrival information', help: 'Sent 2 days before check-in, or right away for last-minute bookings.', wa: 'arrival_reminder', email: 'arrival_reminder' },
+    { key: 'arrival_time', label: 'Arrival time request', help: 'Sent the day before check-in, ~24h after the arrival information, to guests who have not told us their arrival time.', wa: 'arrival_time_reminder', email: 'arrival_time_reminder' },
     { key: 'post_stay', label: 'Post-stay feedback', help: 'Sent the day after check-out, when post-stay messages are on in Settings.', wa: 'post_stay', email: 'post_stay' },
     { key: 'staff', label: 'Staff alerts', help: 'Sent to staff when Lana escalates a guest issue.', wa: 'staff_escalation' },
     { key: 'maintenance', label: 'Maintenance reminders', help: 'Sent to maintenance staff for each task, with Acepto / Necesito ayuda / Terminado buttons.', maintenance: true },

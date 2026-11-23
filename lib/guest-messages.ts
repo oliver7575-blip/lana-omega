@@ -5,12 +5,13 @@ import { getMapping, renderMappedTemplateText, reservationValues, sendMappedTemp
 import { ensureConversation, findOrCreateGuest, logLanaMessage } from './guest-records'
 import { renderEmailTemplate, sendTenantEmail } from './email'
 
-export type GuestPurpose = 'new_reservation' | 'arrival_reminder' | 'post_stay'
+export type GuestPurpose = 'new_reservation' | 'arrival_reminder' | 'arrival_time_reminder' | 'post_stay'
 
 // sent_reminders.message_type values — kept stable so past sends still dedupe.
 const WHATSAPP_TYPE: Record<GuestPurpose, string> = {
   new_reservation: 'new_reservation',
   arrival_reminder: 'arrival_reminder',
+  arrival_time_reminder: 'arrival_time_reminder',
   post_stay: 'post_stay_feedback',
 }
 

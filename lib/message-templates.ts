@@ -14,6 +14,10 @@ export const MESSAGE_PURPOSES = {
     label: 'Arrival information (2 days before)',
     help: 'Sent 2 days before check-in — or right away if the booking is made less than 2 days before arrival.',
   },
+  arrival_time_reminder: {
+    label: 'Arrival time request (day before)',
+    help: 'Sent the day before check-in, about 24 hours after the arrival information, to guests who have not told us their arrival time yet.',
+  },
   post_stay: {
     label: 'Post-stay feedback',
     help: 'Sent the day after check-out. Only runs when post-stay messages are turned on in Settings.',

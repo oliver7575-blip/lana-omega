@@ -2,7 +2,7 @@ import nodemailer from 'nodemailer'
 import { createServiceClient } from './supabase/service'
 import { decryptCredentials } from './crypto'
 
-export type EmailPurpose = 'new_reservation' | 'arrival_reminder' | 'post_stay'
+export type EmailPurpose = 'new_reservation' | 'arrival_reminder' | 'arrival_time_reminder' | 'post_stay'
 
 export const EMAIL_PURPOSES: Record<EmailPurpose, { label: string; help: string }> = {
   new_reservation: {
@@ -12,6 +12,10 @@ export const EMAIL_PURPOSES: Record<EmailPurpose, { label: string; help: string 
   arrival_reminder: {
     label: 'Arrival information email',
     help: 'Sent 2 days before check-in (or right away for last-minute bookings).',
+  },
+  arrival_time_reminder: {
+    label: 'Arrival time request email',
+    help: 'Sent the day before check-in to guests who have not told us their arrival time.',
   },
   post_stay: {
     label: 'Post-stay feedback email',

@@ -5,6 +5,10 @@
       "schedule": "0 12 * * *"
     },
     {
+      "path": "/api/cron/arrival-time-reminders",
+      "schedule": "0 13 * * *"
+    },
+    {
       "path": "/api/cron/post-stay-feedback",
       "schedule": "0 12 * * *"
     }
