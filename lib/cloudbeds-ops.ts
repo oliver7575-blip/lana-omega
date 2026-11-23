@@ -749,6 +749,39 @@ export async function findReservationByConfirmation(
   return null
 }
 
+/**
+ * Finds a reservation when the email carries no booking number (typical for Airbnb relays): matches on the
+ * check-in date, then narrows by the guest's first name, check-out date, channel and room type.
+ * Returns a reservation only when exactly one stands out; otherwise the candidates, so staff can pick.
+ */
+export async function findReservationByClues(
+  cb: CB,
+  clues: { checkIn: string; checkOut?: string | null; guestName?: string | null; channel?: string | null; roomTypeHint?: string | null; adults?: number | null }
+): Promise<{ match: { reservationID: string } | null; candidates: { reservationID: string; guestName: string }[] }> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(clues.checkIn)) return { match: null, candidates: [] }
+  const list = (await listReservations(cb, { checkInFrom: clues.checkIn, checkInTo: clues.checkIn, includeAllRooms: true }, 3).catch(() => [] as Json[]))
+    .filter((r) => ACTIVE(r.status) && String(r.startDate ?? '').slice(0, 10) === clues.checkIn)
+  const norm = (v: unknown) => String(v ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]/g, ' ')
+  const first = norm(clues.guestName).trim().split(/\s+/)[0] ?? ''
+  const hint = norm(clues.roomTypeHint)
+  const scored = list.map((r) => {
+    let score = 0
+    const names = norm(r.guestName).split(/\s+/)
+    if (first.length >= 2 && names.includes(first)) score += 4
+    if (clues.checkOut && String(r.endDate ?? '').slice(0, 10) === clues.checkOut) score += 2
+    if (clues.channel && norm(r.source).includes(norm(clues.channel).trim())) score += 2
+    const types = ((r.rooms as Json[]) ?? []).map((x) => norm(x.roomTypeName))
+    if (hint && types.some((t) => t && (hint.includes(t) || t.split(' ').filter((w) => w.length > 3).every((w) => hint.includes(w))))) score += 1
+    if (clues.adults && Number(r.adults ?? 0) === clues.adults) score += 1
+    return { r, score }
+  }).sort((a, b) => b.score - a.score)
+  const top = scored[0]
+  const candidates = scored.filter((x) => x.score > 0).slice(0, 4).map((x) => ({ reservationID: String(x.r.reservationID), guestName: String(x.r.guestName ?? '') }))
+  // Needs the first name (or an otherwise decisive score) and a clear lead over the runner-up.
+  if (top && top.score >= 4 && top.score - (scored[1]?.score ?? 0) >= 2) return { match: { reservationID: String(top.r.reservationID) }, candidates }
+  return { match: null, candidates }
+}
+
 /** Writes the guest's expected arrival time (HH:MM) onto the reservation in Cloudbeds. */
 export async function setEstimatedArrival(cb: CB, reservationID: string, time: string): Promise<void> {
   await cbPut(cb, 'putReservation', { reservationID, estimatedArrivalTime: time })

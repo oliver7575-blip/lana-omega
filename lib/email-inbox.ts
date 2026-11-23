@@ -145,6 +145,7 @@ export async function pollInbox(tenantId: string): Promise<PollResult> {
             messageId,
             references: Array.isArray(parsed.references) ? parsed.references.join(' ') : parsed.references ?? null,
             subject,
+            bodyText: text,
             auto: autoSubmitted !== 'no' || ['bulk', 'junk', 'list'].includes(precedence),
           }
           if (sorted.arrival?.time) {

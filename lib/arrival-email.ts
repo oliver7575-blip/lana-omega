@@ -1,6 +1,6 @@
 import { createServiceClient } from './supabase/service'
 import { cloudbedsForTenant } from './cloudbeds-tenant'
-import { findReservationByConfirmation, getReservationDetail, setEstimatedArrival } from './cloudbeds-ops'
+import { findReservationByClues, findReservationByConfirmation, getReservationDetail, setEstimatedArrival } from './cloudbeds-ops'
 import { notifyStaff } from './escalation'
 import { parseEscalationContacts, findEscalationContact } from './escalation-contacts'
 import {
@@ -30,11 +30,25 @@ export interface ArrivalInfo {
   time?: string | null
   kind?: 'stated' | 'request' | null
   check_in_date?: string | null
+  check_out_date?: string | null
   guest_name?: string | null
   guest_message?: string | null
 }
 
 export type ArrivalMail = ReplyMail
+
+const MONTHS = ['january','february','march','april','may','june','july','august','september','october','november','december']
+
+/** Check-in / check-out dates as printed in relayed emails ("26 November 2026 … 1 December 2026"), when the AI didn't read them. */
+function datesFromMail(mail: ArrivalMail): { checkIn: string; checkOut: string | null } | null {
+  const text = `${mail.subject}\n${mail.bodyText ?? ''}`
+  const found: string[] = []
+  for (const m of text.matchAll(/(\d{1,2})\s+(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{4})/gi)) {
+    found.push(`${m[3]}-${String(MONTHS.indexOf(m[2].toLowerCase()) + 1).padStart(2, '0')}-${m[1].padStart(2, '0')}`)
+    if (found.length === 2) break
+  }
+  return found.length ? { checkIn: found[0], checkOut: found[1] ?? null } : null
+}
 
 export async function handleArrivalEmail(tenantId: string, mail: ArrivalMail, arrival: ArrivalInfo): Promise<void> {
   const db = createServiceClient()
@@ -48,17 +62,35 @@ export async function handleArrivalEmail(tenantId: string, mail: ArrivalMail, ar
   let saved: { id: string; guestName: string; startDate: string; endDate: string; room: string } | null = null
   let problem: string | null = null
   let savedNote = ''
-  if (!number) {
-    problem = `Guest gave an arrival time (${time}) but no booking number — add it in Cloudbeds by hand.`
-  } else {
+  {
     try {
       const cb = await cloudbedsForTenant(db, tenantId)
       if (!cb) {
         problem = 'Cloudbeds is not connected, so the arrival time was not saved.'
       } else {
-        const found = await findReservationByConfirmation(cb, number, arrival.check_in_date)
+        let found = number ? await findReservationByConfirmation(cb, number, arrival.check_in_date) : null
+        let viaClues = ''
+        if (!found && !number) {
+          // No booking number (e.g. an Airbnb relay): work out who it is from the dates, first name, channel and room type.
+          const checkIn = arrival.check_in_date || datesFromMail(mail)?.checkIn || null
+          const checkOut = arrival.check_out_date || datesFromMail(mail)?.checkOut || null
+          if (checkIn) {
+            const clue = await findReservationByClues(cb, {
+              checkIn,
+              checkOut,
+              guestName: arrival.guest_name,
+              channel: /airbnb/i.test(mail.fromEmail) ? 'airbnb' : /booking\.com/i.test(mail.fromEmail) ? 'booking' : null,
+              roomTypeHint: mail.subject,
+            })
+            if (clue.match) { found = clue.match; viaClues = ` (identified from the check-in date ${checkIn} and guest name "${arrival.guest_name ?? ''}", no booking number in the email)` }
+            else problem = clue.candidates.length
+              ? `Guest gave an arrival time (${time}) with no booking number, and several stays match ${checkIn}: ${clue.candidates.map((c) => `${c.guestName} #${c.reservationID}`).join('; ')} — add it by hand.`
+              : `Guest gave an arrival time (${time}) with no booking number, and no stay checking in on ${checkIn} matched — add it by hand.`
+          } else problem = `Guest gave an arrival time (${time}) but no booking number or check-in date — add it in Cloudbeds by hand.`
+          if (found) savedNote = viaClues
+        }
         if (!found) {
-          problem = `Couldn't find booking ${number} in Cloudbeds — add the arrival time (${time}) by hand.`
+          problem ??= `Couldn't find booking ${number} in Cloudbeds — add the arrival time (${time}) by hand.`
         } else {
           const d = await getReservationDetail(cb, found.reservationID)
           if (['canceled', 'cancelled', 'no_show', 'checked_out'].includes(d.status.toLowerCase())) {
@@ -72,7 +104,7 @@ export async function handleArrivalEmail(tenantId: string, mail: ArrivalMail, ar
               endDate: d.endDate,
               room: d.rooms.map((r) => r.roomName ?? r.roomTypeName).filter(Boolean).join(', '),
             }
-            if (d.estimatedArrivalTime && d.estimatedArrivalTime !== time) savedNote = ` (was ${d.estimatedArrivalTime})`
+            if (d.estimatedArrivalTime && d.estimatedArrivalTime !== time) savedNote += ` (was ${d.estimatedArrivalTime})`
           }
         }
       }

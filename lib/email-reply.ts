@@ -50,6 +50,8 @@ export interface ReplyMail {
   messageId: string
   references: string | null
   subject: string
+  /** The email's plain text (used to read dates when no booking number is given). */
+  bodyText?: string
   /** Automatic / bulk mail (Auto-Submitted, Precedence: bulk…) — never answered. */
   auto: boolean
 }
