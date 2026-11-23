@@ -216,7 +216,8 @@ export async function deliverReply(
   // Booking.com delivers anything above this line to the guest.
   const relay = /@guest\.booking\.com$/.test(to)
   const body = relay ? `${text}\n\n##- Please type your reply above this line -##` : text
-  const subject = /^re:/i.test(mail.subject) ? mail.subject : `Re: ${mail.subject}`
+  // Booking.com pastes the subject into the guest's chat as the first line, so relay replies go out without one.
+  const subject = relay ? '' : /^re:/i.test(mail.subject) ? mail.subject : `Re: ${mail.subject}`
   const html = text
     .split(/\n{2,}/)
     .map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`)
