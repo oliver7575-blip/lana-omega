@@ -186,9 +186,9 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
   const sidebar = (
     <nav className={`flex h-full flex-col ${focus ? 'pb-5 pl-[11px] pr-3 pt-[15px]' : 'px-3 py-6'}`}>
       {focus ? (
-        // Same Soirée wordmark, in the same spot, as the calendar header underneath (centred over its 149px room column).
+        // Same hotel wordmark (the current hotel's name), in the same spot, as the calendar header underneath (centred over its 149px room column).
         <div className="mb-4 flex h-10 shrink-0 items-center justify-center" style={{ width: 165 }}>
-          <Link href="/cloudbeds" className="font-display text-[40px] font-semibold italic leading-none tracking-tight text-white">Soirée</Link>
+          <Link href="/cloudbeds" className="font-display text-[40px] font-semibold italic leading-none tracking-tight text-white">{info?.tenantName ?? '\u00a0'}</Link>
         </div>
       ) : null}
       <div className={`${focus ? 'mb-4' : 'mb-8'} text-center`}>
