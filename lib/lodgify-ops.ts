@@ -184,7 +184,10 @@ export async function setRateLodgify(auth: LodgifyAuth, rateID: string, start: s
     method: 'POST',
     body: JSON.stringify({ property_id: Number(propertyId), room_type_id: Number(roomTypeId), rates }),
   })
-  if (!r.ok) throw new Error(r.error)
+  if (!r.ok) {
+    if (/940|external rates/i.test(r.error)) throw new Error("Lodgify doesn't allow apps to change prices on this property (it isn't set up for an external rate manager). Change the price in Lodgify.")
+    throw new Error(r.error)
+  }
 }
 
 export async function calendarLodgify(auth: LodgifyAuth, start: string, dayCount: number, today: string): Promise<CalendarData> {
