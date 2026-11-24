@@ -58,15 +58,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
 
-  let body: { action?: string; booking?: { id?: number | string; status?: string } } = {}
+  let parsed: unknown = {}
   try {
-    body = JSON.parse(rawBody)
+    parsed = JSON.parse(rawBody)
   } catch {
     return NextResponse.json({ received: true, ignored: 'not JSON' })
   }
-
-  const bookingId = body.booking?.id !== undefined ? String(body.booking.id) : undefined
-  await supabase.from('welcome_log').insert({ tenant_id: tenantId, reservation_id: bookingId ?? null, source: 'webhook_received', result: { action: body.action, status: body.booking?.status } })
+  // Lodgify's payload shape isn't fixed: accept an object or a list, with the id under booking.id, id or booking_id.
+  const first = (Array.isArray(parsed) ? parsed[0] : parsed) as Record<string, unknown> | undefined
+  const bk = (first?.booking ?? first?.data ?? first) as Record<string, unknown> | undefined
+  const idRaw = (bk?.id ?? bk?.booking_id ?? first?.booking_id ?? first?.id) as string | number | undefined
+  const bookingId = idRaw !== undefined && idRaw !== null ? String(idRaw) : undefined
+  // The subscribed event is also in our own URL (?event=...), which is the fallback when the body doesn't say.
+  const action = ((first?.action ?? first?.event ?? new URL(request.url).searchParams.get('event')) as string | null) ?? undefined
+  await supabase.from('welcome_log').insert({ tenant_id: tenantId, reservation_id: bookingId ?? null, source: 'webhook_received', result: { action, raw: rawBody.slice(0, 1500) } })
+  const body = { action }
   if (bookingId && body.action && NEW_BOOKING_EVENTS.has(body.action)) {
     after(async () => {
       // Same dedup table the cron jobs use: a retry or a second "booked"
