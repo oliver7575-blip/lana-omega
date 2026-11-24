@@ -37,6 +37,16 @@ export async function GET(request: Request) {
   const auth = { apiKey: api_key, propertyId }
   const pms = await pmsForTenant(supabase, tenantId)
 
+  const declineId = params.get('decline')
+  if (declineId) {
+    const { cancelBookingLodgify } = await import('@/lib/lodgify-ops')
+    try {
+      await cancelBookingLodgify(auth, declineId)
+      return NextResponse.json({ ok: true, after: await getBookingRaw(auth, declineId) })
+    } catch (e) {
+      return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : String(e) })
+    }
+  }
   const ratesProp = params.get('rates')
   if (ratesProp) {
     const rt = params.get('roomTypeId') ?? ''
