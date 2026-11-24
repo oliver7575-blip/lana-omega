@@ -64,6 +64,20 @@ export async function GET(request: Request) {
         }
       }
 
+      // Lodgify has no arrival-time field, so times (from the panel, Lana or an email) are kept in Omega's own table.
+      if (pms.kind === 'lodgify') {
+        const { data: at } = await supabase
+          .from('pms_arrival_times')
+          .select('arrival_time')
+          .eq('tenant_id', tenant.id)
+          .eq('reservation_id', a.reservationID)
+          .maybeSingle()
+        if (at?.arrival_time) {
+          results.push({ tenantId: tenant.id, reservationID: a.reservationID, skipped: 'Arrival time already known' })
+          continue
+        }
+      }
+
       const outcome = await sendGuestMessage(ctx, 'arrival_time_reminder', {
         reservationID: a.reservationID,
         guestName: a.guestName,
