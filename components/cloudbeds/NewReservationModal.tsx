@@ -62,7 +62,7 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
   const [sendEmail, setSendEmail] = useState(true)
   const lodgify = options?.pms === 'lodgify'
   const [nightly, setNightly] = useState('')
-  const [withQuote, setWithQuote] = useState(true)
+  const withQuote = false // Lalo bookings from the panel are always saved without a quote
 
   const [mode, setMode] = useState<'reservation' | 'block'>(initialMode ?? 'reservation')
   const [blockType, setBlockType] = useState<'blocked_dates' | 'out_of_service'>('blocked_dates')
@@ -193,7 +193,7 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
   const n = nights(start, end)
   const blocking = mode === 'block'
   const canBlock = Boolean(roomID && end > start && !saving)
-  const canCreate = Boolean(chosen && firstName.trim() && lastName.trim() && email.trim() && country && (paymentMethod || lodgify) && nightlyValid && !saving)
+  const canCreate = Boolean(chosen && firstName.trim() && lastName.trim() && email.trim() && country && (paymentMethod || lodgify) && nightlyValid && (!lodgify || (nightlyNum !== null && nightlyNum > 0)) && !saving)
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#14213d]/40 p-4 pt-10" onClick={onClose}>
@@ -328,28 +328,18 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
               </select>
             </label>
           </div>}
-          {chosen && lodgify && (
-            <div className="mt-3">
-              <span className={label}>Reservation type</span>
-              <div className="mt-1 grid grid-cols-2 gap-2 text-[12.5px]">
-                <button type="button" onClick={() => setWithQuote(true)} className={`h-[34px] rounded-lg border ${withQuote ? 'border-[#0e5f47] bg-[#e7f4ee] font-semibold text-[#0e5f47]' : 'border-gray-300 text-gray-600'}`}>With quote</button>
-                <button type="button" onClick={() => setWithQuote(false)} className={`h-[34px] rounded-lg border ${!withQuote ? 'border-[#0e5f47] bg-[#e7f4ee] font-semibold text-[#0e5f47]' : 'border-gray-300 text-gray-600'}`}>Without quote</button>
-              </div>
-              <span className="mt-0.5 block text-[11px] text-gray-500">{withQuote ? "Uses Lodgify's own price and creates the quote." : 'Saved without a quote. Enter the price below, or leave it empty for no price.'}</span>
-            </div>
-          )}
-          {chosen && (!lodgify || !withQuote) && (
+          {chosen && (
             <label className="mt-3 block"><span className={label}>Price per night (MXN)</span>
               <input type="number" min="0" step="1" inputMode="decimal" value={nightly} onChange={(e) => setNightly(e.target.value)}
-                placeholder={setPerNight !== null ? `Set price: ${Math.round(setPerNight).toLocaleString('en-US')}` : lodgify ? 'Lodgify calculates it' : 'Set price'} className={input} />
-              <span className="mt-0.5 block text-[11px] text-gray-500">{lodgify ? 'Leave empty to save with no price.' : 'Leave empty to use the set price.'}</span>
+                placeholder={setPerNight !== null ? `Set price: ${Math.round(setPerNight).toLocaleString('en-US')}` : lodgify ? 'Price per night' : 'Set price'} className={input} />
+              <span className="mt-0.5 block text-[11px] text-gray-500">{lodgify ? 'Required: the booking is saved without a quote at this price.' : 'Leave empty to use the set price.'}</span>
             </label>
           )}
           {!lodgify && <label className="mt-2 flex items-center gap-2 text-[12.5px]">
             <input type="checkbox" checked={sendEmail} onChange={(e) => setSendEmail(e.target.checked)} />
             Send Cloudbeds confirmation email to the guest
           </label>}
-          {lodgify && <p className="mt-1 text-[11.5px] text-gray-500">Saved in Lodgify as a confirmed booking (source: Lana panel). Choose below whether it gets a quote.</p>}
+          {lodgify && <p className="mt-1 text-[11.5px] text-gray-500">Saved in Lodgify as a confirmed booking (source: Lana panel). Saved without a quote: enter the price per night below.</p>}
           </>}
 
           {error && <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-[12.5px] text-red-700">{error}</p>}

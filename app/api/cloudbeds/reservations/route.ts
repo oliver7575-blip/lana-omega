@@ -35,6 +35,7 @@ export async function POST(request: Request) {
     if (!b.firstName?.trim() || !b.lastName?.trim()) need.push("the guest's first and last name")
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(b.email ?? '')) need.push('a valid email')
     if (!/^[A-Za-z]{2}$/.test(b.country ?? '')) need.push('the country')
+    if (!(Number(b.customTotal) > 0)) need.push('the price per night')
     if (need.length) return NextResponse.json({ error: `Please add ${need.join(', ')}.` }, { status: 400 })
     try {
       const { id: reservationID, quoteWarning } = await createBookingLodgify(l.auth, {
@@ -48,8 +49,8 @@ export async function POST(request: Request) {
         email: b.email!.trim(),
         phone: b.phone?.trim() || undefined,
         country: b.country!.toUpperCase(),
-        skipQuote: b.withQuote === false,
-        total: b.withQuote === false && b.customTotal != null && Number.isFinite(Number(b.customTotal)) && Number(b.customTotal) >= 0 ? Number(b.customTotal) : undefined,
+        skipQuote: true,
+        total: b.customTotal != null && Number.isFinite(Number(b.customTotal)) && Number(b.customTotal) >= 0 ? Number(b.customTotal) : undefined,
       })
       // Lodgify has no arrival-time field: keep it in Lana's own table, like her WhatsApp updates.
       if (b.arrivalTime) {

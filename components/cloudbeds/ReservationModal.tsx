@@ -567,9 +567,6 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
               )}
               <button onClick={() => openHistoryPopup({ reservationId: id, guestName: r.guestName })} className={`${btn} ${bt} !border-[#c9d9f7] !text-[#2456b8]`}>Message history</button>
               <span className="flex-1" />
-              {r.hasQuote === false && canCancel && (
-                <button disabled={busy} onClick={() => act({ action: 'quote' }, 'Quote created at Lodgify prices.')} className={`${btn} ${bt} !border-[#c9d9f7] !text-[#2456b8]`}>Create quote (Lodgify price)</button>
-              )}
               {r.hasQuote !== undefined && canCancel && !/airbnb|booking\.com|expedia|homeaway|vrbo|ical/i.test(r.source ?? '') && (
                 <button disabled={busy} onClick={() => setPriceEdit('')} className={`${btn} ${bt} !border-[#c9d9f7] !text-[#2456b8]`}>Change price</button>
               )}
