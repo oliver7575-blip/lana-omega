@@ -131,32 +131,83 @@ export async function dashSummaryLodgify(auth: LodgifyAuth, today: string) {
   }
 }
 
-/** Nightly price per rental for the window, from Lodgify's rates calendar (best effort). */
-async function ratesFor(auth: LodgifyAuth, propId: string, start: string, end: string): Promise<Record<string, number>> {
-  const out: Record<string, number> = {}
-  try {
-    const r = await lodgifyFetch(auth, `/v2/rates/calendar?HouseId=${encodeURIComponent(propId)}&StartDate=${start}&EndDate=${end}`)
-    if (!r.ok) return out
-    const d = r.data as Raw
-    const items = (d.calendar_items as Raw[] | undefined) ?? (Array.isArray(d) ? (d as unknown as Raw[]) : [])
-    for (const it of items) {
-      const date = day(it.date ?? it.start_date)
-      const price = Number(it.price_per_day ?? it.price ?? it.rate ?? 0)
-      if (date && price > 0) out[date] = price
-    }
-  } catch {
-    /* rates are optional */
+interface RateDay { date: string; price: number; minStay?: number; maxStay?: number; extra?: number; extraFrom?: number }
+
+/** Lodgify's rates calendar for one rental (inclusive dates). */
+async function rateDays(auth: LodgifyAuth, propId: string, roomTypeId: string, start: string, endInclusive: string): Promise<RateDay[]> {
+  const r = await lodgifyFetch(auth, `/v2/rates/calendar?houseId=${encodeURIComponent(propId)}&roomTypeId=${encodeURIComponent(roomTypeId)}&startDate=${start}&endDate=${endInclusive}`)
+  if (!r.ok) return []
+  const items = ((r.data as Raw | null)?.calendar_items as Raw[] | undefined) ?? []
+  const out: RateDay[] = []
+  for (const it of items) {
+    const p = ((it.prices as Raw[] | undefined) ?? [])[0]
+    const price = amount(p?.price_per_day)
+    if (!p || !price || price <= 0) continue
+    out.push({
+      date: day(it.date),
+      price,
+      minStay: Number(p.min_stay) || undefined,
+      maxStay: Number(p.max_stay) || undefined,
+      extra: amount(p.price_per_additional_guest),
+      extraFrom: Number(p.additional_guests_starts_from) || undefined,
+    })
   }
   return out
+}
+
+/** Sets the nightly price of a rental for start..endInclusive, keeping each night's stay limits. */
+export async function setRateLodgify(auth: LodgifyAuth, rateID: string, start: string, endInclusive: string, price: number) {
+  const [propertyId, roomTypeId] = rateID.split(':')
+  if (!propertyId || !roomTypeId) throw new Error('This rental has no editable rate.')
+  const existing = await rateDays(auth, propertyId, roomTypeId, start, endInclusive)
+  const byDate = new Map(existing.map((d) => [d.date, d]))
+  // Group consecutive nights that share the same stay limits into one rate period.
+  const periods: { start: string; end: string; d?: RateDay }[] = []
+  for (let d = start; d <= endInclusive; d = addDays(d, 1)) {
+    const cur = byDate.get(d)
+    const last = periods[periods.length - 1]
+    const same = last && last.end === d && last.d?.minStay === cur?.minStay && last.d?.maxStay === cur?.maxStay && last.d?.extra === cur?.extra && last.d?.extraFrom === cur?.extraFrom
+    if (same) last.end = addDays(d, 1)
+    else periods.push({ start: d, end: addDays(d, 1), d: cur })
+  }
+  const rates = periods.map((p) => ({
+    is_default: false,
+    start_date: p.start,
+    end_date: p.end, // exclusive
+    price_per_day: price,
+    ...(p.d?.minStay ? { min_stay: p.d.minStay } : {}),
+    ...(p.d?.maxStay ? { max_stay: p.d.maxStay } : {}),
+    ...(p.d?.extra ? { price_per_additional_guest: p.d.extra } : {}),
+    ...(p.d?.extraFrom ? { additional_guests_starts_from: p.d.extraFrom } : {}),
+  }))
+  const r = await lodgifyFetch(auth, '/v1/rates/savewithoutavailability', {
+    method: 'POST',
+    body: JSON.stringify({ property_id: Number(propertyId), room_type_id: Number(roomTypeId), rates }),
+  })
+  if (!r.ok) throw new Error(r.error)
 }
 
 export async function calendarLodgify(auth: LodgifyAuth, start: string, dayCount: number, today: string): Promise<CalendarData> {
   const end = addDays(start, dayCount)
   const days = Array.from({ length: dayCount }, (_, i) => addDays(start, i))
   const [props, all] = await Promise.all([loadProps(auth), allBookings(auth)])
-  const rates = await Promise.all(props.map((p) => ratesFor(auth, p.id, start, end)))
+  const rentals = await rentalRooms(auth)
+  const rates = await Promise.all(
+    props.map(async (p) => {
+      const rt = rentals.find((x) => x.propertyId === p.id)?.roomTypeId
+      if (!rt) return { rt: '', map: {} as Record<string, number> }
+      const days = await rateDays(auth, p.id, rt, start, addDays(end, -1)).catch(() => [])
+      return { rt, map: Object.fromEntries(days.map((d) => [d.date, d.price])) as Record<string, number> }
+    }),
+  )
 
-  const roomTypes: CalendarData['roomTypes'] = props.map((p, i) => ({ id: p.id, name: p.name, rates: rates[i], rooms: [{ id: p.id, name: p.name }] }))
+  const roomTypes: CalendarData['roomTypes'] = props.map((p, i) => ({
+    id: p.id,
+    name: p.name,
+    rates: rates[i].map,
+    ...(rates[i].rt ? { rateID: `${p.id}:${rates[i].rt}` } : {}),
+    rooms: [{ id: p.id, name: p.name }],
+  }))
 
   const bookings: CalendarData['bookings'] = []
   const blocks: CalendarData['blocks'] = []

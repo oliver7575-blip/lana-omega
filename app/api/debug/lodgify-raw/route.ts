@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { decryptCredentials, type EncryptedPayload } from '@/lib/crypto'
+import { lodgifyFetch } from '@/lib/lodgify'
 import { getBookingRaw, getPropertyRaw, listPropertiesRaw, listRoomsRaw, listUpcomingRaw, listWebhooks } from '@/lib/lodgify'
 import { pmsForTenant } from '@/lib/pms'
 
@@ -36,6 +37,13 @@ export async function GET(request: Request) {
   const auth = { apiKey: api_key, propertyId }
   const pms = await pmsForTenant(supabase, tenantId)
 
+  const ratesProp = params.get('rates')
+  if (ratesProp) {
+    const rt = params.get('roomTypeId') ?? ''
+    const from = params.get('from') ?? new Date().toISOString().slice(0, 10)
+    const to = params.get('to') ?? from
+    return NextResponse.json(await lodgifyFetch(auth, `/v2/rates/calendar?houseId=${ratesProp}&roomTypeId=${rt}&startDate=${from}&endDate=${to}`))
+  }
   const propId = params.get('rooms')
   if (propId) {
     const [rooms, property] = await Promise.all([listRoomsRaw(auth, propId), getPropertyRaw(auth, propId)])
