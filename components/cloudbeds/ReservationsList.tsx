@@ -84,7 +84,7 @@ export default function ReservationsList() {
 
       {error && <p className="mb-4 rounded-md bg-red-950/40 px-4 py-2 text-sm text-red-300">{error}</p>}
 
-      <div className={`overflow-hidden rounded-2xl border ${LINE}`} style={{ background: 'var(--card-bg, rgba(22,40,92,.5))' }}>
+      <div data-listbox className={`overflow-hidden rounded-2xl border ${LINE}`} style={{ background: 'var(--card-bg, rgba(22,40,92,.5))' }}>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>

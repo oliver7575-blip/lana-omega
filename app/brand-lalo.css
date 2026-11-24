@@ -303,3 +303,6 @@ html[data-brand="lalo"][data-theme="light"] th[data-guestcol]{color:#1a3a27 !imp
 /* Reservations: guest column in dark mode — slightly softer, green-tinted off-white */
 html[data-brand="lalo"] td[data-guestcol]{color:#d3ebdb}
 html[data-brand="lalo"] th[data-guestcol]{color:#b4d6c0}
+/* Guest / arrival lists: darker, green-tinted panel behind the names so they read clearly (dark mode) */
+html[data-brand="lalo"]:not([data-theme="light"]) [data-listbox]{background:rgba(5,18,11,.72) !important;border-color:rgba(110,200,140,.16) !important}
+html[data-brand="lalo"]:not([data-theme="light"]) [data-listbox] tr[data-dayrow]{background:linear-gradient(90deg,rgba(110,200,140,.2),rgba(110,200,140,.05)) !important}

@@ -302,7 +302,7 @@ export default function DashviewPage() {
                   className="min-w-0 flex-1 bg-transparent text-[12.5px] text-[#eaf0fb] outline-none placeholder:text-[#8ea3cf]" />
               </label>
             </div>
-            <div className={tableWrap}>
+            <div data-listbox className={tableWrap}>
               <table className="w-full">
                 <thead className={`border-b ${LINE}`}>
                   <tr><th className={thc}>Guest</th><th className={thc}>Conf #</th><th className={thc}>Room</th><th className={thc}>Arrival</th><th className={thc}>Status</th></tr>
@@ -347,7 +347,7 @@ export default function DashviewPage() {
                     </div>
                   ))}
                 </div>
-                <div className={tableWrap}>
+                <div data-listbox className={tableWrap}>
                   <table className="w-full">
                     <thead className={`border-b ${LINE}`}><tr><th className={thc}>Guest</th><th className={thc}>Revenue</th><th className={thc}>Check-in</th><th className={thc}>Nights</th></tr></thead>
                     <tbody className="divide-y divide-[#8fb4ff]/10">
@@ -402,7 +402,7 @@ export default function DashviewPage() {
             {!ins ? <p className="py-6 text-center text-[12.5px] text-[#9fb3dc]">Loading…</p> : ins.upcoming.length === 0 ? (
               <p className="py-6 text-center text-[12.5px] text-[#9fb3dc]">None available</p>
             ) : (
-              <ul className="max-h-[170px] divide-y divide-[#8fb4ff]/10 overflow-y-auto pr-1">
+              <ul data-listbox className="max-h-[170px] divide-y divide-[#8fb4ff]/10 overflow-y-auto pr-1">
                 {ins.upcoming.slice(0, 12).map((b) => (
                   <li key={b.reservationID}>
                     <button onClick={() => setOpen(b.reservationID)} className="flex w-full items-center gap-2 py-1.5 text-left hover:bg-white/[0.05]">
