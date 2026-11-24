@@ -294,6 +294,7 @@ export async function reservationDetailLodgify(auth: LodgifyAuth, id: string, to
     guestID: null,
     dateCreated: str(b.created_at) || null,
     confirmationCode: code,
+    hasQuote: b.quote != null,
     specialRequests: str(b.notes) || null,
     breakdown: {
       subTotal: amount(sub.stay) ?? null,
@@ -430,6 +431,21 @@ export async function createBookingLodgify(auth: LodgifyAuth, b: NewLodgifyBooki
   })
   if (!q.ok) quoteWarning = `The booking was saved as Booked in Lodgify (number ${id}), but Lodgify did not create its quote: ${q.error}. Open the booking in Lodgify to add the quote.`
   return { id, quoteWarning }
+}
+
+/** Adds a quote at Lodgify's own prices to a booking that has none (POST /v1/reservation/booking/{id}/quote). */
+export async function createQuoteLodgify(auth: LodgifyAuth, id: string): Promise<void> {
+  const r = await lodgifyFetch(auth, `/v2/reservations/bookings/${encodeURIComponent(id)}`)
+  if (!r.ok) throw new Error(r.error)
+  const b = r.data as Raw
+  const room = (await rentalRooms(auth)).find((x) => x.propertyId === str(b.property_id))
+  if (!room) throw new Error('Could not find the rental of this booking in Lodgify')
+  const q = await lodgifyFetch(auth, `/v1/reservation/booking/${encodeURIComponent(id)}/quote`, {
+    method: 'POST',
+    body: JSON.stringify({ is_policy_active: false, room_types: [{ room_type_id: Number(room.roomTypeId) }] }),
+  })
+  if (!q.ok) throw new Error(q.error)
+  cache.clear()
 }
 
 /** Cancels a booking in Lodgify (PUT /v1/reservation/booking/{id}/decline). */

@@ -25,7 +25,7 @@ export async function GET(request: Request) {
 /** Creates a reservation in Cloudbeds from the Dashboard's "Create new reservation" window. */
 export async function POST(request: Request) {
   const c = await cloudbedsForCaller()
-  const b = (await request.json()) as Partial<NewReservation>
+  const b = (await request.json()) as Partial<NewReservation> & { withQuote?: boolean }
   if ('error' in c) {
     const l = await lodgifyForCaller()
     if (!l) return c.error
@@ -48,7 +48,8 @@ export async function POST(request: Request) {
         email: b.email!.trim(),
         phone: b.phone?.trim() || undefined,
         country: b.country!.toUpperCase(),
-        total: b.customTotal != null && Number.isFinite(Number(b.customTotal)) && Number(b.customTotal) >= 0 ? Number(b.customTotal) : undefined,
+        skipQuote: b.withQuote === false,
+        total: b.withQuote === false && b.customTotal != null && Number.isFinite(Number(b.customTotal)) && Number(b.customTotal) >= 0 ? Number(b.customTotal) : undefined,
       })
       // Lodgify has no arrival-time field: keep it in Lana's own table, like her WhatsApp updates.
       if (b.arrivalTime) {

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { cloudbedsForCaller } from '@/lib/cloudbeds-caller'
 import { lodgifyForCaller } from '@/lib/lodgify-caller'
-import { cancelBookingLodgify, reservationDetailLodgify } from '@/lib/lodgify-ops'
+import { cancelBookingLodgify, createQuoteLodgify, reservationDetailLodgify } from '@/lib/lodgify-ops'
 import { localDate } from '@/lib/tz'
 import { assignRoom, checkIn, checkOut, checkOutRoom, cloudbedsLinks, getGuestProfile, getReservationDetail, getReservationGuestContact, getReservationNotes, moveReservation, addReservationNote, deleteReservationNote, updateReservationNote, setArrivalTime, setStatus, setStayDates, unassignRoom } from '@/lib/cloudbeds-ops'
 
@@ -70,6 +70,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (lb.action === 'cancel') {
       try {
         await cancelBookingLodgify(l.auth, id)
+        return NextResponse.json({ ok: true, reservation: await reservationDetailLodgify(l.auth, id, localDate(new Date(), l.tz)) })
+      } catch (err) {
+        return NextResponse.json({ error: err instanceof Error ? err.message : 'Lodgify error' }, { status: 502 })
+      }
+    }
+    if (lb.action === 'quote') {
+      try {
+        await createQuoteLodgify(l.auth, id)
         return NextResponse.json({ ok: true, reservation: await reservationDetailLodgify(l.auth, id, localDate(new Date(), l.tz)) })
       } catch (err) {
         return NextResponse.json({ error: err instanceof Error ? err.message : 'Lodgify error' }, { status: 502 })

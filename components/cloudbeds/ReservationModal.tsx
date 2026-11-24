@@ -73,6 +73,7 @@ interface Detail {
   guestCountry: string | null
   dateCreated: string | null
   confirmationCode: string | null
+  hasQuote?: boolean
   specialRequests: string | null
   breakdown: { subTotal: number | null; additionalItems: number | null; taxesFees: number | null; paid: number | null }
 }
@@ -565,6 +566,9 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
               )}
               <button onClick={() => openHistoryPopup({ reservationId: id, guestName: r.guestName })} className={`${btn} ${bt} !border-[#c9d9f7] !text-[#2456b8]`}>Message history</button>
               <span className="flex-1" />
+              {r.hasQuote === false && canCancel && (
+                <button disabled={busy} onClick={() => act({ action: 'quote' }, 'Quote created at Lodgify prices.')} className={`${btn} ${bt} !border-[#c9d9f7] !text-[#2456b8]`}>Create quote (Lodgify price)</button>
+              )}
               {canCancel && (
                 <button disabled={busy} onClick={() => setConfirmCancel(true)} className={`${btn} ${bt} !border-[#f3cfcb] !bg-[#fffafa] !text-[#b42318]`}>Cancel reservation</button>
               )}

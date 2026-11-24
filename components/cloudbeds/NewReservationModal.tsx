@@ -62,6 +62,7 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
   const [sendEmail, setSendEmail] = useState(true)
   const lodgify = options?.pms === 'lodgify'
   const [nightly, setNightly] = useState('')
+  const [withQuote, setWithQuote] = useState(true)
 
   const [mode, setMode] = useState<'reservation' | 'block'>(initialMode ?? 'reservation')
   const [blockType, setBlockType] = useState<'blocked_dates' | 'out_of_service'>('blocked_dates')
@@ -136,7 +137,7 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
   const setPerNight = chosen && chosen.total !== null && nightCount > 0 ? chosen.total / nightCount : null
   const nightlyNum = nightly.trim() === '' ? null : Number(nightly)
   const nightlyValid = nightlyNum === null || (Number.isFinite(nightlyNum) && nightlyNum >= 0)
-  const customTotal = nightlyNum !== null && nightlyValid && (setPerNight !== null || lodgify) ? Math.round(nightlyNum * nightCount * 100) / 100 : undefined
+  const customTotal = nightlyNum !== null && nightlyValid && (!lodgify || !withQuote) && (setPerNight !== null || lodgify) ? Math.round(nightlyNum * nightCount * 100) / 100 : undefined
   const effectiveTotal = customTotal ?? chosen?.total ?? null
 
   async function create() {
@@ -148,6 +149,7 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
         roomTypeID, roomID: roomID || undefined, roomRateID: chosen?.roomRateID ?? undefined,
         firstName, lastName, email, phone, country, arrivalTime: arrivalTime || undefined,
         sourceID: sourceID || undefined, paymentMethod, sendEmail,
+        withQuote: lodgify ? withQuote : undefined,
         customTotal, listTotal: customTotal !== undefined ? chosen?.total ?? undefined : undefined,
       })
       if (j.priceWarning) window.alert(j.priceWarning)
@@ -326,18 +328,28 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
               </select>
             </label>
           </div>}
-          {chosen && (
+          {chosen && lodgify && (
+            <div className="mt-3">
+              <span className={label}>Reservation type</span>
+              <div className="mt-1 grid grid-cols-2 gap-2 text-[12.5px]">
+                <button type="button" onClick={() => setWithQuote(true)} className={`h-[34px] rounded-lg border ${withQuote ? 'border-[#0e5f47] bg-[#e7f4ee] font-semibold text-[#0e5f47]' : 'border-gray-300 text-gray-600'}`}>With quote</button>
+                <button type="button" onClick={() => setWithQuote(false)} className={`h-[34px] rounded-lg border ${!withQuote ? 'border-[#0e5f47] bg-[#e7f4ee] font-semibold text-[#0e5f47]' : 'border-gray-300 text-gray-600'}`}>Without quote</button>
+              </div>
+              <span className="mt-0.5 block text-[11px] text-gray-500">{withQuote ? "Uses Lodgify's own price and creates the quote." : 'Saved without a quote. Enter the price below, or leave it empty for no price.'}</span>
+            </div>
+          )}
+          {chosen && (!lodgify || !withQuote) && (
             <label className="mt-3 block"><span className={label}>Price per night (MXN)</span>
               <input type="number" min="0" step="1" inputMode="decimal" value={nightly} onChange={(e) => setNightly(e.target.value)}
                 placeholder={setPerNight !== null ? `Set price: ${Math.round(setPerNight).toLocaleString('en-US')}` : lodgify ? 'Lodgify calculates it' : 'Set price'} className={input} />
-              <span className="mt-0.5 block text-[11px] text-gray-500">{lodgify ? 'Leave empty to let Lodgify calculate the price.' : 'Leave empty to use the set price.'}</span>
+              <span className="mt-0.5 block text-[11px] text-gray-500">{lodgify ? 'Leave empty to save with no price.' : 'Leave empty to use the set price.'}</span>
             </label>
           )}
           {!lodgify && <label className="mt-2 flex items-center gap-2 text-[12.5px]">
             <input type="checkbox" checked={sendEmail} onChange={(e) => setSendEmail(e.target.checked)} />
             Send Cloudbeds confirmation email to the guest
           </label>}
-          {lodgify && <p className="mt-1 text-[11.5px] text-gray-500">Saved in Lodgify as a confirmed booking (source: Lana panel). Lodgify works out the price unless you enter one below.</p>}
+          {lodgify && <p className="mt-1 text-[11.5px] text-gray-500">Saved in Lodgify as a confirmed booking (source: Lana panel). Choose below whether it gets a quote.</p>}
           </>}
 
           {error && <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-[12.5px] text-red-700">{error}</p>}
