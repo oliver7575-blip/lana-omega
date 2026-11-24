@@ -570,7 +570,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
               {r.hasQuote === false && canCancel && (
                 <button disabled={busy} onClick={() => act({ action: 'quote' }, 'Quote created at Lodgify prices.')} className={`${btn} ${bt} !border-[#c9d9f7] !text-[#2456b8]`}>Create quote (Lodgify price)</button>
               )}
-              {r.hasQuote !== undefined && canCancel && !isThirdParty && (
+              {r.hasQuote !== undefined && canCancel && !/airbnb|booking\.com|expedia|homeaway|vrbo|ical/i.test(r.source ?? '') && (
                 <button disabled={busy} onClick={() => setPriceEdit('')} className={`${btn} ${bt} !border-[#c9d9f7] !text-[#2456b8]`}>Change price</button>
               )}
               {canCancel && (
