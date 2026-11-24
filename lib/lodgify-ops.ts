@@ -297,7 +297,7 @@ export async function reservationDetailLodgify(auth: LodgifyAuth, id: string, to
     hasQuote: b.quote != null,
     specialRequests: str(b.notes) || null,
     breakdown: {
-      subTotal: amount(sub.stay) ?? null,
+      subTotal: b.quote == null && total ? total : amount(sub.stay) ?? null,
       additionalItems: (amount(sub.addons) ?? 0) + (amount(sub.fees) ?? 0) || null,
       taxesFees: (amount(sub.taxes) ?? 0) + (amount(sub.vat) ?? 0),
       paid,
