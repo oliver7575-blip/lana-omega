@@ -15,6 +15,7 @@ interface RoomType {
   rooms: { roomID: string; roomName: string }[]
 }
 interface Options {
+  pms?: 'lodgify'
   sources: { id: string; name: string }[]
   sourcesError?: string | null
   paymentMethods: { code: string; name: string }[]
@@ -59,6 +60,7 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
   const [sourceID, setSourceID] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('')
   const [sendEmail, setSendEmail] = useState(true)
+  const lodgify = options?.pms === 'lodgify'
   const [nightly, setNightly] = useState('')
 
   const [mode, setMode] = useState<'reservation' | 'block'>(initialMode ?? 'reservation')
@@ -84,6 +86,9 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
       })
       .catch(() => setOptions({ sources: [], paymentMethods: [] }))
   }, [])
+
+  // Lodgify blocks are made in Lodgify itself.
+  useEffect(() => { if (lodgify && mode === 'block') setMode('reservation') }, [lodgify, mode])
 
   // Any change to the stay means availability must be checked again.
   useEffect(() => {
@@ -131,7 +136,7 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
   const setPerNight = chosen && chosen.total !== null && nightCount > 0 ? chosen.total / nightCount : null
   const nightlyNum = nightly.trim() === '' ? null : Number(nightly)
   const nightlyValid = nightlyNum === null || (Number.isFinite(nightlyNum) && nightlyNum >= 0)
-  const customTotal = nightlyNum !== null && nightlyValid && setPerNight !== null ? Math.round(nightlyNum * nightCount * 100) / 100 : undefined
+  const customTotal = nightlyNum !== null && nightlyValid && (setPerNight !== null || lodgify) ? Math.round(nightlyNum * nightCount * 100) / 100 : undefined
   const effectiveTotal = customTotal ?? chosen?.total ?? null
 
   async function create() {
@@ -186,7 +191,7 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
   const n = nights(start, end)
   const blocking = mode === 'block'
   const canBlock = Boolean(roomID && end > start && !saving)
-  const canCreate = Boolean(chosen && firstName.trim() && lastName.trim() && email.trim() && country && paymentMethod && nightlyValid && !saving)
+  const canCreate = Boolean(chosen && firstName.trim() && lastName.trim() && email.trim() && country && (paymentMethod || lodgify) && nightlyValid && !saving)
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#14213d]/40 p-4 pt-10" onClick={onClose}>
@@ -202,7 +207,7 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
         <div className="max-h-[calc(100vh-9rem)] overflow-y-auto px-6 pb-5">
           <div className="mt-4 inline-flex rounded-full bg-[#e8eef0] p-[3px] text-[12.5px] font-semibold">
             <button onClick={() => setMode('reservation')} className={`h-[30px] rounded-full px-4 ${!blocking ? 'bg-white text-[#0e5f47] shadow-[0_1px_3px_rgba(16,24,40,.12)]' : 'text-gray-600'}`}>Reservation</button>
-            <button onClick={() => setMode('block')} className={`h-[30px] rounded-full px-4 ${blocking ? 'bg-white text-[#0e5f47] shadow-[0_1px_3px_rgba(16,24,40,.12)]' : 'text-gray-600'}`}>Block dates / Out of service</button>
+            {!lodgify && <button onClick={() => setMode('block')} className={`h-[30px] rounded-full px-4 ${blocking ? 'bg-white text-[#0e5f47] shadow-[0_1px_3px_rgba(16,24,40,.12)]' : 'text-gray-600'}`}>Block dates / Out of service</button>}
           </div>
           <p className={section}>Stay</p>
           <div className="grid grid-cols-4 gap-2">
@@ -302,7 +307,7 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
           </div>
 
           <p className={section}>Booking</p>
-          <div className="grid grid-cols-2 gap-2">
+          {!lodgify && <div className="grid grid-cols-2 gap-2">
             <label><span className={label}>Source</span>
               <select value={sourceID} onChange={(e) => setSourceID(e.target.value)} className={input} disabled={!options}>
                 {!options && <option>Loading…</option>}
@@ -320,18 +325,19 @@ export default function NewReservationModal({ today, onClose, onCreated, onBlock
                 {options?.paymentMethods.map((m) => <option key={m.code} value={m.code}>{m.name}</option>)}
               </select>
             </label>
-          </div>
+          </div>}
           {chosen && (
             <label className="mt-3 block"><span className={label}>Price per night (MXN)</span>
               <input type="number" min="0" step="1" inputMode="decimal" value={nightly} onChange={(e) => setNightly(e.target.value)}
-                placeholder={setPerNight !== null ? `Set price: ${Math.round(setPerNight).toLocaleString('en-US')}` : 'Set price'} className={input} />
-              <span className="mt-0.5 block text-[11px] text-gray-500">Leave empty to use the set price.</span>
+                placeholder={setPerNight !== null ? `Set price: ${Math.round(setPerNight).toLocaleString('en-US')}` : lodgify ? 'Lodgify calculates it' : 'Set price'} className={input} />
+              <span className="mt-0.5 block text-[11px] text-gray-500">{lodgify ? 'Leave empty to let Lodgify calculate the price.' : 'Leave empty to use the set price.'}</span>
             </label>
           )}
-          <label className="mt-2 flex items-center gap-2 text-[12.5px]">
+          {!lodgify && <label className="mt-2 flex items-center gap-2 text-[12.5px]">
             <input type="checkbox" checked={sendEmail} onChange={(e) => setSendEmail(e.target.checked)} />
             Send Cloudbeds confirmation email to the guest
-          </label>
+          </label>}
+          {lodgify && <p className="mt-1 text-[11.5px] text-gray-500">Saved in Lodgify as a confirmed booking (source: Lana panel). Lodgify works out the price unless you enter one below.</p>}
           </>}
 
           {error && <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-[12.5px] text-red-700">{error}</p>}

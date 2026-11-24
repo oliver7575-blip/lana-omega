@@ -271,3 +271,95 @@ export async function searchLodgify(auth: LodgifyAuth, q: string, today: string)
     .sort((a, b) => b.startDate.localeCompare(a.startDate))
     .slice(0, 50)
 }
+
+// ---- New reservation ------------------------------------------------------------
+
+interface RentalRoom { propertyId: string; name: string; roomTypeId: string; maxGuests: number }
+const roomCache = new Map<string, { at: number; rows: RentalRoom[] }>()
+
+/** Every rental with the room type id Lodgify needs to book it. */
+async function rentalRooms(auth: LodgifyAuth): Promise<RentalRoom[]> {
+  const key = auth.apiKey.slice(-8)
+  const hit = roomCache.get(key)
+  if (hit && Date.now() - hit.at < 10 * 60_000) return hit.rows
+  const props = await loadProps(auth)
+  const rows: RentalRoom[] = []
+  for (const p of props) {
+    const r = await lodgifyFetch(auth, `/v2/properties/${encodeURIComponent(p.id)}/rooms`)
+    if (!r.ok) continue
+    const list = (Array.isArray(r.data) ? r.data : ((r.data as { items?: Raw[] })?.items ?? [])) as Raw[]
+    const first = list[0]
+    if (!first || first.id === undefined) continue
+    rows.push({ propertyId: p.id, name: p.name, roomTypeId: str(first.id), maxGuests: Number(first.max_people) || 2 })
+  }
+  roomCache.set(key, { at: Date.now(), rows })
+  return rows
+}
+
+/** Rentals that are free for the whole stay (no booking or blocked dates overlap it). */
+export async function availabilityLodgify(auth: LodgifyAuth, start: string, end: string, adults: number, children: number) {
+  const [rooms, all] = await Promise.all([rentalRooms(auth), allBookings(auth)])
+  const busy = new Set<string>()
+  for (const b of all) {
+    if (isCanceled(b) || mapLodgifyStatus(b) === 'enquiry') continue
+    if (day(b.arrival) < end && day(b.departure) > start) busy.add(str(b.property_id))
+  }
+  return rooms
+    .filter((r) => !busy.has(r.propertyId) && r.maxGuests >= adults + children)
+    .map((r) => ({
+      roomTypeID: r.propertyId,
+      name: r.name,
+      maxGuests: r.maxGuests,
+      roomsAvailable: 1,
+      total: null as number | null,
+      roomRateID: null,
+      ratePlan: null,
+      rooms: [{ roomID: r.propertyId, roomName: r.name }],
+    }))
+}
+
+export interface NewLodgifyBooking {
+  propertyId: string
+  start: string
+  end: string
+  adults: number
+  children: number
+  firstName: string
+  lastName: string
+  email: string
+  phone?: string
+  country: string
+  total?: number
+}
+
+/** Creates a booking in Lodgify (POST /v1/reservation/booking). Leaving total out lets Lodgify price the stay. */
+export async function createBookingLodgify(auth: LodgifyAuth, b: NewLodgifyBooking): Promise<string> {
+  const rooms = await rentalRooms(auth)
+  const room = rooms.find((r) => r.propertyId === b.propertyId)
+  if (!room) throw new Error('That rental was not found in Lodgify')
+  // Re-check just before saving so a booking made a moment ago is not double-booked.
+  const free = await availabilityLodgify(auth, b.start, b.end, 1, 0)
+  if (!free.some((r) => r.roomTypeID === b.propertyId)) throw new Error('That rental is no longer free for these dates.')
+  cache.clear()
+  const body: Record<string, unknown> = {
+    arrival: b.start,
+    departure: b.end,
+    property_id: Number(b.propertyId),
+    status: 'Booked',
+    source_text: 'Lana panel',
+    rooms: [{ room_type_id: Number(room.roomTypeId), guest_breakdown: { Adults: b.adults, Children: b.children } }],
+    guest: {
+      guest_name: { first_name: b.firstName, last_name: b.lastName },
+      email: b.email,
+      ...(b.phone ? { phone: b.phone } : {}),
+      country_code: b.country,
+    },
+    ...(b.total !== undefined ? { total: b.total, currency_code: 'MXN' } : {}),
+  }
+  const r = await lodgifyFetch(auth, '/v1/reservation/booking', { method: 'POST', body: JSON.stringify(body) })
+  if (!r.ok) throw new Error(r.error)
+  const id = typeof r.data === 'number' || typeof r.data === 'string' ? String(r.data) : str((r.data as Raw | null)?.id)
+  if (!id) throw new Error('Lodgify did not return the new booking id')
+  cache.clear()
+  return id
+}
