@@ -68,6 +68,13 @@ export async function GET(request: Request) {
     const d = (after.ok ? after.data : null) as Record<string, unknown> | null
     return NextResponse.json({ bookingId: bid, shape, quote: q, status: d?.status, total: d?.total_amount, subtotals: d?.subtotals, quoteStatus: (d?.quote as Record<string, unknown> | null)?.status })
   }
+  const listName = params.get('list')
+  if (listName) {
+    const { listBookings, guestOf, amount } = await import('@/lib/lodgify')
+    const all = await listBookings(auth, 'stayFilter=All')
+    const rows = (all.ok ? all.rows : []) as Record<string, unknown>[]
+    return NextResponse.json(rows.filter((b) => String(guestOf(b).name ?? '').toLowerCase().includes(listName.toLowerCase())).map((b) => ({ id: b.id, status: b.status, arrival: b.arrival, departure: b.departure, total: amount(b.total_amount), source: b.source, created: b.created_at })))
+  }
   const declineId = params.get('decline')
   if (declineId) {
     const { cancelBookingLodgify } = await import('@/lib/lodgify-ops')
