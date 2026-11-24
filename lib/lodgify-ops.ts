@@ -498,7 +498,16 @@ export async function cancelBookingLodgify(auth: LodgifyAuth, id: string): Promi
   if (/airbnb|booking|expedia|homeaway|ical/.test(src)) {
     throw new Error(`This booking came from ${sourceLabel(b) ?? 'a channel'}. Cancel it on that channel (or in Lodgify), so the guest and the channel are told.`)
   }
-  const p = await lodgifyFetch(auth, `/v1/reservation/booking/${encodeURIComponent(id)}/decline`, { method: 'PUT', body: JSON.stringify({}) })
+  const eid = encodeURIComponent(id)
+  const decline = () => lodgifyFetch(auth, `/v1/reservation/booking/${eid}/decline`, { method: 'PUT', body: JSON.stringify({}) })
+  let p = await decline()
+  if (!p.ok && /transition|666/i.test(p.error)) {
+    // A booking whose quote was agreed (e.g. created in Lodgify) cannot go Booked → Declined directly:
+    // step it back to Tentative first, then decline.
+    const t = await lodgifyFetch(auth, `/v1/reservation/booking/${eid}/tentative`, { method: 'PUT', body: JSON.stringify({}) })
+    if (t.ok) p = await decline()
+    else p = { ...p, error: `${p.error} (also could not set it to tentative first: ${t.error})` } as typeof p
+  }
   if (!p.ok) throw new Error(p.error)
   cache.clear()
 }
