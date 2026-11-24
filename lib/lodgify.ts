@@ -438,6 +438,16 @@ export async function listPropertiesRaw(auth: LodgifyAuth) {
   return lodgifyFetch(auth, '/v2/properties?page=1&size=50')
 }
 
+/** One property's rooms, raw (debug only). */
+export async function listRoomsRaw(auth: LodgifyAuth, propertyId: string) {
+  return lodgifyFetch(auth, `/v2/properties/${encodeURIComponent(propertyId)}/rooms`)
+}
+
+/** One property, raw (debug only). */
+export async function getPropertyRaw(auth: LodgifyAuth, propertyId: string) {
+  return lodgifyFetch(auth, `/v2/properties/${encodeURIComponent(propertyId)}`)
+}
+
 /** The first few upcoming bookings, raw (debug only). */
 export async function listUpcomingRaw(auth: LodgifyAuth, size = 3) {
   return lodgifyFetch(auth, `/v2/reservations/bookings?stayFilter=Upcoming&page=1&size=${size}`)

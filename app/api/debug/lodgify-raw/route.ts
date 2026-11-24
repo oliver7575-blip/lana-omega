@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { decryptCredentials, type EncryptedPayload } from '@/lib/crypto'
-import { getBookingRaw, listPropertiesRaw, listUpcomingRaw, listWebhooks } from '@/lib/lodgify'
+import { getBookingRaw, getPropertyRaw, listPropertiesRaw, listRoomsRaw, listUpcomingRaw, listWebhooks } from '@/lib/lodgify'
 import { pmsForTenant } from '@/lib/pms'
 
 /**
@@ -36,6 +36,11 @@ export async function GET(request: Request) {
   const auth = { apiKey: api_key, propertyId }
   const pms = await pmsForTenant(supabase, tenantId)
 
+  const propId = params.get('rooms')
+  if (propId) {
+    const [rooms, property] = await Promise.all([listRoomsRaw(auth, propId), getPropertyRaw(auth, propId)])
+    return NextResponse.json({ rooms, property })
+  }
   const id = params.get('id')
   if (id) {
     const [raw, mapped] = await Promise.all([getBookingRaw(auth, id), pms?.lookupReservation(id)])
