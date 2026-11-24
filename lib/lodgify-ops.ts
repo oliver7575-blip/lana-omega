@@ -506,7 +506,12 @@ export async function cancelBookingLodgify(auth: LodgifyAuth, id: string): Promi
     // step it back to Tentative first, then decline.
     const t = await lodgifyFetch(auth, `/v1/reservation/booking/${eid}/tentative`, { method: 'PUT', body: JSON.stringify({}) })
     if (t.ok) p = await decline()
-    else p = { ...p, error: `${p.error} (also could not set it to tentative first: ${t.error})` } as typeof p
+    else {
+      // Try reopening it instead (POST /v1/reservation/booking/{id}/open), then decline.
+      const o = await lodgifyFetch(auth, `/v1/reservation/booking/${eid}/open`, { method: 'POST', body: JSON.stringify({}) })
+      if (o.ok) p = await decline()
+      else p = { ...p, error: 'Lodgify does not let the panel cancel this booking because its quote was agreed in Lodgify. Cancel it in Lodgify instead.' } as typeof p
+    }
   }
   if (!p.ok) throw new Error(p.error)
   cache.clear()
