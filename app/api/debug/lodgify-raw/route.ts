@@ -37,6 +37,31 @@ export async function GET(request: Request) {
   const auth = { apiKey: api_key, propertyId }
   const pms = await pmsForTenant(supabase, tenantId)
 
+  // Experiment: how does Lodgify take a custom price on a quote? ?quotetest=new|<bookingId>&shape=1..4&amount=N
+  const qt = params.get('quotetest')
+  if (qt) {
+    const { createBookingLodgify } = await import('@/lib/lodgify-ops')
+    const shape = Number(params.get('shape') ?? '1')
+    const amountN = Number(params.get('amount') ?? '3000')
+    let bid = qt
+    if (qt === 'new') {
+      const made = await createBookingLodgify(auth, { propertyId: '739470', start: '2027-09-01', end: '2027-09-03', adults: 2, children: 0, firstName: 'Quote', lastName: 'Test', email: 'oliver7575@aol.com', country: 'MX' })
+      bid = made.id
+    }
+    const custom = [
+      { amount: amountN, currency_code: 'MXN' },
+      amountN,
+      { amount: amountN },
+      { price_per_day: amountN },
+    ][shape - 1]
+    const q = await lodgifyFetch(auth, `/v1/reservation/booking/${bid}/quote`, {
+      method: 'POST',
+      body: JSON.stringify({ is_policy_active: false, room_types: [{ room_type_id: 806586, custom_fee_amount: custom }] }),
+    })
+    const after = await getBookingRaw(auth, bid)
+    const d = (after.ok ? after.data : null) as Record<string, unknown> | null
+    return NextResponse.json({ bookingId: bid, shape, quote: q, status: d?.status, total: d?.total_amount, subtotals: d?.subtotals, quoteStatus: (d?.quote as Record<string, unknown> | null)?.status })
+  }
   const declineId = params.get('decline')
   if (declineId) {
     const { cancelBookingLodgify } = await import('@/lib/lodgify-ops')
