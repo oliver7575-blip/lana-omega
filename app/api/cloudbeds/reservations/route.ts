@@ -73,7 +73,16 @@ export async function POST(request: Request) {
           { onConflict: 'tenant_id,reservation_id' },
         )
       }
-      // The welcome message is sent by Lodgify's booking webhook, as for any other new booking.
+      // Lodgify doesn't send its booking webhook for bookings made through its API, so send the welcome
+      // ourselves (a repeat from the webhook is skipped: every send is claimed once per booking).
+      after(async () => {
+        try {
+          const res = await processNewReservation(l.tenantId, reservationID)
+          console.log('[new-reservation] panel booking (Lodgify)', reservationID, JSON.stringify({ step: res.step, ok: res.ok, detail: 'detail' in res ? res.detail : undefined }))
+        } catch (e) {
+          console.error('[new-reservation] notify failed (Lodgify)', reservationID, e)
+        }
+      })
       return NextResponse.json({ reservationID, priceWarning: quoteWarning })
     } catch (err) {
       return NextResponse.json({ error: err instanceof Error ? err.message : 'Lodgify error' }, { status: 502 })
