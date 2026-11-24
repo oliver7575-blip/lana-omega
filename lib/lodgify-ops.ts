@@ -384,6 +384,8 @@ export interface NewLodgifyBooking {
   phone?: string
   country: string
   total?: number
+  /** Experiment/diagnostic: save the booking without creating a quote afterwards. */
+  skipQuote?: boolean
 }
 
 /** Creates a booking in Lodgify (POST /v1/reservation/booking). Leaving total out lets Lodgify price the stay. */
@@ -416,6 +418,7 @@ export async function createBookingLodgify(auth: LodgifyAuth, b: NewLodgifyBooki
   if (!id) throw new Error('Lodgify did not return the new booking id')
   cache.clear()
 
+  if (b.skipQuote) return { id }
   // A booking made through the API has no quote until one is created: ask Lodgify to price the stay
   // from its rates (POST /v1/reservation/booking/{id}/quote). Without the policy workflow the quote needs no
   // payment schedule, so the booking stays Booked instead of waiting for the guest (Tentative).

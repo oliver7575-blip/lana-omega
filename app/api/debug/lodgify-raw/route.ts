@@ -44,6 +44,12 @@ export async function GET(request: Request) {
     const shape = Number(params.get('shape') ?? '1')
     const amountN = Number(params.get('amount') ?? '3000')
     let bid = qt
+    if (qt === 'newtotal') {
+      const made = await createBookingLodgify(auth, { propertyId: '739470', start: '2027-09-05', end: '2027-09-07', adults: 2, children: 0, firstName: 'Total', lastName: 'Test', email: 'oliver7575@aol.com', country: 'MX', total: amountN * 2, skipQuote: true })
+      const after = await getBookingRaw(auth, made.id)
+      const d = (after.ok ? after.data : null) as Record<string, unknown> | null
+      return NextResponse.json({ bookingId: made.id, status: d?.status, total: d?.total_amount, subtotals: d?.subtotals, quote: d?.quote })
+    }
     if (qt === 'new') {
       const made = await createBookingLodgify(auth, { propertyId: '739470', start: '2027-09-01', end: '2027-09-03', adults: 2, children: 0, firstName: 'Quote', lastName: 'Test', email: 'oliver7575@aol.com', country: 'MX' })
       bid = made.id
