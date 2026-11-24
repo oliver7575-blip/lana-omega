@@ -27,9 +27,9 @@ export interface LodgifyAuth {
   propertyId?: string
 }
 
-type Raw = Record<string, unknown>
+export type Raw = Record<string, unknown>
 
-async function lodgifyFetch(auth: LodgifyAuth, path: string, init?: RequestInit): Promise<{ ok: true; data: unknown } | { ok: false; status: number; error: string }> {
+export async function lodgifyFetch(auth: LodgifyAuth, path: string, init?: RequestInit): Promise<{ ok: true; data: unknown } | { ok: false; status: number; error: string }> {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
     headers: {
@@ -70,7 +70,7 @@ export function mapLodgifyStatus(b: Raw): string {
   return s || 'unknown'
 }
 
-function guestOf(b: Raw): Raw {
+export function guestOf(b: Raw): Raw {
   return (b.guest as Raw | undefined) ?? {}
 }
 
@@ -80,7 +80,7 @@ function phoneOf(b: Raw): string | undefined {
   return str(g.phone) ?? str(g.phone_number) ?? str(g.mobile)
 }
 
-function amount(v: unknown): number | undefined {
+export function amount(v: unknown): number | undefined {
   if (typeof v === 'number') return v
   if (v && typeof v === 'object' && 'amount' in v) {
     const n = Number((v as { amount: unknown }).amount)
@@ -183,7 +183,7 @@ function inProperty(auth: LodgifyAuth, b: Raw): boolean {
 
 // ---- Reads -----------------------------------------------------------------------
 
-async function listBookings(auth: LodgifyAuth, query: string): Promise<{ ok: true; rows: Raw[] } | { ok: false; error: string }> {
+export async function listBookings(auth: LodgifyAuth, query: string): Promise<{ ok: true; rows: Raw[] } | { ok: false; error: string }> {
   const rows: Raw[] = []
   for (let page = 1; page <= MAX_PAGES; page++) {
     const r = await lodgifyFetch(auth, `/v2/reservations/bookings?${query}&page=${page}&size=${PAGE_SIZE}`)

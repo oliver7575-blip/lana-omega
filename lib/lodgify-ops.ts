@@ -1,0 +1,273 @@
+/**
+ * Dashboard + Calendar data for a Lodgify hotel, in the same shapes the
+ * Cloudbeds pages already read (lib/cloudbeds-ops.ts), so the pages work for
+ * either PMS. Read-only: every Lodgify property (rental) is one "room type"
+ * with one room.
+ */
+import {
+  amount,
+  guestOf,
+  listBookings,
+  listPropertiesRaw,
+  lodgifyFetch,
+  mapLodgifyStatus,
+  sourceLabel,
+  type LodgifyAuth,
+  type Raw,
+} from './lodgify'
+import type { CalendarData, DashRow, ActivityRow } from './cloudbeds-ops'
+
+const str = (v: unknown) => (v === null || v === undefined ? '' : String(v).trim())
+const day = (v: unknown) => str(v).slice(0, 10)
+
+export function addDays(d: string, n: number): string {
+  const t = new Date(`${d}T12:00:00Z`)
+  t.setUTCDate(t.getUTCDate() + n)
+  return t.toISOString().slice(0, 10)
+}
+const nights = (a: string, b: string) => Math.max(0, Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86400000))
+
+interface Prop { id: string; name: string }
+
+async function loadProps(auth: LodgifyAuth): Promise<Prop[]> {
+  const r = await listPropertiesRaw(auth)
+  if (!r.ok) throw new Error(r.error)
+  const d = r.data as { items?: Raw[] } | Raw[] | null
+  const list = Array.isArray(d) ? d : (d?.items ?? [])
+  return list
+    .filter((p) => p.id !== undefined && (!auth.propertyId || String(p.id) === auth.propertyId))
+    .map((p) => ({ id: String(p.id), name: str(p.name) || `Property ${p.id}` }))
+}
+
+// A short cache: the dashboard fires several requests at once.
+const cache = new Map<string, { at: number; rows: Raw[] }>()
+async function allBookings(auth: LodgifyAuth): Promise<Raw[]> {
+  const key = auth.apiKey.slice(-8)
+  const hit = cache.get(key)
+  if (hit && Date.now() - hit.at < 30_000) return hit.rows
+  const r = await listBookings(auth, 'stayFilter=All&includeCount=false')
+  if (!r.ok) throw new Error(r.error)
+  cache.set(key, { at: Date.now(), rows: r.rows })
+  return r.rows
+}
+
+const isCanceled = (b: Raw) => mapLodgifyStatus(b) === 'canceled'
+/** Real stays: not enquiries, not cancelled, not owner blocks. */
+const isStay = (b: Raw) => {
+  const s = mapLodgifyStatus(b)
+  return s !== 'canceled' && s !== 'enquiry' && b.is_unavailable !== true
+}
+
+/** What the calendar/dashboard show as the stay's status, by date. */
+function stayState(b: Raw, today: string): string {
+  const a = day(b.arrival)
+  const d = day(b.departure)
+  if (String(b.status ?? '').toLowerCase() === 'tentative') return 'not_confirmed'
+  if (d <= today) return 'checked_out'
+  if (a <= today) return 'in_house'
+  return 'confirmed'
+}
+
+const propName = (props: Prop[], b: Raw) => props.find((p) => p.id === str(b.property_id))?.name ?? '—'
+
+function row(props: Prop[], b: Raw, today: string): DashRow {
+  return {
+    reservationID: str(b.id),
+    guestName: str(guestOf(b).name),
+    room: propName(props, b),
+    arrivalTime: null,
+    status: stayState(b, today),
+    startDate: day(b.arrival),
+    endDate: day(b.departure),
+  }
+}
+
+export async function dashListLodgify(auth: LodgifyAuth, tab: 'arrivals' | 'departures' | 'stayovers' | 'inhouse', date: string, today: string): Promise<DashRow[]> {
+  const [props, all] = await Promise.all([loadProps(auth), allBookings(auth)])
+  const stays = all.filter(isStay)
+  const pick = stays.filter((b) => {
+    const a = day(b.arrival)
+    const d = day(b.departure)
+    if (tab === 'arrivals') return a === date
+    if (tab === 'departures') return d === date
+    if (tab === 'stayovers') return a < date && d > date
+    return a <= today && d > today // in-house tonight
+  })
+  return pick.map((b) => row(props, b, today)).sort((x, y) => x.room.localeCompare(y.room))
+}
+
+function activity(b: Raw): ActivityRow {
+  return {
+    reservationID: str(b.id),
+    guestName: str(guestOf(b).name),
+    revenue: amount(b.total_amount) ?? null,
+    checkIn: day(b.arrival),
+    nights: nights(day(b.arrival), day(b.departure)),
+    status: mapLodgifyStatus(b),
+  }
+}
+
+export async function dashSummaryLodgify(auth: LodgifyAuth, today: string) {
+  const [props, all] = await Promise.all([loadProps(auth), allBookings(auth)])
+  const stays = all.filter(isStay)
+  const arrivals = stays.filter((b) => day(b.arrival) === today).length
+  const departures = stays.filter((b) => day(b.departure) === today).length
+  const stayovers = stays.filter((b) => day(b.arrival) < today && day(b.departure) > today).length
+  const occupied = new Set(stays.filter((b) => day(b.arrival) <= today && day(b.departure) > today).map((b) => str(b.property_id)))
+  const roomsOccupied = props.filter((p) => occupied.has(p.id)).length
+
+  const salesRows = stays.filter((b) => day(b.created_at) === today).slice(0, 30).map(activity)
+  const cancelRows = all.filter((b) => isCanceled(b) && day(b.canceled_at ?? b.updated_at) === today).slice(0, 30).map(activity)
+
+  return {
+    arrivals,
+    departures,
+    stayovers,
+    inHouse: roomsOccupied,
+    roomsOccupied,
+    percentageOccupied: props.length ? Math.round((roomsOccupied / props.length) * 100) : 0,
+    sales: { count: salesRows.length, roomNights: salesRows.reduce((s, r) => s + r.nights, 0), revenue: salesRows.reduce((s, r) => s + (r.revenue ?? 0), 0), rows: salesRows },
+    cancellations: { count: cancelRows.length, roomNights: cancelRows.reduce((s, r) => s + r.nights, 0), revenue: cancelRows.reduce((s, r) => s + (r.revenue ?? 0), 0), rows: cancelRows },
+  }
+}
+
+/** Nightly price per rental for the window, from Lodgify's rates calendar (best effort). */
+async function ratesFor(auth: LodgifyAuth, propId: string, start: string, end: string): Promise<Record<string, number>> {
+  const out: Record<string, number> = {}
+  try {
+    const r = await lodgifyFetch(auth, `/v2/rates/calendar?HouseId=${encodeURIComponent(propId)}&StartDate=${start}&EndDate=${end}`)
+    if (!r.ok) return out
+    const d = r.data as Raw
+    const items = (d.calendar_items as Raw[] | undefined) ?? (Array.isArray(d) ? (d as unknown as Raw[]) : [])
+    for (const it of items) {
+      const date = day(it.date ?? it.start_date)
+      const price = Number(it.price_per_day ?? it.price ?? it.rate ?? 0)
+      if (date && price > 0) out[date] = price
+    }
+  } catch {
+    /* rates are optional */
+  }
+  return out
+}
+
+export async function calendarLodgify(auth: LodgifyAuth, start: string, dayCount: number, today: string): Promise<CalendarData> {
+  const end = addDays(start, dayCount)
+  const days = Array.from({ length: dayCount }, (_, i) => addDays(start, i))
+  const [props, all] = await Promise.all([loadProps(auth), allBookings(auth)])
+  const rates = await Promise.all(props.map((p) => ratesFor(auth, p.id, start, end)))
+
+  const roomTypes: CalendarData['roomTypes'] = props.map((p, i) => ({ id: p.id, name: p.name, rates: rates[i], rooms: [{ id: p.id, name: p.name }] }))
+
+  const bookings: CalendarData['bookings'] = []
+  const blocks: CalendarData['blocks'] = []
+  for (const b of all) {
+    const a = day(b.arrival)
+    const d = day(b.departure)
+    if (!a || !d || a >= end || d <= start) continue
+    const roomID = str(b.property_id)
+    if (!props.some((p) => p.id === roomID)) continue
+    if (b.is_unavailable === true && !isCanceled(b)) {
+      blocks.push({ roomBlockID: str(b.id), type: 'blocked', roomID, start: a, end: d, reason: str(b.notes) || 'Unavailable' })
+      continue
+    }
+    if (!isStay(b)) continue
+    bookings.push({
+      reservationID: str(b.id),
+      guestName: str(guestOf(b).name),
+      status: stayState(b, today),
+      roomID,
+      start: a,
+      end: d,
+      due: (amount(b.amount_due) ?? 0) > 0.005 && !/airbnb|booking/i.test(sourceLabel(b) ?? ''),
+      src: sourceLabel(b) ?? '',
+    })
+  }
+
+  const overbookings: CalendarData['overbookings'] = []
+  const byRoom = new Map<string, CalendarData['bookings']>()
+  for (const b of bookings) byRoom.set(b.roomID, [...(byRoom.get(b.roomID) ?? []), b])
+  for (const [roomID, list] of byRoom) {
+    const sorted = [...list].sort((x, y) => x.start.localeCompare(y.start))
+    for (let i = 1; i < sorted.length; i++) {
+      if (sorted[i].start < sorted[i - 1].end) overbookings.push({ roomID, reservationIDs: [sorted[i - 1].reservationID, sorted[i].reservationID] })
+    }
+  }
+
+  return { start, days, roomTypes, bookings, unassigned: [], blocks, overbookings }
+}
+
+/** One booking in the shape the reservation window reads (read-only). */
+export async function reservationDetailLodgify(auth: LodgifyAuth, id: string, today: string) {
+  const [props, r] = await Promise.all([loadProps(auth), lodgifyFetch(auth, `/v2/reservations/bookings/${encodeURIComponent(id)}`)])
+  if (!r.ok) throw new Error(r.error)
+  const b = r.data as Raw
+  const g = guestOf(b)
+  const a = day(b.arrival)
+  const d = day(b.departure)
+  const pid = str(b.property_id)
+  const room = props.find((p) => p.id === pid)
+  const rooms = (b.rooms as Raw[] | undefined) ?? []
+  const breakdown = rooms.reduce<{ adults: number; children: number }>(
+    (acc, x) => {
+      const gb = (x.guest_breakdown as Raw | undefined) ?? {}
+      acc.adults += Number(gb.adults ?? x.people ?? 0) || 0
+      acc.children += (Number(gb.children ?? 0) || 0) + (Number(gb.infants ?? 0) || 0)
+      return acc
+    },
+    { adults: 0, children: 0 },
+  )
+  const sub = (b.subtotals as Raw | undefined) ?? {}
+  const total = amount(b.total_amount) ?? null
+  const paid = amount(b.amount_paid) ?? null
+  const code = (await import('./lodgify')).channelCodes(b)[0] ?? null
+  const state = stayState(b, today)
+  return {
+    reservationID: str(b.id),
+    guestName: str(g.name),
+    guestEmail: str(g.email) || null,
+    guestPhone: str(g.phone) || null,
+    status: mapLodgifyStatus(b) === 'canceled' ? 'canceled' : state,
+    source: sourceLabel(b) ?? null,
+    startDate: a,
+    endDate: d,
+    adults: breakdown.adults || 1,
+    children: breakdown.children,
+    rooms: [{ subReservationID: str(b.id), reservationRoomID: null, roomID: pid, roomTypeID: pid, roomTypeName: room?.name ?? '', roomName: room?.name ?? null, roomStatus: state, startDate: a, endDate: d, adults: breakdown.adults || 1, children: breakdown.children }],
+    total,
+    balance: amount(b.amount_due) ?? null,
+    estimatedArrivalTime: str((b.check_in as Raw | undefined)?.time).slice(0, 5) || null,
+    guestCountry: str(g.country_code) || null,
+    guestID: null,
+    dateCreated: str(b.created_at) || null,
+    confirmationCode: code,
+    specialRequests: str(b.notes) || null,
+    breakdown: {
+      subTotal: amount(sub.stay) ?? null,
+      additionalItems: (amount(sub.addons) ?? 0) + (amount(sub.fees) ?? 0) || null,
+      taxesFees: (amount(sub.taxes) ?? 0) + (amount(sub.vat) ?? 0),
+      paid,
+    },
+  }
+}
+
+export async function searchLodgify(auth: LodgifyAuth, q: string, today: string): Promise<DashRow[]> {
+  const term = q.trim().toLowerCase()
+  if (!term) return []
+  const { channelCodes } = await import('./lodgify')
+  const [props, all] = await Promise.all([loadProps(auth), allBookings(auth)])
+  return all
+    .filter((b) => b.is_unavailable !== true)
+    .filter((b) => {
+      const g = guestOf(b)
+      return (
+        str(b.id) === term ||
+        str(g.name).toLowerCase().includes(term) ||
+        str(g.email).toLowerCase().includes(term) ||
+        str(g.phone).replace(/\s/g, '').includes(term.replace(/\s/g, '')) ||
+        channelCodes(b).some((c) => c.toLowerCase() === term)
+      )
+    })
+    .map((b) => row(props, b, today))
+    .sort((a, b) => b.startDate.localeCompare(a.startDate))
+    .slice(0, 50)
+}

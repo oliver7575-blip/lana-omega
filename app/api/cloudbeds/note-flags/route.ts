@@ -14,7 +14,7 @@ const cache = new Map<string, { flag: boolean; at: number }>()
 
 export async function GET(request: Request) {
   const c = await cloudbedsForCaller()
-  if ('error' in c) return c.error
+  if ('error' in c) return NextResponse.json({ flagged: [] })
   const ids = [...new Set((new URL(request.url).searchParams.get('ids') ?? '').split(',').map((s) => s.trim()).filter((s) => /^\d+$/.test(s)))].slice(0, 80)
   const now = Date.now()
   const key = (id: string) => `${c.cb.propertyId}:${id}`

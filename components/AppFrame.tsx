@@ -33,6 +33,7 @@ interface ShellInfo {
   tenantName: string
   tenantId?: string
   tenants?: { id: string; name: string }[]
+  pms?: 'cloudbeds' | 'lodgify' | null
   unreadReservations: number
   unreadEmails: number
   unreadReviews: number
@@ -217,7 +218,7 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
       </div>
 
       <div className="space-y-1">
-        {item('/cloudbeds', 'Cloudbeds', BedIcon, pathname.startsWith('/cloudbeds'))}
+        {item('/cloudbeds', info?.pms === 'lodgify' ? 'Lodgify' : 'Cloudbeds', BedIcon, pathname.startsWith('/cloudbeds'))}
         <div className="ml-8 border-l border-line pl-2">
           {sub('/cloudbeds', 'Dashboard', pathname === '/cloudbeds')}
           {sub('/cloudbeds/calendar', 'Calendar', pathname.startsWith('/cloudbeds/calendar'))}

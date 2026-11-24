@@ -18,7 +18,8 @@ export async function GET() {
     .single()
   if (!staff) return NextResponse.json({ error: 'No tenant' }, { status: 404 })
 
-  const [{ data: tenant }, { count: newEscalations }, unreadReservations, unread, { count: paymentsAttention }, { data: tenants }] = await Promise.all([
+  const [{ data: pmsRows }, { data: tenant }, { count: newEscalations }, unreadReservations, unread, { count: paymentsAttention }, { data: tenants }] = await Promise.all([
+    supabase.from('tenant_integrations').select('integration_type').in('integration_type', ['pms_cloudbeds', 'pms_lodgify']).eq('status', 'connected'),
     supabase.from('tenants').select('name').eq('id', staff.tenant_id).single(),
     supabase.from('escalations').select('id', { count: 'exact', head: true }).eq('status', 'new'),
     unreadConversationIds(supabase, staff.id as string, { reservationsOnly: true }).then((ids) => ids.length),
@@ -31,6 +32,7 @@ export async function GET() {
   return NextResponse.json({
     email: user.email ?? '',
     tenantName: tenant?.name ?? '',
+    pms: (pmsRows ?? []).some((r) => r.integration_type === 'pms_cloudbeds') ? 'cloudbeds' : (pmsRows ?? []).some((r) => r.integration_type === 'pms_lodgify') ? 'lodgify' : null,
     tenantId: staff.tenant_id,
     tenants: ((tenants ?? []) as { tenant_id: string; name: string }[]).map((t) => ({ id: t.tenant_id, name: t.name })),
     unreadReservations,
