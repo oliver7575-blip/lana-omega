@@ -102,6 +102,7 @@ export async function listReservationsLodgify(auth: LodgifyAuth, page: number, t
   const [props, all] = await Promise.all([loadProps(auth), allBookings(auth)])
   const sorted = all
     .filter((b) => b.is_unavailable !== true)
+    .filter((b) => mapLodgifyStatus(b) !== 'canceled')
     .sort((a, b) => str(b.created_at).localeCompare(str(a.created_at)))
   const start = (Math.max(1, page) - 1) * size
   const rows = sorted.slice(start, start + size).map((b) => {

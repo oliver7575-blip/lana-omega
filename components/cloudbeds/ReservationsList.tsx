@@ -84,7 +84,7 @@ export default function ReservationsList() {
 
       {error && <p className="mb-4 rounded-md bg-red-950/40 px-4 py-2 text-sm text-red-300">{error}</p>}
 
-      <div className={`overflow-hidden rounded-2xl border ${LINE}`} style={{ background: 'rgba(22,40,92,.5)' }}>
+      <div className={`overflow-hidden rounded-2xl border ${LINE}`} style={{ background: 'var(--card-bg, rgba(22,40,92,.5))' }}>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -101,7 +101,7 @@ export default function ReservationsList() {
               {groups.map((g, gi) => {
                 const band = gi % 2 === 0 ? 'rgba(91,149,245,.07)' : 'rgba(255,255,255,0)'
                 return [
-                  <tr key={`h-${gi}-${g.day}`} style={{ background: 'linear-gradient(90deg,rgba(143,180,255,.2),rgba(143,180,255,.05))' }} className={`border-y ${LINE}`}>
+                  <tr key={`h-${gi}-${g.day}`} data-dayrow style={{ background: 'linear-gradient(90deg,rgba(143,180,255,.2),rgba(143,180,255,.05))' }} className={`border-y ${LINE}`}>
                     <td colSpan={8} className="px-4 py-1.5">
                       <span className="text-[11px] font-semibold uppercase tracking-[.12em] text-[#cfdcff]">{g.day ? dayHeading(g.day, today) : 'Booking date unknown'}</span>
                       <span className="ml-2 rounded-full bg-white/10 px-2 py-0.5 text-[10.5px] font-semibold text-[#cfdcff]">{g.items.length}</span>

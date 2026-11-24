@@ -290,3 +290,9 @@ html[data-brand="lalo"] ::selection { background: #ea6b41; color: #fff; }
 html[data-brand="lalo"] :focus-visible { outline-color: #ea6b41; }
 /* The hotel wordmark: heavy, upright capitals like the lalozipo.mx logo. */
 html[data-brand="lalo"] .font-display { font-style: normal; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+
+/* Reservations page: day header rows in brand green */
+html[data-brand="lalo"] tr[data-dayrow]{background:linear-gradient(90deg,rgba(110,200,140,.22),rgba(110,200,140,.05)) !important}
+html[data-brand="lalo"] tr[data-dayrow] span{color:#d7efdf !important}
+html[data-brand="lalo"][data-theme="light"] tr[data-dayrow]{background:linear-gradient(90deg,rgba(67,150,84,.2),rgba(67,150,84,.05)) !important}
+html[data-brand="lalo"][data-theme="light"] tr[data-dayrow] span{color:#1f5a33 !important}
