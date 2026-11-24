@@ -1,4 +1,5 @@
 import { createServiceClient } from './supabase/service'
+import { pmsForTenant } from './pms'
 import { cloudbedsForTenant } from './cloudbeds-tenant'
 import { findReservationByClues, findReservationByConfirmation, getReservationDetail, setEstimatedArrival } from './cloudbeds-ops'
 import { notifyStaff } from './escalation'
@@ -62,11 +63,44 @@ export async function handleArrivalEmail(tenantId: string, mail: ArrivalMail, ar
   let saved: { id: string; guestName: string; startDate: string; endDate: string; room: string } | null = null
   let problem: string | null = null
   let savedNote = ''
+  let pmsLabel = 'Cloudbeds'
   {
     try {
       const cb = await cloudbedsForTenant(db, tenantId)
       if (!cb) {
-        problem = 'Cloudbeds is not connected, so the arrival time was not saved.'
+        const pms = await pmsForTenant(db, tenantId)
+        if (pms?.kind !== 'lodgify') {
+          problem = 'No reservation system is connected, so the arrival time was not saved.'
+        } else {
+          pmsLabel = 'Lodgify'
+          let found = number ? await pms.lookupReservation(number) : null
+          if (!found?.found && !number) {
+            // No booking number: match today's arrivals on the check-in date by guest name.
+            const checkIn = arrival.check_in_date || datesFromMail(mail)?.checkIn || null
+            if (!checkIn) problem = `Guest gave an arrival time (${time}) but no booking number or check-in date — add it by hand.`
+            else {
+              const first = (arrival.guest_name || mail.fromName || '').trim().split(/\s+/)[0]?.toLowerCase()
+              const arr = await pms.getArrivalsInWindow(checkIn)
+              const hits = (arr.arrivals ?? []).filter((a) => first && (a.guestName ?? '').toLowerCase().includes(first))
+              if (hits.length === 1) {
+                found = await pms.lookupReservation(hits[0].reservationID)
+                savedNote = ` (identified from the check-in date ${checkIn} and guest name "${arrival.guest_name ?? ''}", no booking number in the email)`
+              } else problem = hits.length
+                ? `Guest gave an arrival time (${time}) with no booking number, and several stays match ${checkIn}: ${hits.map((c) => `${c.guestName} #${c.reservationID}`).join('; ')} — add it by hand.`
+                : `Guest gave an arrival time (${time}) with no booking number, and no stay checking in on ${checkIn} matched — add it by hand.`
+            }
+          }
+          if (found?.found && found.reservationID) {
+            const st = (found.status ?? '').toLowerCase()
+            if (/cancel|declin|checked.?out|no.?show/.test(st)) {
+              problem = `Booking ${number || found.reservationID} is ${found.status} in Lodgify, so the arrival time (${time}) was not saved.`
+            } else {
+              const r = await pms.updateArrivalTime(found.reservationID, time)
+              if (!r.success) problem = `Could not save the arrival time (${time}): ${r.error ?? 'Lodgify error'}`
+              else saved = { id: found.reservationID, guestName: found.guestName ?? '', startDate: found.startDate ?? '', endDate: found.endDate ?? '', room: (found.rooms ?? []).map((x) => x.roomName ?? x.roomTypeName).filter(Boolean).join(', ') || found.roomName || '' }
+            }
+          } else if (!problem) problem = `Couldn't find booking ${number} in Lodgify — add the arrival time (${time}) by hand.`
+        }
       } else {
         let found = number ? await findReservationByConfirmation(cb, number, arrival.check_in_date) : null
         let viaClues = ''
@@ -113,7 +147,7 @@ export async function handleArrivalEmail(tenantId: string, mail: ArrivalMail, ar
     }
   }
   const notes: string[] = []
-  if (saved) notes.push(`Arrival time ${time} saved to Cloudbeds for ${saved.guestName} · #${saved.id}${savedNote}`)
+  if (saved) notes.push(`Arrival time ${time} saved to ${pmsLabel} for ${saved.guestName} · #${saved.id}${savedNote}`)
   else notes.push(problem ?? 'Arrival time not saved.')
   if (kind === 'request') notes.push('early check-in requested — staff to reply')
   await db.from('inbound_emails').update({ action: saved ? 'arrival_saved' : 'arrival_not_saved', action_detail: notes.join(' · ') }).eq('id', mail.id)
@@ -138,6 +172,7 @@ export async function handleArrivalEmail(tenantId: string, mail: ArrivalMail, ar
       number,
       saved,
       mail,
+      pmsLabel,
     })
     notes.push(alerted ? 'late arrival — staff alerted on WhatsApp' : "late arrival — couldn't alert staff on WhatsApp, please check")
     await db.from('inbound_emails').update({ action_detail: notes.join(' · ') }).eq('id', mail.id)
@@ -210,6 +245,7 @@ async function alertStaff(
     number: string
     saved: { id: string; startDate: string; endDate: string; room: string } | null
     mail: ArrivalMail
+    pmsLabel: string
   }
 ): Promise<boolean> {
   const contact = findEscalationContact(parseEscalationContacts(tenant.escalation_contacts), 'reservations')
@@ -225,7 +261,7 @@ async function alertStaff(
   const parts = [
     `Llegada fuera de horario: ${info.guestName} llegará a las ${info.time} (${info.reason})`,
     info.number ? `Reserva ${info.number}` : null,
-    info.saved ? `Cloudbeds #${info.saved.id}` : 'NO se pudo guardar en Cloudbeds',
+    info.saved ? `${info.pmsLabel} #${info.saved.id}` : `NO se pudo guardar en ${info.pmsLabel}`,
     info.saved ? `${info.saved.startDate} → ${info.saved.endDate}` : null,
     info.saved?.room ? info.saved.room : null,
     `por email (${info.mail.fromEmail})`,
