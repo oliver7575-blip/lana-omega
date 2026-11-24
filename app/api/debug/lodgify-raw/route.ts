@@ -75,6 +75,12 @@ export async function GET(request: Request) {
     const rows = (all.ok ? all.rows : []) as Record<string, unknown>[]
     return NextResponse.json(rows.filter((b) => String(guestOf(b).name ?? '').toLowerCase().includes(listName.toLowerCase())).map((b) => ({ id: b.id, status: b.status, arrival: b.arrival, departure: b.departure, total: amount(b.total_amount), source: b.source, created: b.created_at })))
   }
+  const deleteId = params.get('delete')
+  if (deleteId === '24525237') {
+    // One-off: permanently delete a test booking that Lodgify will not let the API cancel.
+    const d = await lodgifyFetch(auth, `/v1/reservation/booking/${deleteId}`, { method: 'DELETE' })
+    return NextResponse.json({ deleted: d, after: await getBookingRaw(auth, deleteId) })
+  }
   const declineId = params.get('decline')
   if (declineId) {
     const { cancelBookingLodgify } = await import('@/lib/lodgify-ops')
