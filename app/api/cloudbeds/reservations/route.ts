@@ -77,7 +77,7 @@ export async function POST(request: Request) {
       // ourselves (a repeat from the webhook is skipped: every send is claimed once per booking).
       after(async () => {
         try {
-          const res = await processNewReservation(l.tenantId, reservationID)
+          const res = await processNewReservation(l.tenantId, reservationID, 'panel')
           console.log('[new-reservation] panel booking (Lodgify)', reservationID, JSON.stringify({ step: res.step, ok: res.ok, detail: 'detail' in res ? res.detail : undefined }))
         } catch (e) {
           console.error('[new-reservation] notify failed (Lodgify)', reservationID, e)

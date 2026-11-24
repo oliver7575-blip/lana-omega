@@ -13,7 +13,27 @@ import {
  * message, and — if arrival is 2 days away or less — the arrival
  * information right away too, since the daily 2-day job would miss it.
  */
-export async function processNewReservation(tenantId: string, reservationID: string) {
+export async function processNewReservation(tenantId: string, reservationID: string, source = 'direct') {
+  let result: Record<string, unknown>
+  try {
+    result = (await processNewReservationInner(tenantId, reservationID)) as Record<string, unknown>
+  } catch (e) {
+    result = { step: 'exception', ok: false, detail: e instanceof Error ? e.message : String(e) }
+  }
+  // A plain record of every attempt, so a missing welcome can be explained afterwards.
+  try {
+    const r = result as { step?: string; ok?: boolean; detail?: string; newReservation?: { whatsapp?: unknown; email?: unknown } }
+    await createServiceClient().from('welcome_log').insert({
+      tenant_id: tenantId,
+      reservation_id: reservationID,
+      source,
+      result: { step: r.step, ok: r.ok, detail: r.detail, whatsapp: r.newReservation?.whatsapp, email: r.newReservation?.email },
+    })
+  } catch {}
+  return result
+}
+
+async function processNewReservationInner(tenantId: string, reservationID: string) {
   const supabase = createServiceClient()
 
   const pms = await pmsForTenant(supabase, tenantId)

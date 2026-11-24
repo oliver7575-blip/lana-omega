@@ -66,6 +66,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
   }
 
   const bookingId = body.booking?.id !== undefined ? String(body.booking.id) : undefined
+  await supabase.from('welcome_log').insert({ tenant_id: tenantId, reservation_id: bookingId ?? null, source: 'webhook_received', result: { action: body.action, status: body.booking?.status } })
   if (bookingId && body.action && NEW_BOOKING_EVENTS.has(body.action)) {
     after(async () => {
       // Same dedup table the cron jobs use: a retry or a second "booked"
@@ -78,7 +79,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
         .eq('message_type', 'new_reservation')
         .maybeSingle()
       if (already) return
-      const result = await processNewReservation(tenantId, bookingId)
+      const result = await processNewReservation(tenantId, bookingId, 'webhook')
       console.log('[lodgify-webhook]', body.action, bookingId, JSON.stringify(result).slice(0, 500))
     })
   }
