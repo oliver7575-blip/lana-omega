@@ -296,3 +296,7 @@ html[data-brand="lalo"] tr[data-dayrow]{background:linear-gradient(90deg,rgba(11
 html[data-brand="lalo"] tr[data-dayrow] span{color:#d7efdf !important}
 html[data-brand="lalo"][data-theme="light"] tr[data-dayrow]{background:linear-gradient(90deg,rgba(67,150,84,.2),rgba(67,150,84,.05)) !important}
 html[data-brand="lalo"][data-theme="light"] tr[data-dayrow] span{color:#1f5a33 !important}
+
+/* Reservations: guest column in light mode — near-black with a green tint */
+html[data-brand="lalo"][data-theme="light"] td[data-guestcol]{color:#10261a !important}
+html[data-brand="lalo"][data-theme="light"] th[data-guestcol]{color:#1a3a27 !important}

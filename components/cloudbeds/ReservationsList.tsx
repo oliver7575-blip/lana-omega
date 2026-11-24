@@ -90,7 +90,7 @@ export default function ReservationsList() {
             <thead>
               <tr className={`border-b ${LINE} text-left text-[10.5px] font-semibold uppercase tracking-[.12em] text-[#9fb3dc]`}>
                 {['Guest', 'Check-in', 'Check-out', 'Nights', 'Room Type', 'Room Number', 'Amount', 'Status'].map((h) => (
-                  <th key={h} className="px-4 py-2.5">{h}</th>
+                  <th key={h} data-guestcol={h === 'Guest' ? '' : undefined} className="px-4 py-2.5">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -110,7 +110,7 @@ export default function ReservationsList() {
                   ...g.items.map((r) => (
                     <tr key={r.reservationID} onClick={() => setOpen(r.reservationID)} style={{ background: band }}
                       className="cursor-pointer border-b border-[#8fb4ff]/10 text-[12.5px] text-[#eaf0fb] hover:bg-white/[0.07]">
-                      <td className="px-4 py-2.5 font-semibold text-white">{r.guestName || '—'}</td>
+                      <td data-guestcol className="px-4 py-2.5 font-semibold text-white">{r.guestName || '—'}</td>
                       <td className="whitespace-nowrap px-4 py-2.5">{longDate(r.startDate)}</td>
                       <td className="whitespace-nowrap px-4 py-2.5">{longDate(r.endDate)}</td>
                       <td className="px-4 py-2.5">{nights(r.startDate, r.endDate) ?? '—'}</td>
