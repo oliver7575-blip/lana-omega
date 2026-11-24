@@ -417,17 +417,18 @@ export async function createBookingLodgify(auth: LodgifyAuth, b: NewLodgifyBooki
   cache.clear()
 
   // A booking made through the API has no quote until one is created: ask Lodgify to price the stay
-  // from its rates and the property's payment/cancellation policy (POST /v1/reservation/booking/{id}/quote).
+  // from its rates (POST /v1/reservation/booking/{id}/quote). Without the policy workflow the quote needs no
+  // payment schedule, so the booking stays Booked instead of waiting for the guest (Tentative).
   let quoteWarning: string | undefined
   const q = await lodgifyFetch(auth, `/v1/reservation/booking/${encodeURIComponent(id)}/quote`, {
     method: 'POST',
-    body: JSON.stringify({ is_policy_active: true, room_types: [{ room_type_id: Number(room.roomTypeId) }] }),
+    body: JSON.stringify({ is_policy_active: false, room_types: [{ room_type_id: Number(room.roomTypeId) }] }),
   })
   if (!q.ok) quoteWarning = `The booking was saved as Booked in Lodgify (number ${id}), but Lodgify did not create its quote: ${q.error}. Open the booking in Lodgify to add the quote.`
   return { id, quoteWarning }
 }
 
-/** Cancels a booking in Lodgify by setting its status to Declined (PATCH /v2/reservations/bookings/{id}). */
+/** Cancels a booking in Lodgify (PUT /v1/reservation/booking/{id}/decline). */
 export async function cancelBookingLodgify(auth: LodgifyAuth, id: string): Promise<void> {
   const r = await lodgifyFetch(auth, `/v2/reservations/bookings/${encodeURIComponent(id)}`)
   if (!r.ok) throw new Error(r.error)
@@ -436,14 +437,7 @@ export async function cancelBookingLodgify(auth: LodgifyAuth, id: string): Promi
   if (/airbnb|booking|expedia|homeaway|ical/.test(src)) {
     throw new Error(`This booking came from ${sourceLabel(b) ?? 'a channel'}. Cancel it on that channel (or in Lodgify), so the guest and the channel are told.`)
   }
-  const rooms = ((b.rooms as Raw[] | undefined) ?? []).map((x) => {
-    const gb = (x.guest_breakdown as Raw | undefined) ?? {}
-    return { room_type_id: Number(x.room_type_id), guest_breakdown: { Adults: Number(gb.adults ?? x.people ?? 1) || 1, Children: Number(gb.children ?? 0) || 0 } }
-  })
-  const p = await lodgifyFetch(auth, `/v2/reservations/bookings/${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ property_id: Number(b.property_id), arrival: day(b.arrival), departure: day(b.departure), status: 'Declined', rooms }),
-  })
+  const p = await lodgifyFetch(auth, `/v1/reservation/booking/${encodeURIComponent(id)}/decline`, { method: 'PUT', body: JSON.stringify({}) })
   if (!p.ok) throw new Error(p.error)
   cache.clear()
 }
