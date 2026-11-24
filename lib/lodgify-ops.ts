@@ -426,3 +426,24 @@ export async function createBookingLodgify(auth: LodgifyAuth, b: NewLodgifyBooki
   if (!q.ok) quoteWarning = `The booking was saved as Booked in Lodgify (number ${id}), but Lodgify did not create its quote: ${q.error}. Open the booking in Lodgify to add the quote.`
   return { id, quoteWarning }
 }
+
+/** Cancels a booking in Lodgify by setting its status to Declined (PATCH /v2/reservations/bookings/{id}). */
+export async function cancelBookingLodgify(auth: LodgifyAuth, id: string): Promise<void> {
+  const r = await lodgifyFetch(auth, `/v2/reservations/bookings/${encodeURIComponent(id)}`)
+  if (!r.ok) throw new Error(r.error)
+  const b = r.data as Raw
+  const src = String(b.source ?? '').toLowerCase()
+  if (/airbnb|booking|expedia|homeaway|ical/.test(src)) {
+    throw new Error(`This booking came from ${sourceLabel(b) ?? 'a channel'}. Cancel it on that channel (or in Lodgify), so the guest and the channel are told.`)
+  }
+  const rooms = ((b.rooms as Raw[] | undefined) ?? []).map((x) => {
+    const gb = (x.guest_breakdown as Raw | undefined) ?? {}
+    return { room_type_id: Number(x.room_type_id), guest_breakdown: { Adults: Number(gb.adults ?? x.people ?? 1) || 1, Children: Number(gb.children ?? 0) || 0 } }
+  })
+  const p = await lodgifyFetch(auth, `/v2/reservations/bookings/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ property_id: Number(b.property_id), arrival: day(b.arrival), departure: day(b.departure), status: 'Declined', rooms }),
+  })
+  if (!p.ok) throw new Error(p.error)
+  cache.clear()
+}
