@@ -16,6 +16,7 @@ import {
   testConnection,
   type LodgifyAuth,
 } from '../lodgify'
+import { availabilityWithPricesLodgify } from '../lodgify-ops'
 import { createServiceClient } from '../supabase/service'
 import type { PmsAdapter } from './types'
 
@@ -60,6 +61,19 @@ export function lodgifyAdapter(tenantId: string, auth: LodgifyAuth): PmsAdapter 
     getDeparturesInWindow: (date) => getDeparturesInWindow(auth, date),
     getRecentlyCreatedReservations: (hours) => getRecentlyCreatedReservations(auth, hours),
     getRoomTypePhotos: () => getRoomTypePhotos(auth),
+    async checkAvailability(checkIn, checkOut, adults, children) {
+      try {
+        const nights = Math.max(1, Math.round((Date.parse(checkOut) - Date.parse(checkIn)) / 86_400_000))
+        const rows = await availabilityWithPricesLodgify(auth, checkIn, checkOut, adults, children)
+        return {
+          success: true, checkIn, checkOut, nights, guests: adults + children, currency: 'MXN',
+          anyAvailable: rows.length > 0,
+          options: rows.map((r) => ({ roomType: r.name, maxGuests: r.maxGuests, unitsFree: 1, pricePerNight: r.perNight, totalForStay: r.total })),
+        }
+      } catch (e) {
+        return { success: false, error: e instanceof Error ? e.message : 'Could not check availability', checkIn, checkOut, nights: 0, guests: adults + children, anyAvailable: false, options: [] }
+      }
+    },
     testConnection: () => testConnection(auth),
   }
 }

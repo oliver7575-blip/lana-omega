@@ -75,6 +75,11 @@ export async function GET(request: Request) {
     const rows = (all.ok ? all.rows : []) as Record<string, unknown>[]
     return NextResponse.json(rows.filter((b) => String(guestOf(b).name ?? '').toLowerCase().includes(listName.toLowerCase())).map((b) => ({ id: b.id, status: b.status, arrival: b.arrival, departure: b.departure, total: amount(b.total_amount), source: b.source, created: b.created_at })))
   }
+  const avail = params.get('availability')
+  if (avail && pms?.checkAvailability) {
+    const [a, b] = avail.split(',')
+    return NextResponse.json(await pms.checkAvailability(a, b, 2, 0))
+  }
   const declineId = params.get('decline')
   if (declineId) {
     const { cancelBookingLodgify } = await import('@/lib/lodgify-ops')

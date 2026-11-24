@@ -39,6 +39,17 @@ export interface RoomPhotosResult {
   photoUrls?: string[]
 }
 
+interface AvailabilityToolInput {
+  checkIn: string
+  checkOut: string
+  adults?: number
+  children?: number
+}
+
+interface AvailabilityTool {
+  checkAvailability: (input: AvailabilityToolInput) => Promise<unknown>
+}
+
 interface RoomPhotosTool {
   getRoomPhotos: (roomType: string) => Promise<RoomPhotosResult>
 }
@@ -112,7 +123,8 @@ export async function generateReply(
   contactButtonTool?: ContactButtonTool,
   roomPhotosTool?: RoomPhotosTool,
   reviewTool?: ReviewTool,
-  paymentTool?: PaymentTool
+  paymentTool?: PaymentTool,
+  availabilityTool?: AvailabilityTool
 ): Promise<GenerateReplyResult> {
   const tools: Record<string, unknown>[] = []
 
@@ -316,6 +328,24 @@ export async function generateReply(
     })
   }
 
+  if (availabilityTool) {
+    tools.push({
+      name: 'check_availability',
+      description:
+        "Check which rooms are free for a stay. Use it whenever a guest asks whether rooms or a specific room are available, or what is open for given dates. Pass check-in and check-out as YYYY-MM-DD (check-out is the departure day, e.g. 'tonight for 2 nights' = today and today+2). Returns the room types that are free with price per night / total when known, or anyAvailable: false. Answer the guest yes/no from the result.",
+      input_schema: {
+        type: 'object',
+        properties: {
+          checkIn: { type: 'string', description: 'Arrival date, YYYY-MM-DD' },
+          checkOut: { type: 'string', description: 'Departure date, YYYY-MM-DD (the day after the last night)' },
+          adults: { type: 'number', description: 'Number of adults (default 2 if the guest did not say)' },
+          children: { type: 'number', description: 'Number of children (default 0)' },
+        },
+        required: ['checkIn', 'checkOut'],
+      },
+    })
+  }
+
   if (roomPhotosTool) {
     tools.push({
       name: 'send_room_photos',
@@ -421,6 +451,8 @@ export async function generateReply(
           const { photoUrls: _omit, ...forModel } = photos
           void _omit
           result = forModel
+        } else if (block.name === 'check_availability' && availabilityTool) {
+          result = await availabilityTool.checkAvailability(block.input as unknown as AvailabilityToolInput)
         } else if (block.name === 'record_review' && reviewTool) {
           result = await reviewTool.recordReview(block.input as unknown as ReviewToolInput)
         } else if (block.name === 'send_contact_button' && contactButtonTool) {

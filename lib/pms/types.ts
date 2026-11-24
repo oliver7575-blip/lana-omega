@@ -32,6 +32,27 @@ export type {
 /** Which PMS a tenant uses. Matches tenant_integrations.integration_type without the "pms_" prefix. */
 export type PmsKind = 'cloudbeds' | 'lodgify'
 
+/** Which room types are free for given dates, for Lana's availability tool. */
+export interface AvailabilityResult {
+  success: boolean
+  error?: string
+  checkIn: string
+  checkOut: string
+  nights: number
+  guests: number
+  anyAvailable: boolean
+  options: {
+    roomType: string
+    maxGuests: number
+    unitsFree: number
+    /** Average price per night for the stay, when the PMS knows it. */
+    pricePerNight: number | null
+    /** Total for the whole stay, when the PMS knows it. */
+    totalForStay: number | null
+  }[]
+  currency?: string
+}
+
 export interface PmsAdapter {
   kind: PmsKind
   /** Human name for messages and the panel, e.g. "Cloudbeds". */
@@ -58,6 +79,9 @@ export interface PmsAdapter {
 
   /** Room types with photo URLs, for Lana's room-photos tool. Absent if the PMS can't provide them. */
   getRoomTypePhotos?(): Promise<{ success: boolean; roomTypes: RoomTypePhotos[]; error?: string }>
+
+  /** Room types free for the dates and party size (with prices where known). Absent if the PMS can't tell. */
+  checkAvailability?(checkIn: string, checkOut: string, adults: number, children: number): Promise<AvailabilityResult>
 
   /** Health check for the Integrations page: reachable + credentials accepted. */
   testConnection(): Promise<{ ok: boolean; detail?: string; error?: string }>

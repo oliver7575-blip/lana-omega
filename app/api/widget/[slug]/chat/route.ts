@@ -9,6 +9,7 @@ import { notifyStaff } from '@/lib/escalation'
 import { parseEscalationContacts, findEscalationContact } from '@/lib/escalation-contacts'
 import { buildRoomPhotosTool } from '@/lib/room-photos'
 import { buildBookingLinkInstruction } from '@/lib/booking-link'
+import { AVAILABILITY_INSTRUCTION, buildAvailabilityTool } from '@/lib/availability-tool'
 import { buildKnowledgeBaseSection } from '@/lib/knowledge-base'
 import { buildLiveNotesSection } from '@/lib/live-notes'
 
@@ -431,7 +432,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       'You are a helpful, warm hotel concierge assistant. Answer guest questions clearly and concisely.') +
     buildKnowledgeBaseSection(tenant.knowledge_base as string | null) +
     (await buildLiveNotesSection(tenant.id as string)) +
-    buildBookingLinkInstruction(tenant.booking_config as Record<string, unknown>)
+    buildBookingLinkInstruction(tenant.booking_config as Record<string, unknown>) +
+    (pms?.checkAvailability ? AVAILABILITY_INSTRUCTION : '')
 
   const roomPhotosTool = pms ? buildRoomPhotosTool(pms) : undefined
 
@@ -460,7 +462,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       undefined,
       roomPhotosTool,
       makeReviewTool({ tenantId, conversationId: conversationId as string, guestName: null, source: 'widget' }),
-      paymentTool
+      paymentTool,
+      pms ? buildAvailabilityTool(pms) : undefined
     )
     // The widget shows plain text, so room photos go out as links.
     const photoLinks = (result.photoUrls ?? []).join('\n')

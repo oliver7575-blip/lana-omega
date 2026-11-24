@@ -13,6 +13,7 @@ import { buildRoomPhotosTool } from '@/lib/room-photos'
 import { buildKnowledgeBaseSection } from '@/lib/knowledge-base'
 import { buildLiveNotesSection } from '@/lib/live-notes'
 import { buildBookingLinkInstruction } from '@/lib/booking-link'
+import { AVAILABILITY_INSTRUCTION, buildAvailabilityTool } from '@/lib/availability-tool'
 import { describeImage } from '@/lib/whatsapp-media'
 import {
   instagramConnection,
@@ -269,6 +270,7 @@ async function handleMessage(tenantId: string, conn: InstagramConnection, accoun
     buildKnowledgeBaseSection(tenant?.knowledge_base as string | null) +
     (await buildLiveNotesSection(tenantId)) +
     buildBookingLinkInstruction(tenant?.booking_config as Record<string, unknown>) +
+    (pms?.checkAvailability ? AVAILABILITY_INSTRUCTION : '') +
     channelInstruction
 
   // Cloudbeds Pay-by-Link only for now — other PMSs get no payment tool.
@@ -296,7 +298,8 @@ async function handleMessage(tenantId: string, conn: InstagramConnection, accoun
       undefined,
       roomPhotosTool,
       makeReviewTool({ tenantId, conversationId, guestName, source: 'instagram' }),
-      paymentTool
+      paymentTool,
+      pms ? buildAvailabilityTool(pms) : undefined
     )
   } catch (err) {
     console.error('[instagram-inbound] AI reply failed', err)

@@ -400,6 +400,22 @@ export async function availabilityLodgify(auth: LodgifyAuth, start: string, end:
     }))
 }
 
+/** Free rentals for Lana's availability tool, with the nightly rates Lodgify has for those nights. */
+export async function availabilityWithPricesLodgify(auth: LodgifyAuth, start: string, end: string, adults: number, children: number) {
+  const [free, rooms] = await Promise.all([availabilityLodgify(auth, start, end, adults, children), rentalRooms(auth)])
+  const lastNight = addDays(end, -1)
+  const nightsN = Math.max(1, Math.round((Date.parse(end) - Date.parse(start)) / 86_400_000))
+  return Promise.all(
+    free.map(async (f) => {
+      const rt = rooms.find((r) => r.propertyId === f.roomTypeID)?.roomTypeId ?? ''
+      const days = rt ? await rateDays(auth, f.roomTypeID, rt, start, lastNight).catch(() => []) : []
+      const priced = days.filter((d) => d.date >= start && d.date <= lastNight)
+      const total = priced.length === nightsN ? priced.reduce((s, d) => s + d.price, 0) : null
+      return { name: f.name, maxGuests: f.maxGuests, total, perNight: total !== null ? Math.round(total / nightsN) : null }
+    }),
+  )
+}
+
 export interface NewLodgifyBooking {
   propertyId: string
   start: string

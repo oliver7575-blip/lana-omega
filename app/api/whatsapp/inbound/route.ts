@@ -14,6 +14,7 @@ import { notifyStaff } from '@/lib/escalation'
 import { parseEscalationContacts, findEscalationContact } from '@/lib/escalation-contacts'
 import { buildRoomPhotosTool } from '@/lib/room-photos'
 import { buildBookingLinkInstruction } from '@/lib/booking-link'
+import { AVAILABILITY_INSTRUCTION, buildAvailabilityTool } from '@/lib/availability-tool'
 import { buildKnowledgeBaseSection } from '@/lib/knowledge-base'
 import { buildLiveNotesSection } from '@/lib/live-notes'
 import { processMaintenanceButtonReply } from '@/lib/maintenance-reply'
@@ -854,6 +855,7 @@ async function replyToConversation(args: {
     buildKnowledgeBaseSection(tenant?.knowledge_base as string | null) +
     (await buildLiveNotesSection(tenantId)) +
     buildBookingLinkInstruction(tenant?.booking_config as Record<string, unknown>) +
+    (pms?.checkAvailability ? AVAILABILITY_INSTRUCTION : '') +
     channelInstruction
 
   // The newest guest message this reply is answering. If another one arrives while the reply is
@@ -889,7 +891,8 @@ async function replyToConversation(args: {
       contactButtonTool,
       roomPhotosTool,
       makeReviewTool({ tenantId, conversationId: conversationId as string, guestName: guestName ?? null, source: 'whatsapp' }),
-      paymentTool
+      paymentTool,
+      pms ? buildAvailabilityTool(pms) : undefined
     )
     replyText = result.text
     noReply = Boolean(result.noReply)
