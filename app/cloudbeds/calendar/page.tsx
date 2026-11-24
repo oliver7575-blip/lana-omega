@@ -156,6 +156,10 @@ export default function CalendarPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState<'past' | 'future' | null>(null)
   const [goTo, setGoTo] = useState('')
+  const [hotelName, setHotelName] = useState('')
+  useEffect(() => {
+    fetch('/api/shell', { cache: 'no-store' }).then((r) => r.json()).then((j: { tenantName?: string }) => setHotelName(j.tenantName ?? '')).catch(() => {})
+  }, [])
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [open, setOpen] = useState<string | null>(null)
   const [dayW, setDayW] = useState(0) // 0 until the screen width is measured
@@ -757,7 +761,7 @@ export default function CalendarPage() {
           <div className="mr-6 flex items-center">
             {/* The wordmark is centred over the room column below it (same width), and the title starts after it. */}
             <div className="flex shrink-0 items-center justify-center" style={{ width: LEFT_W + 1 }}>
-              <Link href="/cloudbeds" title="Back to the dashboard" className="font-display text-[40px] font-semibold italic leading-none tracking-tight text-white hover:opacity-90">Soirée</Link>
+              <Link href="/cloudbeds" title="Back to the dashboard" className="font-display text-[40px] font-semibold italic leading-none tracking-tight text-white hover:opacity-90">{hotelName || '\u00a0'}</Link>
             </div>
             <span className="mr-[35px] h-9 w-px bg-white/25" />
             <div className="leading-none">
