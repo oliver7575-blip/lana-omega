@@ -412,6 +412,7 @@ export async function createBookingLodgify(auth: LodgifyAuth, b: NewLodgifyBooki
       country_code: b.country,
     },
     ...(b.total !== undefined ? { total: b.total, currency_code: 'MXN' } : {}),
+    ...(b.total !== undefined && b.skipQuote ? { notes: `No quote: price set manually in the Lana panel (MXN ${b.total.toLocaleString('en-US')} total).` } : {}),
   }
   const r = await lodgifyFetch(auth, '/v1/reservation/booking', { method: 'POST', body: JSON.stringify(body) })
   if (!r.ok) throw new Error(r.error)
