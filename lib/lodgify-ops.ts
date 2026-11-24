@@ -448,6 +448,47 @@ export async function createQuoteLodgify(auth: LodgifyAuth, id: string): Promise
   cache.clear()
 }
 
+/**
+ * Lodgify cannot edit a booking's price, so this replaces the booking: it declines the old one and creates an
+ * identical one (same guest, dates, rental) without a quote and with the new total. The booking number changes.
+ */
+export async function changePriceLodgify(auth: LodgifyAuth, id: string, nightly: number): Promise<{ newId: string; oldId: string }> {
+  if (!Number.isFinite(nightly) || nightly < 0) throw new Error('Enter a valid price per night')
+  const r = await lodgifyFetch(auth, `/v2/reservations/bookings/${encodeURIComponent(id)}`)
+  if (!r.ok) throw new Error(r.error)
+  const b = r.data as Raw
+  if (/airbnb|booking|expedia|homeaway|ical/.test(String(b.source ?? '').toLowerCase())) throw new Error('The price of an OTA booking can only be changed on the OTA.')
+  const g = guestOf(b)
+  const start = day(b.arrival)
+  const end = day(b.departure)
+  const nights = Math.round((Date.parse(end) - Date.parse(start)) / 86_400_000)
+  if (nights < 1) throw new Error('Could not read the dates of this booking')
+  const rooms = (b.rooms as Raw[] | undefined) ?? []
+  let adults = 0
+  let children = 0
+  for (const x of rooms) {
+    const gb = (x.guest_breakdown as Raw | undefined) ?? {}
+    adults += Number(gb.adults ?? x.people ?? 0) || 0
+    children += (Number(gb.children ?? 0) || 0) + (Number(gb.infants ?? 0) || 0)
+  }
+  const parts = str(g.name).trim().split(/\s+/)
+  const make = (total?: number): NewLodgifyBooking => ({
+    propertyId: str(b.property_id), start, end, adults: adults || 1, children,
+    firstName: parts[0] || 'Guest', lastName: parts.slice(1).join(' ') || '-',
+    email: str(g.email), phone: str(g.phone) || undefined, country: str(g.country_code) || 'MX',
+    total, skipQuote: true,
+  })
+  await cancelBookingLodgify(auth, id)
+  try {
+    const made = await createBookingLodgify(auth, make(Math.round(nightly * nights * 100) / 100))
+    return { newId: made.id, oldId: id }
+  } catch (e) {
+    // Put the guest back rather than leave the dates empty.
+    try { await createBookingLodgify(auth, make(amount(b.total_amount) ?? undefined)) } catch { /* reported below */ }
+    throw new Error(`Could not create the booking at the new price (${e instanceof Error ? e.message : 'Lodgify error'}). The original booking was restored as a new booking — check Lodgify.`)
+  }
+}
+
 /** Cancels a booking in Lodgify (PUT /v1/reservation/booking/{id}/decline). */
 export async function cancelBookingLodgify(auth: LodgifyAuth, id: string): Promise<void> {
   const r = await lodgifyFetch(auth, `/v2/reservations/bookings/${encodeURIComponent(id)}`)

@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { cloudbedsForCaller } from '@/lib/cloudbeds-caller'
 import { lodgifyForCaller } from '@/lib/lodgify-caller'
-import { cancelBookingLodgify, createQuoteLodgify, reservationDetailLodgify } from '@/lib/lodgify-ops'
+import { cancelBookingLodgify, changePriceLodgify, createQuoteLodgify, reservationDetailLodgify } from '@/lib/lodgify-ops'
+import { createServiceClient } from '@/lib/supabase/service'
 import { localDate } from '@/lib/tz'
 import { assignRoom, checkIn, checkOut, checkOutRoom, cloudbedsLinks, getGuestProfile, getReservationDetail, getReservationGuestContact, getReservationNotes, moveReservation, addReservationNote, deleteReservationNote, updateReservationNote, setArrivalTime, setStatus, setStayDates, unassignRoom } from '@/lib/cloudbeds-ops'
 
@@ -71,6 +72,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       try {
         await cancelBookingLodgify(l.auth, id)
         return NextResponse.json({ ok: true, reservation: await reservationDetailLodgify(l.auth, id, localDate(new Date(), l.tz)) })
+      } catch (err) {
+        return NextResponse.json({ error: err instanceof Error ? err.message : 'Lodgify error' }, { status: 502 })
+      }
+    }
+    if (lb.action === 'change_price') {
+      try {
+        const { nightly } = lb as { nightly?: number }
+        const { newId } = await changePriceLodgify(l.auth, id, Number(nightly))
+        const { data: at } = await createServiceClient().from('pms_arrival_times').select('arrival_time').eq('tenant_id', l.tenantId).eq('reservation_id', id).maybeSingle()
+        if (at?.arrival_time) await createServiceClient().from('pms_arrival_times').upsert({ tenant_id: l.tenantId, reservation_id: newId, arrival_time: at.arrival_time, source: 'panel', updated_at: new Date().toISOString() }, { onConflict: 'tenant_id,reservation_id' })
+        return NextResponse.json({ ok: true, newId, reservation: await reservationDetailLodgify(l.auth, newId, localDate(new Date(), l.tz)) })
       } catch (err) {
         return NextResponse.json({ error: err instanceof Error ? err.message : 'Lodgify error' }, { status: 502 })
       }

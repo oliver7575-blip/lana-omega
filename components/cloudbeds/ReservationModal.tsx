@@ -186,6 +186,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
   const [guestError, setGuestError] = useState<string | null>(null)
   const [guestLoading, setGuestLoading] = useState(false)
   const [confirmCancel, setConfirmCancel] = useState(false)
+  const [priceEdit, setPriceEdit] = useState<string | null>(null)
   const [confirmPayLink, setConfirmPayLink] = useState(false)
   const [confirmCheckOut, setConfirmCheckOut] = useState(false)
   // Add a payment / refund (Cloudbeds payment methods)
@@ -287,7 +288,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
       const j = await cbApi<{ reservation: Detail }>(`/api/cloudbeds/reservation/${id}`, 'POST', body)
       apply(j.reservation)
       onChanged?.()
-      if (['check_out', 'check_in', 'dates', 'arrival_time', 'cancel'].includes(String(body.action))) {
+      if (['check_out', 'check_in', 'dates', 'arrival_time', 'cancel', 'change_price'].includes(String(body.action))) {
         onCheckedOut?.(`${j.reservation.guestName}: ${ok.replace(/\.$/, '').toLowerCase()}.`)
         onClose()
         return
@@ -450,7 +451,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
   const fmtDay = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
   const money = (n: number | null) => `MXN ${n === null ? '—' : n.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
   const owes = Boolean(r && r.balance && r.balance > 0)
-  const panelOpen = Boolean(r && (mpKind || (confirmCheckOut && owes) || confirmCancel || confirmPayLink || pay || payError || quick))
+  const panelOpen = Boolean(r && (mpKind || (confirmCheckOut && owes) || confirmCancel || priceEdit !== null || confirmPayLink || pay || payError || quick))
   const firstName = r?.guestName.split(' ')[0] || 'guest'
   const roomNames = r ? r.rooms.map((x) => x.roomName ?? `${x.roomTypeName} (unassigned)`).join(', ') || '—' : ''
   const roomTypes = r ? Array.from(new Set(r.rooms.map((x) => x.roomTypeName).filter(Boolean))).join(', ') : ''
@@ -569,6 +570,9 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
               {r.hasQuote === false && canCancel && (
                 <button disabled={busy} onClick={() => act({ action: 'quote' }, 'Quote created at Lodgify prices.')} className={`${btn} ${bt} !border-[#c9d9f7] !text-[#2456b8]`}>Create quote (Lodgify price)</button>
               )}
+              {r.hasQuote !== undefined && canCancel && !isThirdParty && (
+                <button disabled={busy} onClick={() => setPriceEdit('')} className={`${btn} ${bt} !border-[#c9d9f7] !text-[#2456b8]`}>Change price</button>
+              )}
               {canCancel && (
                 <button disabled={busy} onClick={() => setConfirmCancel(true)} className={`${btn} ${bt} !border-[#f3cfcb] !bg-[#fffafa] !text-[#b42318]`}>Cancel reservation</button>
               )}
@@ -624,6 +628,22 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                   <button onClick={() => setConfirmCheckOut(false)} className={btnLg}>Back</button>
                   <button onClick={() => { setConfirmCheckOut(false); createPaymentLinkNow() }} className={btnLg}>Send payment link instead</button>
                   <button disabled={busy} onClick={() => { setConfirmCheckOut(false); act({ action: 'check_out' }, 'Checked out with the balance still open.') }} className={priRed}>Yes, check out anyway</button>
+                </div>
+              </InlinePanel>
+            )}
+
+            {/* Change price (Lodgify) */}
+            {priceEdit !== null && (
+              <InlinePanel tone="blue" title="Change the price?" subtitle={`${r.guestName} · ${r.startDate} – ${r.endDate} · #${id}`} onClose={() => setPriceEdit(null)}>
+                <p className="rounded-xl border border-[#d6e2f8] bg-white px-3 py-2 text-[12.5px] leading-snug text-[#475467]">
+                  Lodgify cannot edit a price, so this cancels this booking and creates an identical one (same guest, dates and rental) without a quote at the new price. The booking number changes and Lodgify may send the guest its booking emails again.
+                </p>
+                <label className="block text-[12.5px]">Price per night (MXN)
+                  <input type="number" min="0" step="1" inputMode="decimal" value={priceEdit} onChange={(e) => setPriceEdit(e.target.value)} className="mt-1 h-[34px] w-full rounded-lg border border-gray-300 px-2" />
+                </label>
+                <div className="flex justify-end gap-2.5">
+                  <button disabled={busy} onClick={() => setPriceEdit(null)} className={btnLg}>Keep as is</button>
+                  <button disabled={busy || priceEdit.trim() === '' || !(Number(priceEdit) >= 0)} onClick={() => act({ action: 'change_price', nightly: priceEdit.trim() }, 'Price changed (new booking created).')} className={priRed}>{busy ? 'Changing…' : 'Replace booking at this price'}</button>
                 </div>
               </InlinePanel>
             )}
