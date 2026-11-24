@@ -639,7 +639,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                   Lodgify cannot edit a price, so this cancels this booking and creates an identical one (same guest, dates and rental) without a quote at the new price. The booking number changes and Lodgify may send the guest its booking emails again.
                 </p>
                 <label className="block text-[12.5px]">Price per night (MXN)
-                  <input type="number" min="0" step="1" inputMode="decimal" value={priceEdit} onChange={(e) => setPriceEdit(e.target.value)} className="mt-1 h-[34px] w-full rounded-lg border border-gray-300 px-2" />
+                  <input type="number" min="0" step="1" inputMode="decimal" value={priceEdit} onChange={(e) => setPriceEdit(e.target.value)} className="mt-1 h-[34px] w-full rounded-lg border border-gray-300 bg-white px-2 text-gray-900 placeholder:text-gray-400" style={{ colorScheme: "light" }} />
                 </label>
                 <div className="flex justify-end gap-2.5">
                   <button disabled={busy} onClick={() => setPriceEdit(null)} className={btnLg}>Keep as is</button>
