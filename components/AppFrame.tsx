@@ -146,8 +146,8 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
         setSwitching(false)
         return
       }
-      // Hotel-specific pages (a conversation, a task…) don't exist in the other hotel.
-      window.location.assign('/inbox')
+      // Hotel-specific pages (a conversation, a task…) don't exist in the other hotel, so always land on the Dashboard.
+      window.location.assign('/cloudbeds')
     } catch {
       alert('Could not switch hotel')
       setSwitching(false)
