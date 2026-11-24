@@ -52,6 +52,11 @@ export async function POST(request: Request) {
         skipQuote: true,
         total: b.customTotal != null && Number.isFinite(Number(b.customTotal)) && Number(b.customTotal) >= 0 ? Number(b.customTotal) : undefined,
       })
+      // Lodgify cannot store notes through its API: keep a panel-only note that this booking has no quote.
+      await createServiceClient().from('pms_reservation_notes').insert({
+        tenant_id: l.tenantId, reservation_id: reservationID,
+        text: `No quote: price set manually in the Lana panel (MXN ${Number(b.customTotal).toLocaleString('en-US')} total).`,
+      })
       // Lodgify has no arrival-time field: keep it in Lana's own table, like her WhatsApp updates.
       if (b.arrivalTime) {
         await createServiceClient().from('pms_arrival_times').upsert(
