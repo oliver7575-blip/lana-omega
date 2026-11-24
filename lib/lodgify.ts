@@ -226,7 +226,10 @@ async function loadRooms(auth: LodgifyAuth): Promise<{ names: Map<string, string
       const urls = [
         ...(((room.images as Raw[] | undefined) ?? []).map((i) => str(i.url))),
         str(room.image_url),
-      ].filter((u): u is string => !!u && /^https?:\/\//.test(u))
+      ]
+        // Lodgify returns protocol-relative URLs ("//l.icdbcdn.com/...")
+        .map((u) => (u && u.startsWith('//') ? `https:${u}` : u))
+        .filter((u): u is string => !!u && /^https?:\/\//.test(u))
       photos.push({ roomTypeName: name, photos: Array.from(new Set(urls)) })
     }
   }
