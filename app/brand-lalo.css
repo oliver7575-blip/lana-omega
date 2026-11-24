@@ -1,0 +1,292 @@
+/* GENERATED: Lalo brand green. Blue colours hard-coded on the pages are mapped to the Lalo green. */
+html[data-brand="lalo"] .bg-\[\#050b1f\]\/60{background-color:rgba(8,28,14,0.6) !important}
+html[data-brand="lalo"] .bg-\[\#0d1938\]\/40{background-color:rgba(18,51,28,0.4) !important}
+html[data-brand="lalo"] .bg-\[\#0d1938\]\/60{background-color:rgba(18,51,28,0.6) !important}
+html[data-brand="lalo"] .bg-\[\#0e1a3d\]{background-color:#13381e !important}
+html[data-brand="lalo"] .bg-\[\#14213d\]\/40{background-color:rgba(25,56,34,0.4) !important}
+html[data-brand="lalo"] .bg-\[\#14213d\]\/45{background-color:rgba(25,56,34,0.45) !important}
+html[data-brand="lalo"] .bg-\[\#14213d\]{background-color:#193822 !important}
+html[data-brand="lalo"] .bg-\[\#16285c\]\/50{background-color:rgba(30,84,46,0.5) !important}
+html[data-brand="lalo"] .bg-\[\#16285c\]\/60{background-color:rgba(30,84,46,0.6) !important}
+html[data-brand="lalo"] .bg-\[\#1b2340\]{background-color:#1f3c28 !important}
+html[data-brand="lalo"] .bg-\[\#1d3a78\]{background-color:#276e3b !important}
+html[data-brand="lalo"] .bg-\[\#1f2848\]{background-color:#24432d !important}
+html[data-brand="lalo"] .bg-\[\#2456b8\]{background-color:#34a854 !important}
+html[data-brand="lalo"] .bg-\[\#2a2147\]{background-color:#254332 !important}
+html[data-brand="lalo"] .bg-\[\#5b95f5\]\/10{background-color:rgba(108,228,140,0.1) !important}
+html[data-brand="lalo"] .bg-\[\#5b95f5\]\/20{background-color:rgba(108,228,140,0.2) !important}
+html[data-brand="lalo"] .bg-\[\#8fb4ff\]\/15{background-color:rgba(155,243,180,0.15) !important}
+html[data-brand="lalo"] .bg-\[\#8fb4ff\]\/25{background-color:rgba(155,243,180,0.25) !important}
+html[data-brand="lalo"] .bg-\[\#8fb4ff\]{background-color:#9bf3b4 !important}
+html[data-brand="lalo"] .bg-\[\#cbd5e1\]{background-color:#cddfd2 !important}
+html[data-brand="lalo"] .bg-\[\#e3e8f4\]{background-color:#e5f2e9 !important}
+html[data-brand="lalo"] .bg-\[\#e3edff\]{background-color:#e6fcec !important}
+html[data-brand="lalo"] .bg-\[\#e8eef0\]{background-color:#e9efea !important}
+html[data-brand="lalo"] .bg-\[\#eaf1fd\]{background-color:#ecfbf0 !important}
+html[data-brand="lalo"] .bg-\[\#eef0f4\]{background-color:#eff3f0 !important}
+html[data-brand="lalo"] .bg-\[\#efe6fb\]{background-color:#e8f9f0 !important}
+html[data-brand="lalo"] .bg-\[\#f3f5f8\]{background-color:#f4f7f5 !important}
+html[data-brand="lalo"] .bg-\[\#f3f7ff\]{background-color:#f4fef7 !important}
+html[data-brand="lalo"] .bg-\[\#f6f8f9\]{background-color:#f6f9f7 !important}
+html[data-brand="lalo"] .bg-\[\#f6f8fb\]{background-color:#f7faf8 !important}
+html[data-brand="lalo"] .bg-\[\#fbfbfc\]{background-color:#fbfcfb !important}
+html[data-brand="lalo"] .border-\[\#1b2340\]{border-color:#1f3c28 !important}
+html[data-brand="lalo"] .border-\[\#2456b8\]{border-color:#34a854 !important}
+html[data-brand="lalo"] .border-\[\#8fb4ff\]\/10{border-color:rgba(155,243,180,0.1) !important}
+html[data-brand="lalo"] .border-\[\#8fb4ff\]\/25{border-color:rgba(155,243,180,0.25) !important}
+html[data-brand="lalo"] .border-\[\#8fb4ff\]\/30{border-color:rgba(155,243,180,0.3) !important}
+html[data-brand="lalo"] .border-\[\#8fb4ff\]\/50{border-color:rgba(155,243,180,0.5) !important}
+html[data-brand="lalo"] .border-\[\#8fb4ff\]{border-color:#9bf3b4 !important}
+html[data-brand="lalo"] .border-\[\#94a3b8\]{border-color:#98b49f !important}
+html[data-brand="lalo"] .border-\[\#c9d9f7\]{border-color:#cef2d8 !important}
+html[data-brand="lalo"] .border-\[\#cddcf7\]{border-color:#d2f2db !important}
+html[data-brand="lalo"] .border-\[\#d0d5dd\]{border-color:#d1dcd4 !important}
+html[data-brand="lalo"] .border-\[\#d6e2f8\]{border-color:#daf4e1 !important}
+html[data-brand="lalo"] .border-\[\#dde2ea\]{border-color:#dee9e1 !important}
+html[data-brand="lalo"] .border-\[\#e1d3f6\]{border-color:#d7f2e3 !important}
+html[data-brand="lalo"] .border-\[\#e4e8ef\]{border-color:#e5eee8 !important}
+html[data-brand="lalo"] .border-\[\#e6e9f0\]{border-color:#e7efe9 !important}
+html[data-brand="lalo"] .border-\[\#eef0f4\]{border-color:#eff3f0 !important}
+html[data-brand="lalo"] .divide-\[\#8fb4ff\]\/10 > :not([hidden]) ~ :not([hidden]){border-color:rgba(155,243,180,0.1) !important}
+html[data-brand="lalo"] .divide-\[\#8fb4ff\]\/15 > :not([hidden]) ~ :not([hidden]){border-color:rgba(155,243,180,0.15) !important}
+html[data-brand="lalo"] .focus\:border-\[\#8fb4ff\]\/60:focus{border-color:rgba(155,243,180,0.6) !important}
+html[data-brand="lalo"] .hover\:bg-\[\#0d1938\]\/60:hover{background-color:rgba(18,51,28,0.6) !important}
+html[data-brand="lalo"] .hover\:border-\[\#8fb4ff\]\/50:hover{border-color:rgba(155,243,180,0.5) !important}
+html[data-brand="lalo"] .hover\:text-\[\#14213d\]:hover{color:#193822 !important}
+html[data-brand="lalo"] .hover\:text-\[\#475467\]:hover{color:#4b6351 !important}
+html[data-brand="lalo"] .placeholder\:text-\[\#64748b\]::placeholder{color:#688770 !important}
+html[data-brand="lalo"] .placeholder\:text-\[\#8a9bb0\]::placeholder{color:#8eac96 !important}
+html[data-brand="lalo"] .placeholder\:text-\[\#8ea3cf\]::placeholder{color:#95c8a3 !important}
+html[data-brand="lalo"] .ring-\[\#8fb4ff\]\/60{--tw-ring-color:rgba(155,243,180,0.6) !important}
+html[data-brand="lalo"] .text-\[\#14213d\]{color:#193822 !important}
+html[data-brand="lalo"] .text-\[\#14264f\]{color:#1a4928 !important}
+html[data-brand="lalo"] .text-\[\#1b2340\]{color:#1f3c28 !important}
+html[data-brand="lalo"] .text-\[\#1b2a3d\]{color:#1f3925 !important}
+html[data-brand="lalo"] .text-\[\#1d3a78\]{color:#276e3b !important}
+html[data-brand="lalo"] .text-\[\#1d4ed8\]{color:#32c35d !important}
+html[data-brand="lalo"] .text-\[\#2456b8\]{color:#34a854 !important}
+html[data-brand="lalo"] .text-\[\#475467\]{color:#4b6351 !important}
+html[data-brand="lalo"] .text-\[\#5b2ea6\]{color:#3b9966 !important}
+html[data-brand="lalo"] .text-\[\#5b6b8c\]{color:#60876b !important}
+html[data-brand="lalo"] .text-\[\#5ec2ff\]{color:#70ed8a !important}
+html[data-brand="lalo"] .text-\[\#64748b\]{color:#688770 !important}
+html[data-brand="lalo"] .text-\[\#667085\]{color:#698270 !important}
+html[data-brand="lalo"] .text-\[\#6f7f94\]{color:#73907a !important}
+html[data-brand="lalo"] .text-\[\#7a8394\]{color:#7d9182 !important}
+html[data-brand="lalo"] .text-\[\#7b8494\]{color:#7e9183 !important}
+html[data-brand="lalo"] .text-\[\#7b8aa8\]{color:#80a38a !important}
+html[data-brand="lalo"] .text-\[\#8a93a3\]{color:#8da092 !important}
+html[data-brand="lalo"] .text-\[\#8a9bb0\]{color:#8eac96 !important}
+html[data-brand="lalo"] .text-\[\#8dacff\]{color:#9af2b4 !important}
+html[data-brand="lalo"] .text-\[\#8ea3cf\]{color:#95c8a3 !important}
+html[data-brand="lalo"] .text-\[\#8fb4ff\]{color:#9bf3b4 !important}
+html[data-brand="lalo"] .text-\[\#98a2b3\]{color:#9bb0a1 !important}
+html[data-brand="lalo"] .text-\[\#9aa8bb\]{color:#9eb7a4 !important}
+html[data-brand="lalo"] .text-\[\#9fb3dc\]{color:#a6d5b3 !important}
+html[data-brand="lalo"] .text-\[\#9fb8ca\]{color:#a4c5ab !important}
+html[data-brand="lalo"] .text-\[\#b7c9d8\]{color:#bbd4c0 !important}
+html[data-brand="lalo"] .text-\[\#b9c9ee\]{color:#bfe8cb !important}
+html[data-brand="lalo"] .text-\[\#c9b8ff\]{color:#c0f7d7 !important}
+html[data-brand="lalo"] .text-\[\#c9d6f0\]{color:#cdecd6 !important}
+html[data-brand="lalo"] .text-\[\#cfdcff\]{color:#d4fadf !important}
+html[data-brand="lalo"] .text-\[\#dbe5f1\]{color:#ddefe2 !important}
+html[data-brand="lalo"] .text-\[\#eaf0fb\]{color:#ecf9f0 !important}
+html[data-brand="lalo"] .text-\[\#f1f4f9\]{color:#f2f8f4 !important}
+/* light-mode overrides */
+html[data-brand="lalo"][data-theme="light"] .text-\[\#9fb3dc\]:not([class*="bg-gradient"] *){color:#648a6f !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-\[\#9fb3dc\]:not([class*="bg-gradient"] *):hover{color:#648a6f !important}
+html[data-brand="lalo"][data-theme="light"] .placeholder\:text-\[\#9fb3dc\]:not([class*="bg-gradient"] *)::placeholder{color:#648a6f !important}
+html[data-brand="lalo"][data-theme="light"] .text-\[\#eaf0fb\]:not([class*="bg-gradient"] *){color:#23402b !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-\[\#eaf0fb\]:not([class*="bg-gradient"] *):hover{color:#23402b !important}
+html[data-brand="lalo"][data-theme="light"] .placeholder\:text-\[\#eaf0fb\]:not([class*="bg-gradient"] *)::placeholder{color:#23402b !important}
+html[data-brand="lalo"][data-theme="light"] .text-\[\#8fb4ff\]:not([class*="bg-gradient"] *){color:#40b862 !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-\[\#8fb4ff\]:not([class*="bg-gradient"] *):hover{color:#40b862 !important}
+html[data-brand="lalo"][data-theme="light"] .placeholder\:text-\[\#8fb4ff\]:not([class*="bg-gradient"] *)::placeholder{color:#40b862 !important}
+html[data-brand="lalo"][data-theme="light"] .text-\[\#cfdcff\]:not([class*="bg-gradient"] *){color:#396846 !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-\[\#cfdcff\]:not([class*="bg-gradient"] *):hover{color:#396846 !important}
+html[data-brand="lalo"][data-theme="light"] .placeholder\:text-\[\#cfdcff\]:not([class*="bg-gradient"] *)::placeholder{color:#396846 !important}
+html[data-brand="lalo"][data-theme="light"] .text-\[\#b9c9ee\]:not([class*="bg-gradient"] *){color:#4c7758 !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-\[\#b9c9ee\]:not([class*="bg-gradient"] *):hover{color:#4c7758 !important}
+html[data-brand="lalo"][data-theme="light"] .placeholder\:text-\[\#b9c9ee\]:not([class*="bg-gradient"] *)::placeholder{color:#4c7758 !important}
+html[data-brand="lalo"][data-theme="light"] .text-\[\#8ea3cf\]:not([class*="bg-gradient"] *){color:#7aa085 !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-\[\#8ea3cf\]:not([class*="bg-gradient"] *):hover{color:#7aa085 !important}
+html[data-brand="lalo"][data-theme="light"] .placeholder\:text-\[\#8ea3cf\]:not([class*="bg-gradient"] *)::placeholder{color:#7aa085 !important}
+html[data-brand="lalo"][data-theme="light"] .text-\[\#7b8aa8\]:not([class*="bg-gradient"] *){color:#6f8e77 !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-\[\#7b8aa8\]:not([class*="bg-gradient"] *):hover{color:#6f8e77 !important}
+html[data-brand="lalo"][data-theme="light"] .placeholder\:text-\[\#7b8aa8\]:not([class*="bg-gradient"] *)::placeholder{color:#6f8e77 !important}
+html[data-brand="lalo"][data-theme="light"] .text-\[\#7b8494\]:not([class*="bg-gradient"] *){color:#6f8e77 !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-\[\#7b8494\]:not([class*="bg-gradient"] *):hover{color:#6f8e77 !important}
+html[data-brand="lalo"][data-theme="light"] .placeholder\:text-\[\#7b8494\]:not([class*="bg-gradient"] *)::placeholder{color:#6f8e77 !important}
+html[data-brand="lalo"][data-theme="light"] .text-\[\#9aa8bb\]:not([class*="bg-gradient"] *){color:#6f8e77 !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-\[\#9aa8bb\]:not([class*="bg-gradient"] *):hover{color:#6f8e77 !important}
+html[data-brand="lalo"][data-theme="light"] .placeholder\:text-\[\#9aa8bb\]:not([class*="bg-gradient"] *)::placeholder{color:#6f8e77 !important}
+html[data-brand="lalo"][data-theme="light"] .text-\[\#9fb8ca\]:not([class*="bg-gradient"] *){color:#67876f !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-\[\#9fb8ca\]:not([class*="bg-gradient"] *):hover{color:#67876f !important}
+html[data-brand="lalo"][data-theme="light"] .placeholder\:text-\[\#9fb8ca\]:not([class*="bg-gradient"] *)::placeholder{color:#67876f !important}
+html[data-brand="lalo"][data-theme="light"] .text-\[\#b7c9d8\]:not([class*="bg-gradient"] *){color:#597961 !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-\[\#b7c9d8\]:not([class*="bg-gradient"] *):hover{color:#597961 !important}
+html[data-brand="lalo"][data-theme="light"] .placeholder\:text-\[\#b7c9d8\]:not([class*="bg-gradient"] *)::placeholder{color:#597961 !important}
+html[data-brand="lalo"][data-theme="light"] .text-\[\#dbe5f1\]:not([class*="bg-gradient"] *){color:#305039 !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-\[\#dbe5f1\]:not([class*="bg-gradient"] *):hover{color:#305039 !important}
+html[data-brand="lalo"][data-theme="light"] .placeholder\:text-\[\#dbe5f1\]:not([class*="bg-gradient"] *)::placeholder{color:#305039 !important}
+html[data-brand="lalo"][data-theme="light"] .text-\[\#c9d6f0\]:not([class*="bg-gradient"] *){color:#40684b !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-\[\#c9d6f0\]:not([class*="bg-gradient"] *):hover{color:#40684b !important}
+html[data-brand="lalo"][data-theme="light"] .placeholder\:text-\[\#c9d6f0\]:not([class*="bg-gradient"] *)::placeholder{color:#40684b !important}
+html[data-brand="lalo"][data-theme="light"] .text-\[\#f1f4f9\]:not([class*="bg-gradient"] *){color:#23402b !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-\[\#f1f4f9\]:not([class*="bg-gradient"] *):hover{color:#23402b !important}
+html[data-brand="lalo"][data-theme="light"] .placeholder\:text-\[\#f1f4f9\]:not([class*="bg-gradient"] *)::placeholder{color:#23402b !important}
+html[data-brand="lalo"][data-theme="light"] .text-\[\#8dacff\]:not([class*="bg-gradient"] *){color:#40b862 !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-\[\#8dacff\]:not([class*="bg-gradient"] *):hover{color:#40b862 !important}
+html[data-brand="lalo"][data-theme="light"] .placeholder\:text-\[\#8dacff\]:not([class*="bg-gradient"] *)::placeholder{color:#40b862 !important}
+html[data-brand="lalo"][data-theme="light"] .text-\[\#5ec2ff\]:not([class*="bg-gradient"] *){color:#2ca444 !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-\[\#5ec2ff\]:not([class*="bg-gradient"] *):hover{color:#2ca444 !important}
+html[data-brand="lalo"][data-theme="light"] .placeholder\:text-\[\#5ec2ff\]:not([class*="bg-gradient"] *)::placeholder{color:#2ca444 !important}
+html[data-brand="lalo"][data-theme="light"] .text-\[\#ffd0d4\]:not([class*="bg-gradient"] *){color:#a3362b !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-\[\#ffd0d4\]:not([class*="bg-gradient"] *):hover{color:#a3362b !important}
+html[data-brand="lalo"][data-theme="light"] .placeholder\:text-\[\#ffd0d4\]:not([class*="bg-gradient"] *)::placeholder{color:#a3362b !important}
+html[data-brand="lalo"][data-theme="light"] .text-\[\#ffb3ab\]:not([class*="bg-gradient"] *){color:#b54434 !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-\[\#ffb3ab\]:not([class*="bg-gradient"] *):hover{color:#b54434 !important}
+html[data-brand="lalo"][data-theme="light"] .placeholder\:text-\[\#ffb3ab\]:not([class*="bg-gradient"] *)::placeholder{color:#b54434 !important}
+html[data-brand="lalo"][data-theme="light"] .text-\[\#f5d58a\]:not([class*="bg-gradient"] *){color:#8a5a00 !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-\[\#f5d58a\]:not([class*="bg-gradient"] *):hover{color:#8a5a00 !important}
+html[data-brand="lalo"][data-theme="light"] .placeholder\:text-\[\#f5d58a\]:not([class*="bg-gradient"] *)::placeholder{color:#8a5a00 !important}
+html[data-brand="lalo"][data-theme="light"] .text-\[\#ffcf80\]:not([class*="bg-gradient"] *){color:#9a5a00 !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-\[\#ffcf80\]:not([class*="bg-gradient"] *):hover{color:#9a5a00 !important}
+html[data-brand="lalo"][data-theme="light"] .placeholder\:text-\[\#ffcf80\]:not([class*="bg-gradient"] *)::placeholder{color:#9a5a00 !important}
+html[data-brand="lalo"][data-theme="light"] .text-\[\#7be8b4\]:not([class*="bg-gradient"] *){color:#0e7a56 !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-\[\#7be8b4\]:not([class*="bg-gradient"] *):hover{color:#0e7a56 !important}
+html[data-brand="lalo"][data-theme="light"] .placeholder\:text-\[\#7be8b4\]:not([class*="bg-gradient"] *)::placeholder{color:#0e7a56 !important}
+html[data-brand="lalo"][data-theme="light"] .text-\[\#c9b8ff\]:not([class*="bg-gradient"] *){color:#3b9966 !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-\[\#c9b8ff\]:not([class*="bg-gradient"] *):hover{color:#3b9966 !important}
+html[data-brand="lalo"][data-theme="light"] .placeholder\:text-\[\#c9b8ff\]:not([class*="bg-gradient"] *)::placeholder{color:#3b9966 !important}
+html[data-brand="lalo"][data-theme="light"] .text-\[\#f0b548\]:not([class*="bg-gradient"] *){color:#a8741c !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-\[\#f0b548\]:not([class*="bg-gradient"] *):hover{color:#a8741c !important}
+html[data-brand="lalo"][data-theme="light"] .placeholder\:text-\[\#f0b548\]:not([class*="bg-gradient"] *)::placeholder{color:#a8741c !important}
+html[data-brand="lalo"][data-theme="light"] .text-\[\#3ccf8a\]:not([class*="bg-gradient"] *){color:#1a8f6c !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-\[\#3ccf8a\]:not([class*="bg-gradient"] *):hover{color:#1a8f6c !important}
+html[data-brand="lalo"][data-theme="light"] .placeholder\:text-\[\#3ccf8a\]:not([class*="bg-gradient"] *)::placeholder{color:#1a8f6c !important}
+html[data-brand="lalo"][data-theme="light"] .text-\[\#8a9bb0\]:not([class*="bg-gradient"] *){color:#6f8e77 !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-\[\#8a9bb0\]:not([class*="bg-gradient"] *):hover{color:#6f8e77 !important}
+html[data-brand="lalo"][data-theme="light"] .placeholder\:text-\[\#8a9bb0\]:not([class*="bg-gradient"] *)::placeholder{color:#6f8e77 !important}
+html[data-brand="lalo"][data-theme="light"] .text-\[\#6f7f94\]:not([class*="bg-gradient"] *){color:#6f8e77 !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-\[\#6f7f94\]:not([class*="bg-gradient"] *):hover{color:#6f8e77 !important}
+html[data-brand="lalo"][data-theme="light"] .placeholder\:text-\[\#6f7f94\]:not([class*="bg-gradient"] *)::placeholder{color:#6f8e77 !important}
+html[data-brand="lalo"][data-theme="light"] .text-\[\#8a93a3\]:not([class*="bg-gradient"] *){color:#6f8e77 !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-\[\#8a93a3\]:not([class*="bg-gradient"] *):hover{color:#6f8e77 !important}
+html[data-brand="lalo"][data-theme="light"] .placeholder\:text-\[\#8a93a3\]:not([class*="bg-gradient"] *)::placeholder{color:#6f8e77 !important}
+html[data-brand="lalo"][data-theme="light"] .text-\[\#5b95f5\]:not([class*="bg-gradient"] *){color:#40b862 !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-\[\#5b95f5\]:not([class*="bg-gradient"] *):hover{color:#40b862 !important}
+html[data-brand="lalo"][data-theme="light"] .placeholder\:text-\[\#5b95f5\]:not([class*="bg-gradient"] *)::placeholder{color:#40b862 !important}
+html[data-brand="lalo"][data-theme="light"] .bg-\[\#1d3a78\]:not([class*="bg-gradient"] *){background-color:#e2f8e8 !important}
+html[data-brand="lalo"][data-theme="light"] .bg-\[\#0e1a3d\]:not([class*="bg-gradient"] *){background-color:#fbfaf6 !important}
+html[data-brand="lalo"][data-theme="light"] .bg-\[\#3a2a0c\]:not([class*="bg-gradient"] *){background-color:#fff3d4 !important}
+html[data-brand="lalo"][data-theme="light"] .text-red-300:not([class*="bg-gradient"] *){color:#b4372c !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-red-300:not([class*="bg-gradient"] *):hover{color:#b4372c !important}
+html[data-brand="lalo"][data-theme="light"] .text-red-200:not([class*="bg-gradient"] *){color:#a3362b !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-red-200:not([class*="bg-gradient"] *):hover{color:#a3362b !important}
+html[data-brand="lalo"][data-theme="light"] .text-amber-200:not([class*="bg-gradient"] *){color:#8a5a00 !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-amber-200:not([class*="bg-gradient"] *):hover{color:#8a5a00 !important}
+html[data-brand="lalo"][data-theme="light"] .text-amber-300:not([class*="bg-gradient"] *){color:#9a6200 !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-amber-300:not([class*="bg-gradient"] *):hover{color:#9a6200 !important}
+html[data-brand="lalo"][data-theme="light"] .text-emerald-200:not([class*="bg-gradient"] *){color:#0e7a56 !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-emerald-200:not([class*="bg-gradient"] *):hover{color:#0e7a56 !important}
+html[data-brand="lalo"][data-theme="light"] .text-emerald-300:not([class*="bg-gradient"] *){color:#0e7a56 !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-emerald-300:not([class*="bg-gradient"] *):hover{color:#0e7a56 !important}
+html[data-brand="lalo"][data-theme="light"] .text-sky-200:not([class*="bg-gradient"] *){color:#2a913f !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-sky-200:not([class*="bg-gradient"] *):hover{color:#2a913f !important}
+html[data-brand="lalo"][data-theme="light"] .text-sky-300:not([class*="bg-gradient"] *){color:#2a913f !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-sky-300:not([class*="bg-gradient"] *):hover{color:#2a913f !important}
+html[data-brand="lalo"][data-theme="light"] .text-purple-300:not([class*="bg-gradient"] *){color:#4db27a !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-purple-300:not([class*="bg-gradient"] *):hover{color:#4db27a !important}
+html[data-brand="lalo"][data-theme="light"] .text-violet-200:not([class*="bg-gradient"] *){color:#3b9966 !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-violet-200:not([class*="bg-gradient"] *):hover{color:#3b9966 !important}
+html[data-brand="lalo"][data-theme="light"] .text-pink-200:not([class*="bg-gradient"] *){color:#b02a64 !important}
+html[data-brand="lalo"][data-theme="light"] .hover\:text-pink-200:not([class*="bg-gradient"] *):hover{color:#b02a64 !important}
+html[data-brand="lalo"][data-theme="light"] ::selection{background: #c0eecd; color: #193822;}
+html[data-brand="lalo"][data-theme="light"] :focus-visible{outline-color: #40b862;}
+html[data-brand="lalo"][data-theme="light"] .legacy-dark{color: #23402b;}
+html[data-brand="lalo"][data-theme="light"] .legacy-dark h1,html[data-brand="lalo"][data-theme="light"] .legacy-dark h2,html[data-brand="lalo"][data-theme="light"] .legacy-dark h3{color: #193822;}
+html[data-brand="lalo"][data-theme="light"] .legacy-dark a{color: #40b862;}
+html[data-brand="lalo"][data-theme="light"] .legacy-dark [style*='border: 1px solid'],html[data-brand="lalo"][data-theme="light"] .legacy-dark [style*='border-radius: 8']{background-color: rgba(255, 255, 255, 0.7); border-color: #d6d0c3 !important;}
+html[data-brand="lalo"][data-theme="light"] .legacy-dark input:not([type='checkbox']):not([type='radio']),html[data-brand="lalo"][data-theme="light"] .legacy-dark textarea,html[data-brand="lalo"][data-theme="light"] .legacy-dark select{background: #fff !important; color: #23402b !important; border: 1px solid #cfc9bb !important;}
+html[data-brand="lalo"][data-theme="light"] .legacy-dark input:focus,html[data-brand="lalo"][data-theme="light"] .legacy-dark textarea:focus,html[data-brand="lalo"][data-theme="light"] .legacy-dark select:focus{border-color: #40b862 !important;}
+html[data-brand="lalo"][data-theme="light"] .legacy-dark input[type='checkbox'],html[data-brand="lalo"][data-theme="light"] .legacy-dark input[type='radio']{accent-color: #40b862;}
+html[data-brand="lalo"][data-theme="light"] .legacy-dark button{background: #fff; color: #23402b; border: 1px solid #cfc9bb;}
+html[data-brand="lalo"][data-theme="light"] .legacy-dark button:hover:not(:disabled){background: #40b862; border-color: #40b862; color: #fff;}
+html[data-brand="lalo"][data-theme="light"] .legacy-dark th,html[data-brand="lalo"][data-theme="light"] .legacy-dark td{border-bottom-color: #ddd8cb;}
+html[data-brand="lalo"][data-theme="light"] .legacy-dark pre,html[data-brand="lalo"][data-theme="light"] .legacy-dark code{background: #f1eee5; color: #23402b;}
+html[data-brand="lalo"][data-theme="light"] [style*="rgb(52,80,143)"]{border-color: #d6d0c3 !important;}
+html[data-brand="lalo"][data-theme="light"] [style*="color: rgb(252,165,165)"]{color: #b42318 !important;}
+html[data-brand="lalo"][data-theme="light"] [style*="color: rgb(252,211,77)"]{color: #8a5a00 !important;}
+html[data-brand="lalo"][data-theme="light"] [style*="color: rgb(110,231,183)"]{color: #0e7a56 !important;}
+html[data-brand="lalo"][data-theme="light"] [style*="color: rgb(147,197,253)"]{color: #34a854 !important;}
+html[data-brand="lalo"][data-theme="light"] [style*="background: rgb(31,59,45)"]{background: #e6f5f0 !important;}
+/* legacy pages (dark) */
+html[data-brand="lalo"] .legacy-dark{color: #e8efea;
+  font-size: 12.5px;
+  line-height: 1.45;}
+html[data-brand="lalo"] .legacy-dark a{color: #7aef9a;}
+html[data-brand="lalo"] .legacy-dark [style*='border: 1px solid'],html[data-brand="lalo"] .legacy-dark [style*='border-radius: 8']{background-color: #1e542e;
+  border-color: #3e8552 !important;}
+html[data-brand="lalo"] .legacy-dark input:not([type='checkbox']):not([type='radio']),html[data-brand="lalo"] .legacy-dark textarea,html[data-brand="lalo"] .legacy-dark select{background: #12331c !important;
+  color: #e8efea !important;
+  border: 1px solid #3e8552 !important;
+  border-radius: 6px;
+  padding: 4px 8px !important;
+  font-size: 12.5px !important;
+  outline: none;}
+html[data-brand="lalo"] .legacy-dark input:focus,html[data-brand="lalo"] .legacy-dark textarea:focus,html[data-brand="lalo"] .legacy-dark select:focus{border-color: #7aef9a !important;}
+html[data-brand="lalo"] .legacy-dark input[type='checkbox'],html[data-brand="lalo"] .legacy-dark input[type='radio']{accent-color: #7aef9a;}
+html[data-brand="lalo"] .legacy-dark button{background: #276e3b;
+  color: #e8efea;
+  border: 1px solid #3e8552;
+  border-radius: 6px;
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+  cursor: pointer;}
+html[data-brand="lalo"] .legacy-dark button:hover:not(:disabled){background: #7aef9a;
+  border-color: #7aef9a;
+  color: #fff;}
+html[data-brand="lalo"] .legacy-dark th,html[data-brand="lalo"] .legacy-dark td{border-bottom: 1px solid #3e8552;
+  padding: 6px 10px;
+  text-align: left;}
+html[data-brand="lalo"] .legacy-dark pre,html[data-brand="lalo"] .legacy-dark code{background: #12331c;
+  color: #e8efea;}
+
+/* Lalo brand: #439654 green on cream (#fdfaf5), orange #ea6b41 as the accent. */
+html[data-brand="lalo"] {
+  --paper: 8 27 17;
+  --surface: 14 40 26;
+  --line: 36 84 55;
+  --navy: 232 241 235;
+  --clay: 90 163 104;
+  --ink: 52 128 76;
+  --body-bg: #07170e;
+  --holo-bg: repeating-radial-gradient(circle at 92% 8%, transparent 0, transparent 58px, rgba(110, 200, 140, 0.03) 58px, rgba(110, 200, 140, 0.03) 59px), linear-gradient(rgba(110, 200, 140, 0.04) 1px, transparent 1px) 0 0 / 44px 44px, linear-gradient(90deg, rgba(110, 200, 140, 0.04) 1px, transparent 1px) 0 0 / 44px 44px, radial-gradient(900px 520px at 0% 0%, rgba(67, 150, 84, 0.26), transparent 62%), radial-gradient(900px 520px at 100% 100%, rgba(234, 107, 65, 0.08), transparent 62%), linear-gradient(180deg, #0d2a1a, #07170e);
+  --card-bg: rgba(18, 52, 33, 0.55);
+  --cal-head: #0b2216;
+  --cal-room: #10301f;
+  --mark-a: rgba(110, 200, 140, 0.1);
+  --mark-b: rgba(110, 200, 140, 0.38);
+  --mark-c: rgba(110, 200, 140, 0.03);
+}
+html[data-brand="lalo"][data-theme="light"] {
+  --paper: 244 240 230;
+  --surface: 253 250 245;
+  --line: 214 214 196;
+  --navy: 28 46 36;
+  --clay: 67 150 84;
+  --ink: 47 110 66;
+  --body-bg: #f1eee3;
+  --holo-bg: repeating-radial-gradient(circle at 92% 8%, transparent 0, transparent 58px, rgba(50, 110, 70, 0.035) 58px, rgba(50, 110, 70, 0.035) 59px), linear-gradient(rgba(50, 110, 70, 0.045) 1px, transparent 1px) 0 0 / 44px 44px, linear-gradient(90deg, rgba(50, 110, 70, 0.045) 1px, transparent 1px) 0 0 / 44px 44px, radial-gradient(900px 520px at 0% 0%, rgba(67, 150, 84, 0.16), transparent 62%), radial-gradient(900px 520px at 100% 100%, rgba(234, 107, 65, 0.10), transparent 62%), linear-gradient(180deg, #fdfaf5, #f3efe4);
+  --card-bg: rgba(255, 255, 255, 0.78);
+  --cal-head: #ebe9dc;
+  --cal-room: #f4f1e6;
+  --mark-a: rgba(67, 150, 84, 0.1);
+  --mark-b: rgba(67, 150, 84, 0.38);
+  --mark-c: rgba(67, 150, 84, 0.03);
+}
+html[data-brand="lalo"] ::selection { background: #ea6b41; color: #fff; }
+html[data-brand="lalo"] :focus-visible { outline-color: #ea6b41; }
+/* The hotel wordmark: heavy, upright capitals like the lalozipo.mx logo. */
+html[data-brand="lalo"] .font-display { font-style: normal; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }

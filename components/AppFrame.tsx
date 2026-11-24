@@ -34,6 +34,7 @@ interface ShellInfo {
   tenantId?: string
   tenants?: { id: string; name: string }[]
   pms?: 'cloudbeds' | 'lodgify' | null
+  brand?: string
   unreadReservations: number
   unreadEmails: number
   unreadReviews: number
@@ -59,7 +60,15 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
     const load = async () => {
       try {
         const res = await fetch('/api/shell', { cache: 'no-store' })
-        if (res.ok && !stop) setInfo(await res.json())
+        if (res.ok && !stop) {
+          const j = await res.json()
+          setInfo(j)
+          // Per-hotel look (Lalo = brand green); remembered so the next page load has no flash.
+          const brand = (j as { brand?: string }).brand ?? ''
+          if (brand) document.documentElement.dataset.brand = brand
+          else delete document.documentElement.dataset.brand
+          try { if (brand) localStorage.setItem('brand', brand); else localStorage.removeItem('brand') } catch {}
+        }
       } catch {
         // The sidebar still works without the badge.
       }
