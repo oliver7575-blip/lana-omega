@@ -96,6 +96,32 @@ export async function dashListLodgify(auth: LodgifyAuth, tab: 'arrivals' | 'depa
   return pick.map((b) => row(props, b, today)).sort((x, y) => x.room.localeCompare(y.room))
 }
 
+/** The Reservations page: newest bookings first, 40 per page. */
+export async function listReservationsLodgify(auth: LodgifyAuth, page: number, today: string) {
+  const size = 40
+  const [props, all] = await Promise.all([loadProps(auth), allBookings(auth)])
+  const sorted = all
+    .filter((b) => b.is_unavailable !== true)
+    .sort((a, b) => str(b.created_at).localeCompare(str(a.created_at)))
+  const start = (Math.max(1, page) - 1) * size
+  const rows = sorted.slice(start, start + size).map((b) => {
+    const pid = str(b.property_id)
+    const name = props.find((p) => p.id === pid)?.name ?? ''
+    return {
+      reservationID: str(b.id),
+      guestID: null,
+      guestName: str(guestOf(b).name),
+      bookedOn: day(b.created_at),
+      startDate: day(b.arrival),
+      endDate: day(b.departure),
+      status: mapLodgifyStatus(b) === 'canceled' ? 'canceled' : stayState(b, today),
+      total: amount(b.total_amount) ?? null,
+      rooms: [{ roomTypeID: pid, roomTypeName: name, roomID: pid, roomName: name }],
+    }
+  })
+  return { rows, hasMore: start + size < sorted.length }
+}
+
 function activity(b: Raw): ActivityRow {
   return {
     reservationID: str(b.id),

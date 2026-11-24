@@ -2,7 +2,8 @@ import { NextResponse, after } from 'next/server'
 import { processNewReservation } from '@/lib/new-reservation-notify'
 import { cloudbedsForCaller } from '@/lib/cloudbeds-caller'
 import { lodgifyForCaller } from '@/lib/lodgify-caller'
-import { createBookingLodgify } from '@/lib/lodgify-ops'
+import { localDate } from '@/lib/tz'
+import { createBookingLodgify, listReservationsLodgify } from '@/lib/lodgify-ops'
 import { createServiceClient } from '@/lib/supabase/service'
 import { createReservation, listReservationsSummary, type NewReservation } from '@/lib/cloudbeds-ops'
 
@@ -13,8 +14,16 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/
 /** Lists reservations for the panel's Reservations page. ?page=1,2,… */
 export async function GET(request: Request) {
   const c = await cloudbedsForCaller()
-  if ('error' in c) return c.error
   const page = Number(new URL(request.url).searchParams.get('page') ?? '1') || 1
+  if ('error' in c) {
+    const l = await lodgifyForCaller()
+    if (!l) return c.error
+    try {
+      return NextResponse.json(await listReservationsLodgify(l.auth, page, localDate(new Date(), l.tz)))
+    } catch (err) {
+      return NextResponse.json({ error: err instanceof Error ? err.message : 'Lodgify error' }, { status: 502 })
+    }
+  }
   try {
     return NextResponse.json(await listReservationsSummary(c.cb, page))
   } catch (err) {
