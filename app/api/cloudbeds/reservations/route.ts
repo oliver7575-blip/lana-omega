@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     if (!/^[A-Za-z]{2}$/.test(b.country ?? '')) need.push('the country')
     if (need.length) return NextResponse.json({ error: `Please add ${need.join(', ')}.` }, { status: 400 })
     try {
-      const reservationID = await createBookingLodgify(l.auth, {
+      const { id: reservationID, quoteWarning } = await createBookingLodgify(l.auth, {
         propertyId: b.roomTypeID!,
         start: b.startDate!,
         end: b.endDate!,
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
         )
       }
       // The welcome message is sent by Lodgify's booking webhook, as for any other new booking.
-      return NextResponse.json({ reservationID })
+      return NextResponse.json({ reservationID, priceWarning: quoteWarning })
     } catch (err) {
       return NextResponse.json({ error: err instanceof Error ? err.message : 'Lodgify error' }, { status: 502 })
     }

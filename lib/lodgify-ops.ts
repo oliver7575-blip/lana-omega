@@ -384,7 +384,7 @@ export interface NewLodgifyBooking {
 }
 
 /** Creates a booking in Lodgify (POST /v1/reservation/booking). Leaving total out lets Lodgify price the stay. */
-export async function createBookingLodgify(auth: LodgifyAuth, b: NewLodgifyBooking): Promise<string> {
+export async function createBookingLodgify(auth: LodgifyAuth, b: NewLodgifyBooking): Promise<{ id: string; quoteWarning?: string }> {
   const rooms = await rentalRooms(auth)
   const room = rooms.find((r) => r.propertyId === b.propertyId)
   if (!room) throw new Error('That rental was not found in Lodgify')
@@ -412,5 +412,14 @@ export async function createBookingLodgify(auth: LodgifyAuth, b: NewLodgifyBooki
   const id = typeof r.data === 'number' || typeof r.data === 'string' ? String(r.data) : str((r.data as Raw | null)?.id)
   if (!id) throw new Error('Lodgify did not return the new booking id')
   cache.clear()
-  return id
+
+  // A booking made through the API has no quote until one is created: ask Lodgify to price the stay
+  // from its rates and the property's payment/cancellation policy (POST /v1/reservation/booking/{id}/quote).
+  let quoteWarning: string | undefined
+  const q = await lodgifyFetch(auth, `/v1/reservation/booking/${encodeURIComponent(id)}/quote`, {
+    method: 'POST',
+    body: JSON.stringify({ is_policy_active: true, room_types: [{ room_type_id: Number(room.roomTypeId) }] }),
+  })
+  if (!q.ok) quoteWarning = `The booking was saved as Booked in Lodgify (number ${id}), but Lodgify did not create its quote: ${q.error}. Open the booking in Lodgify to add the quote.`
+  return { id, quoteWarning }
 }
