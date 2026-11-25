@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     found: true,
     pms: c.be.label,
     currency: f.currency || 'MXN',
-    reservation: { id: f.reservationId, guestName: f.guestName, source: f.source, status: f.status, balance: f.balance, paid: f.paid, startDate: f.startDate, endDate: f.endDate },
+    reservation: { id: f.reservationId, guestName: f.guestName, source: f.source, status: f.status, balance: f.balance, paid: f.paid, taxes: f.taxes ?? null, startDate: f.startDate, endDate: f.endDate },
     eligible: el.eligible,
     options: el.eligible ? el.options : [],
     code: el.eligible ? null : el.code,
