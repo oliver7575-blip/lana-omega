@@ -1,16 +1,44 @@
 import { NextResponse } from 'next/server'
 import { cloudbedsForCaller } from '@/lib/cloudbeds-caller'
 import { addReservationPayment, getReservationDetail } from '@/lib/cloudbeds-ops'
+import { lodgifyForCaller } from '@/lib/lodgify-caller'
+import { lodgifyDetail } from '@/lib/lodgify-detail'
+import { createServiceClient } from '@/lib/supabase/service'
+import { createClient } from '@/lib/supabase/server'
 
 /** Adds a payment (or a refund) to a reservation in Cloudbeds. Body: { kind: 'payment' | 'refund', amount, method, note? } */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const c = await cloudbedsForCaller()
-  if ('error' in c) return c.error
   const b = (await request.json().catch(() => ({}))) as { kind?: string; amount?: number | string; method?: string; note?: string }
   const amount = Number(b.amount)
   if (!Number.isFinite(amount) || amount <= 0) return NextResponse.json({ error: 'Enter an amount greater than zero.' }, { status: 400 })
-  if (!b.method) return NextResponse.json({ error: 'Choose a payment method.' }, { status: 400 })
+  if (!b.method?.trim()) return NextResponse.json({ error: 'Choose or type a payment method.' }, { status: 400 })
+  if ('error' in c) {
+    // Lodgify (Lalo) can't record payments, so they are kept in the panel's own table.
+    const l = await lodgifyForCaller()
+    if (!l) return c.error
+    if (b.kind === 'refund') return NextResponse.json({ error: 'Refunds cannot be recorded for Lodgify bookings.' }, { status: 400 })
+    try {
+      const detail = await lodgifyDetail(l, id)
+      if (/airbnb|booking|expedia|homeaway|vrbo|ical/i.test(detail.source ?? '')) {
+        return NextResponse.json({ error: 'Channel bookings are prepaid through the channel.' }, { status: 400 })
+      }
+      const { data: { user } } = await (await createClient()).auth.getUser()
+      const { error } = await createServiceClient().from('pms_manual_payments').insert({
+        tenant_id: l.tenantId,
+        reservation_id: id,
+        amount: Math.round(amount * 100) / 100,
+        method: b.method.trim().slice(0, 80),
+        note: b.note?.trim().slice(0, 200) || null,
+        created_by: user?.email ?? null,
+      })
+      if (error) throw new Error(error.message)
+      return NextResponse.json({ reservation: await lodgifyDetail(l, id) })
+    } catch (err) {
+      return NextResponse.json({ error: err instanceof Error ? err.message : 'Could not record the payment' }, { status: 502 })
+    }
+  }
   const refund = b.kind === 'refund'
   try {
     if (refund) {

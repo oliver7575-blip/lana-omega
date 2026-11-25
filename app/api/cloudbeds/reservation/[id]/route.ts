@@ -1,3 +1,4 @@
+import { lodgifyDetail } from '@/lib/lodgify-detail'
 import { NextResponse } from 'next/server'
 import { cloudbedsForCaller } from '@/lib/cloudbeds-caller'
 import { lodgifyForCaller } from '@/lib/lodgify-caller'
@@ -17,18 +18,6 @@ async function lodgifyNotes(tenantId: string, id: string) {
     .eq('reservation_id', id)
     .order('created_at', { ascending: true })
   return (data ?? []).map((n) => ({ id: String(n.id), author: String(n.author ?? ''), date: String(n.created_at ?? ''), text: String(n.text ?? '') }))
-}
-
-/** The arrival time someone actually gave (panel, Lana or an email) for a Lodgify booking; null when none. */
-async function lodgifyArrival(tenantId: string, id: string): Promise<string | null> {
-  const { data } = await createServiceClient().from('pms_arrival_times').select('arrival_time').eq('tenant_id', tenantId).eq('reservation_id', id).maybeSingle()
-  return (data?.arrival_time as string | null) ?? null
-}
-
-async function lodgifyDetail(l: { auth: Parameters<typeof reservationDetailLodgify>[0]; tz: string; tenantId: string }, id: string) {
-  const reservation = await reservationDetailLodgify(l.auth, id, localDate(new Date(), l.tz))
-  reservation.estimatedArrivalTime = await lodgifyArrival(l.tenantId, id)
-  return reservation
 }
 
 export async function GET(_r: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -135,6 +124,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         const { nightly } = lb as { nightly?: number }
         const { newId } = await changePriceLodgify(l.auth, id, Number(nightly))
         await createServiceClient().from('pms_reservation_notes').update({ reservation_id: newId }).eq('tenant_id', l.tenantId).eq('reservation_id', id)
+        await createServiceClient().from('pms_manual_payments').update({ reservation_id: newId }).eq('tenant_id', l.tenantId).eq('reservation_id', id)
         const { data: at } = await createServiceClient().from('pms_arrival_times').select('arrival_time').eq('tenant_id', l.tenantId).eq('reservation_id', id).maybeSingle()
         if (at?.arrival_time) await createServiceClient().from('pms_arrival_times').upsert({ tenant_id: l.tenantId, reservation_id: newId, arrival_time: at.arrival_time, source: 'panel', updated_at: new Date().toISOString() }, { onConflict: 'tenant_id,reservation_id' })
         return NextResponse.json({ ok: true, newId, reservation: await lodgifyDetail(l, newId) })

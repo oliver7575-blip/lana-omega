@@ -74,6 +74,7 @@ interface Detail {
   dateCreated: string | null
   confirmationCode: string | null
   hasQuote?: boolean
+  manualPayments?: { id: string; amount: number; method: string; note: string | null; createdAt: string }[]
   specialRequests: string | null
   breakdown: { subTotal: number | null; additionalItems: number | null; taxesFees: number | null; paid: number | null }
 }
@@ -212,7 +213,9 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
     // A payment starts on the method that matches the booking source; a refund starts on cash.
     const preset = (methods: { code: string; name: string }[]) =>
       setMpMethod(kind === 'payment' ? defaultPaymentMethod(r.source, methods) : defaultPaymentMethod('walk-in', methods))
-    if (mpMethods) preset(mpMethods)
+    if (r.hasQuote !== undefined) {
+      setMpMethod(kind === 'payment' ? 'Cash' : '')
+    } else if (mpMethods) preset(mpMethods)
     else {
       cbApi<{ paymentMethods: { code: string; name: string }[] }>('/api/cloudbeds/availability?options=1')
         .then((o) => {
@@ -515,8 +518,8 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                   <p className={`text-[9.5px] font-bold tracking-[.06em] ${owes ? 'text-[#b42318]' : 'text-[#0e6b4a]'}`}>{owes ? 'BALANCE DUE' : 'PAID IN FULL'}</p>
                   <p className={`text-[16px] font-bold tracking-tight ${owes ? 'text-[#b42318]' : 'text-[#0e6b4a]'}`}>MXN {(r.balance ?? 0).toLocaleString('en-US')}</p>
                 </div>
-                {/* Lodgify (Lalo) has no way to record a payment from here: hasQuote is only set for Lodgify bookings. */}
-                {r.hasQuote === undefined && (
+                {/* Lodgify (Lalo): channel (OTA) bookings are prepaid, so no Add payment there. hasQuote is only set for Lodgify bookings. */}
+                {!(r.hasQuote !== undefined && /airbnb|booking\.com|expedia|homeaway|vrbo|ical/i.test(r.source ?? '')) && (
                   <button onClick={() => openMoney('payment')}
                     className={`h-[28px] whitespace-nowrap rounded-full px-3 text-[11.5px] font-semibold text-white transition ${mpKind === 'payment' ? 'bg-[#0e5f47] ring-4 ring-[#1f9d78]/25' : 'bg-gradient-to-b from-[#27ad86] to-[#1a8f6c] shadow-[0_4px_10px_rgba(31,157,120,.35),inset_0_1px_0_rgba(255,255,255,.25)] hover:brightness-95'}`}>
                     + Add payment
@@ -588,6 +591,16 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                     <input type="number" min="0" step="0.01" inputMode="decimal" value={mpAmount} onChange={(e) => setMpAmount(e.target.value)} autoFocus
                       className={`${field} mt-1.5 !h-11 !text-[17px] !font-semibold normal-case tracking-normal`} />
                   </label>
+                  {r.hasQuote !== undefined ? (
+                    <label className={lbl}>Payment method
+                      <input value={mpMethod} onChange={(e) => setMpMethod(e.target.value)} maxLength={80} placeholder="Type a method, or pick one below" className={`${field} mt-1.5 !h-11 normal-case tracking-normal`} />
+                      <span className="mt-1.5 flex flex-wrap gap-1.5 normal-case tracking-normal">
+                        {['Cash', 'Pro Bono', 'Exchange/Trade'].map((m) => (
+                          <button key={m} type="button" className={chip(mpMethod === m)} onClick={() => setMpMethod(m)}>{m}</button>
+                        ))}
+                      </span>
+                    </label>
+                  ) : (
                   <label className={lbl}>Payment method
                     <select value={mpMethod} onChange={(e) => setMpMethod(e.target.value)} disabled={!mpMethods} className={`${field} mt-1.5 !h-11 normal-case tracking-normal`}>
                       {!mpMethods && <option>Loading…</option>}
@@ -595,6 +608,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                       {mpMethods?.map((m) => <option key={m.code} value={m.code}>{m.name}</option>)}
                     </select>
                   </label>
+                  )}
                 </div>
                 {mpKind === 'payment' && owes && (
                   <div className="flex flex-wrap items-center gap-2">
@@ -826,6 +840,9 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                   {bd?.taxesFees != null && <div className={row}><span className="text-[#667085]">Taxes &amp; fees</span><span>{money(bd.taxesFees)}</span></div>}
                   <div className={`${row} mt-1 border-t border-[#e6e9f0] pt-2.5 font-bold`}><span>Grand total</span><span>{money(r.total)}</span></div>
                   <div className={row}><span className="text-[#667085]">Paid</span><span className="font-semibold text-[#0e6b4a]">{money(paidAmt)}</span></div>
+                  {r.manualPayments?.map((p) => (
+                    <div key={p.id} className="flex justify-between text-[12px] text-[#667085]"><span>{p.method}{p.note ? ` · ${p.note}` : ''} · {new Date(p.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span><span>{money(p.amount)}</span></div>
+                  ))}
                   <div className="mt-1.5 h-1.5 rounded-full bg-[#f3d9d5]"><i className="block h-full rounded-full bg-[#1f9d78]" style={{ width: `${r.total ? Math.min(100, Math.max(0, ((paidAmt ?? 0) / r.total) * 100)) : 0}%` }} /></div>
                 </div>
 
