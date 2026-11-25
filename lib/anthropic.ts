@@ -37,6 +37,10 @@ export interface RoomPhotosResult {
   error?: string
   /** Photo URLs — handed back to the caller to send, never shown to the model. */
   photoUrls?: string[]
+  focus?: string
+  /** A specific angle was asked for but none of the room's photos shows it. */
+  noPhotoOfThat?: boolean
+  photosShow?: string[]
 }
 
 interface AvailabilityToolInput {
@@ -51,7 +55,7 @@ interface AvailabilityTool {
 }
 
 interface RoomPhotosTool {
-  getRoomPhotos: (roomType: string) => Promise<RoomPhotosResult>
+  getRoomPhotos: (roomType: string, focus?: string) => Promise<RoomPhotosResult>
 }
 
 interface ArrivalUpdateToolInput {
@@ -350,13 +354,18 @@ export async function generateReply(
     tools.push({
       name: 'send_room_photos',
       description:
-        "Send the guest real photos of one room type. Use this when a guest asks to see photos or pictures of a room or unit. The photos are sent automatically after your reply — just write a short, warm line introducing them and do not paste any image links. If the result says the room type wasn't found, tell the guest which room types exist (from availableRoomTypes) and ask which one they'd like to see.",
+        "Send the guest real photos of one room type. Use this when a guest asks to see photos or pictures of a room or unit. The photos are sent automatically after your reply — just write a short, warm line introducing them and do not paste any image links. If the result says the room type wasn't found, tell the guest which room types exist (from availableRoomTypes) and ask which one they'd like to see. If the result has noPhotoOfThat, tell the guest honestly that there is no photo of that part of the room (you may mention what the photos do show, from photosShow) and that the team can help.",
       input_schema: {
         type: 'object',
         properties: {
           roomType: {
             type: 'string',
             description: 'The room type the guest wants to see, as they described it (e.g. "rooftop", "king bedroom")',
+          },
+          focus: {
+            type: 'string',
+            enum: ['bed', 'bathroom', 'balcony_terrace', 'pool', 'view', 'kitchen', 'living_area', 'entrance_exterior'],
+            description: 'Set this when the guest asks for a specific part of the room (the bathroom, the balcony, the pool, the view, the kitchen…). Only photos showing that part are sent. Leave it out for a general set of photos.',
           },
         },
         required: ['roomType'],
@@ -445,7 +454,7 @@ export async function generateReply(
             block.input.confirmationNumber as string
           )
         } else if (block.name === 'send_room_photos' && roomPhotosTool) {
-          const photos = await roomPhotosTool.getRoomPhotos(block.input.roomType as string)
+          const photos = await roomPhotosTool.getRoomPhotos(block.input.roomType as string, block.input.focus as string | undefined)
           if (photos.found && photos.photoUrls?.length) photoUrls = photos.photoUrls
           // The model only needs to know how many photos go out, not the URLs.
           const { photoUrls: _omit, ...forModel } = photos
