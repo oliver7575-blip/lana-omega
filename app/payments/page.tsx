@@ -11,6 +11,7 @@ interface Req {
   currency: string
   status: string
   link_url: string | null
+  link_id?: string | null
   link_status: string | null
   expires_at: string | null
   created_by: string
@@ -191,7 +192,8 @@ export default function PaymentsPage() {
           </thead>
           <tbody className="divide-y divide-line">
             {rows.map((r) => {
-              const s = STATUS[r.status] ?? { label: r.status, cls: 'bg-white/10 text-navy/70' }
+              const lateWatch = r.status === 'expired' && (r.link_id ?? '').startsWith('lodgify:')
+              const s = lateWatch ? { label: 'Expired · still watched', cls: 'bg-white/10 text-navy/70' } : (STATUS[r.status] ?? { label: r.status, cls: 'bg-white/10 text-navy/70' })
               return (
                 <tr key={r.id} className="align-top">
                   <td className="px-3 py-2 text-navy/70">{new Date(r.created_at).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}<span className="block text-[11px] text-navy/40">{r.created_by}</span></td>
@@ -205,7 +207,7 @@ export default function PaymentsPage() {
                   <td className="px-3 py-2 text-xs text-navy/60">{r.expires_at ? new Date(r.expires_at).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-right text-xs">
                     {r.link_url && r.status === 'link_active' && <button type="button" onClick={() => copy(r.link_url!)} className="mr-2 text-clay hover:underline">Copy link</button>}
-                    {canManage && ['link_active', 'paid_unverified', 'needs_review'].includes(r.status) && (
+                    {canManage && (['link_active', 'paid_unverified', 'needs_review'].includes(r.status) || lateWatch) && (
                       <>
                         <button type="button" disabled={busy === r.id} onClick={() => act(r.id, 'recheck')} className="mr-2 text-navy/80 hover:text-white">Recheck</button>
                         <button type="button" disabled={busy === r.id} onClick={() => act(r.id, 'close')} className="text-red-300/80 hover:text-red-300">Close</button>

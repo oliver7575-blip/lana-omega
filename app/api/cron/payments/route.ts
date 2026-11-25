@@ -2,11 +2,14 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { pmsForTenant } from '@/lib/pms'
 import { paymentBackendFor } from '@/lib/payments/backend'
-import { loadPaymentContext, pollPayment, type PaymentRequestRow } from '@/lib/payments/service'
+import { lateLodgifyCandidates, loadPaymentContext, pollPayment, type PaymentRequestRow } from '@/lib/payments/service'
 
 export const maxDuration = 60
 
-/** Every minute: checks open payment links (Cloudbeds and Lodgify hotels) and verifies paid ones against the reservation. */
+/**
+ * Every minute: checks open payment links (Cloudbeds and Lodgify hotels) and verifies paid ones against the reservation.
+ * Also, every 30 min per request: expired Lodgify links (still payable at Lodgify) for up to 30 days, to catch late payments.
+ */
 export async function GET(request: Request) {
   if (!process.env.CRON_SECRET || request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -25,7 +28,8 @@ export async function GET(request: Request) {
 
   const results: { id: string; status: string }[] = []
   const byTenant = new Map<string, PaymentRequestRow[]>()
-  for (const r of (open ?? []) as PaymentRequestRow[]) byTenant.set(r.tenant_id, [...(byTenant.get(r.tenant_id) ?? []), r])
+  const late = await lateLodgifyCandidates(db, 10)
+  for (const r of [...((open ?? []) as PaymentRequestRow[]), ...late]) byTenant.set(r.tenant_id, [...(byTenant.get(r.tenant_id) ?? []), r])
   const started = Date.now()
   for (const [tenantId, rows] of byTenant) {
     const be = await paymentBackendFor(await pmsForTenant(db, tenantId))

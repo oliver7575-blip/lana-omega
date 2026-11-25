@@ -76,6 +76,26 @@ interface Detail {
   hasQuote?: boolean
   specialRequests: string | null
   breakdown: { subTotal: number | null; additionalItems: number | null; taxesFees: number | null; paid: number | null }
+  /** Lodgify only: the booking's transactions and the quote's upcoming scheduled payments. */
+  payments?: { date: string | null; type: string; status: string; method: string | null; description: string | null; amount: number | null }[]
+  scheduled?: { dueAt: string | null; type: string | null; status: string | null; amount: number | null }[]
+}
+
+const PAY_METHOD: Record<string, string> = {
+  LodgifyPaymentsStripe: 'Card (Stripe)',
+  StripeSca: 'Card (Stripe)',
+  StripeSpreedly: 'Card (Stripe)',
+  PaypalWallet: 'PayPal',
+  PayPalProSpreedly: 'PayPal',
+  BankAccount: 'Bank transfer',
+  None: 'Recorded manually',
+}
+
+function payChip(status: string): string {
+  const s = status.toLowerCase()
+  if (s === 'done') return 'bg-[#e6f5f0] text-[#0e6b4a]'
+  if (s === 'failed' || s === 'canceled' || s === 'abandoned') return 'bg-[#fdecea] text-[#b42318]'
+  return 'bg-[#f1f3f6] text-[#4a5262]'
 }
 
 /** "MX" → "Mexico"; anything that isn't a 2-letter code is shown as is. */
@@ -111,6 +131,7 @@ const SIGNATURE_SUGGESTION = 'Oliver\nSoirée · Zipolite, Oaxaca\nsoiree.mx'
 interface PaymentLinkResult {
   url: string
   amount: number
+  currency?: string
   reused: boolean
   email: { status: 'sent' | 'skipped' | 'failed'; detail: string }
   whatsapp: { status: 'sent' | 'skipped' | 'failed'; detail: string }
@@ -674,7 +695,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
 
             {/* Payment link */}
             {(pay || payError) && (
-              <InlinePanel tone="blue" title={pay ? `Payment link · MXN ${pay.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Payment link'} onClose={() => { setPay(null); setPayError(null) }}>
+              <InlinePanel tone="blue" title={pay ? `Payment link · ${pay.currency ?? 'MXN'} ${pay.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Payment link'} onClose={() => { setPay(null); setPayError(null) }}>
                 {payError && <p className="text-sm text-red-600">{payError}</p>}
                 {pay && (
                   <>
@@ -825,6 +846,34 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                   <div className={row}><span className="text-[#667085]">Paid</span><span className="font-semibold text-[#0e6b4a]">{money(paidAmt)}</span></div>
                   <div className="mt-1.5 h-1.5 rounded-full bg-[#f3d9d5]"><i className="block h-full rounded-full bg-[#1f9d78]" style={{ width: `${r.total ? Math.min(100, Math.max(0, ((paidAmt ?? 0) / r.total) * 100)) : 0}%` }} /></div>
                 </div>
+
+                {/* Payment history (Lodgify) */}
+                {(r.payments || r.scheduled) && (
+                  <div className={card}>
+                    <p className={lbl}>Payment history</p>
+                    {(r.payments ?? []).length === 0 && <p className="py-[2px] text-[12px] text-[#667085]">No payments recorded yet.</p>}
+                    {(r.payments ?? []).map((t, i) => (
+                      <div key={`p${i}`} className={row}>
+                        <span className="text-[#667085]">
+                          {t.date ? new Date(t.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'} · {t.type === 'Payment' ? '' : `${t.type} · `}{t.method ? (PAY_METHOD[t.method] ?? t.method) : '—'}
+                          <span className={`ml-1.5 rounded-full px-1.5 text-[10px] font-semibold ${payChip(t.status)}`}>{t.status}</span>
+                        </span>
+                        <span className={t.type === 'Refund' ? 'text-[#b42318]' : t.status.toLowerCase() === 'done' ? 'font-semibold text-[#0e6b4a]' : ''}>{t.type === 'Refund' ? '−' : ''}{money(t.amount)}</span>
+                      </div>
+                    ))}
+                    {(r.scheduled ?? []).filter((x) => !/done|paid|completed/i.test(x.status ?? '')).length > 0 && (
+                      <>
+                        <p className={`${lbl} mt-2`}>Scheduled</p>
+                        {(r.scheduled ?? []).filter((x) => !/done|paid|completed/i.test(x.status ?? '')).map((x, i) => (
+                          <div key={`s${i}`} className={row}>
+                            <span className="text-[#667085]">Due {x.dueAt ? new Date(x.dueAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'at booking'}{x.status ? ` · ${x.status}` : ''}</span>
+                            <span>{money(x.amount)}</span>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                )}
 
                 {/* Guest */}
                 <div className={card}>

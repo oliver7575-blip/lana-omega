@@ -249,6 +249,14 @@ export async function pollPayment(db: SupabaseClient, be: PaymentBackend, ctx: P
         event = { name: 'expired', detail: { note: 'Past its expiry time.' } }
       }
     }
+  } else if (row.status === 'expired' && be.kind === 'lodgify') {
+    // Lodgify cannot expire its links: a guest may still pay after Omega marked the request expired.
+    if (await folioShowsPayment(be, row)) {
+      patch.status = 'paid'
+      patch.paid_at = nowIso
+      patch.error = null
+      event = { name: 'paid', detail: { amount: Number(row.amount), verified: 'reservation', late: true } }
+    }
   } else if (row.status === 'paid_unverified') {
     if (await folioShowsPayment(be, row)) {
       patch.status = 'paid'
@@ -265,11 +273,59 @@ export async function pollPayment(db: SupabaseClient, be: PaymentBackend, ctx: P
   const ev = event as { name: string; detail?: Record<string, unknown> } | null
   if (ev) await logPaymentEvent(db, ctx.tenantId, row.id, ev.name, ev.detail)
   const result = ((data as PaymentRequestRow | null) ?? row) as PaymentRequestRow
+  if (ev?.name === 'paid' && ev.detail?.late) {
+    await alertStaffLatePayment(db, result).catch((err) => console.error('[payments] late-payment staff alert failed', err))
+  }
   // Verified payment → tell the guest (once). Best effort: never breaks the check.
   if (result.status === 'paid' && row.status !== 'paid') {
     await notifyGuestPaid(result).catch((err) => console.error('[payments] could not notify the guest', err))
   }
   return result
+}
+
+/** Staff sees a payment that came in after the link had expired in Omega (Escalations list, billing). */
+async function alertStaffLatePayment(db: SupabaseClient, row: PaymentRequestRow): Promise<void> {
+  const amount = Number(row.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  await db.from('escalations').insert({
+    tenant_id: row.tenant_id,
+    conversation_id: row.conversation_id,
+    guest_id: row.guest_id,
+    category: 'billing',
+    urgency: 'normal',
+    summary: `Pago tardío recibido: ${amount} ${row.currency || 'MXN'} para la reserva #${row.reservation_id}${row.guest_name ? ` (${row.guest_name})` : ''}. El link ya había vencido en Omega, pero Lodgify registró el pago.`,
+    delivered: false,
+  })
+}
+
+/**
+ * Expired Lodgify requests that may still be paid (Lodgify links never expire).
+ * Only the newest request per reservation is watched, so one payment can never confirm two requests.
+ */
+export async function lateLodgifyCandidates(db: SupabaseClient, limit = 20): Promise<PaymentRequestRow[]> {
+  const since = new Date(Date.now() - 30 * 86400_000).toISOString()
+  const checkedBefore = new Date(Date.now() - 30 * 60_000).toISOString()
+  const { data } = await db
+    .from('payment_requests')
+    .select('*')
+    .eq('status', 'expired')
+    .like('link_id', 'lodgify:%')
+    .gte('created_at', since)
+    .or(`last_checked_at.is.null,last_checked_at.lt.${checkedBefore}`)
+    .order('last_checked_at', { ascending: true, nullsFirst: true })
+    .limit(limit * 3)
+  const out: PaymentRequestRow[] = []
+  for (const row of (data ?? []) as PaymentRequestRow[]) {
+    const { count } = await db
+      .from('payment_requests')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', row.tenant_id)
+      .eq('reservation_id', row.reservation_id)
+      .gt('created_at', row.created_at)
+      .neq('status', 'failed')
+    if ((count ?? 0) === 0) out.push(row)
+    if (out.length >= limit) break
+  }
+  return out
 }
 
 /** Staff closes a request on our side. Neither PMS can cancel API links, so a closed link may still be payable until it expires. */

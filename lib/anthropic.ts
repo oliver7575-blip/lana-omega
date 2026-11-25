@@ -164,7 +164,7 @@ export async function generateReply(
       {
         name: 'check_payment_status',
         description:
-          "Use when a guest says they paid, asks whether their payment went through, or asks about a payment link. Returns the VERIFIED status. You may say a payment is received/confirmed ONLY when this returns status 'paid'. Otherwise never claim it is paid.",
+          "Use when a guest says they paid, asks whether their payment went through, asks about a payment link, or asks how much they have paid / how much is left to pay. Returns the VERIFIED status and, for reservations that can be paid online, the amount paid so far and the amount remaining (account). Answering a balance question does NOT create a link. You may say a payment is received/confirmed ONLY when this returns status 'paid' or 'paid_in_full'. Otherwise never claim it is paid.",
         input_schema: { type: 'object', properties: who },
       }
     )

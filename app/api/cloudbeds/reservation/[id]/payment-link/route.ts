@@ -3,6 +3,9 @@ import { paymentsCaller } from '@/lib/payments/caller'
 import { cloudbedsForCaller } from '@/lib/cloudbeds-caller'
 import { createPaymentLink } from '@/lib/payments/service'
 import { getReservationDetail, getReservationGuestContact } from '@/lib/cloudbeds-ops'
+import { lodgifyForCaller } from '@/lib/lodgify-caller'
+import { reservationDetailLodgify } from '@/lib/lodgify-ops'
+import { localDate } from '@/lib/tz'
 import { findOrCreateGuest, ensureConversation } from '@/lib/guest-records'
 import { sendTenantEmail } from '@/lib/email'
 import { sendWhatsAppInteractiveButton } from '@/lib/whatsapp-send'
@@ -16,9 +19,28 @@ const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 
 type SendState = { status: 'sent' | 'skipped' | 'failed'; detail: string }
 
+/** Guest name and contact details from the hotel's PMS (Cloudbeds or Lodgify). */
+async function guestContact(kind: 'cloudbeds' | 'lodgify', id: string): Promise<{ guestName: string; email: string | null; phone: string | null; country: string }> {
+  if (kind === 'lodgify') {
+    const l = await lodgifyForCaller()
+    if (!l) throw new Error('Lodgify is not connected')
+    const d = await reservationDetailLodgify(l.auth, id, localDate(new Date(), l.tz))
+    return { guestName: d.guestName, email: d.guestEmail, phone: d.guestPhone, country: (d.guestCountry ?? '').toUpperCase() }
+  }
+  const cbc = await cloudbedsForCaller()
+  if ('error' in cbc) throw new Error('Cloudbeds is not connected')
+  const [reservation, contact] = await Promise.all([getReservationDetail(cbc.cb, id), getReservationGuestContact(cbc.cb, id)])
+  return {
+    guestName: reservation.guestName,
+    email: contact.email ?? reservation.guestEmail,
+    phone: contact.phone ?? reservation.guestPhone,
+    country: (contact.country ?? reservation.guestCountry ?? '').toUpperCase(),
+  }
+}
+
 /**
  * Staff creates the guest's balance payment link (same rules and amount as when Lana creates it) and it goes out
- * straight away to the email and WhatsApp number on the reservation.
+ * straight away to the email and WhatsApp number on the reservation. Works for Cloudbeds and Lodgify hotels.
  */
 export async function POST(_r: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -26,27 +48,27 @@ export async function POST(_r: Request, { params }: { params: Promise<{ id: stri
   if ('error' in c) return c.error
   if (!c.canManage) return NextResponse.json({ error: 'Only owners or admins can create payment links' }, { status: 403 })
   const tenantId = c.ctx.tenantId
-  if (c.be.kind !== 'cloudbeds') return NextResponse.json({ error: 'This button is for Cloudbeds reservations — use the Payments page.' }, { status: 400 })
-  const cbc = await cloudbedsForCaller()
-  if ('error' in cbc) return cbc.error
-  const cb = cbc.cb
-
   const created = await createPaymentLink(c.supabase, c.be, c.ctx, { reservationId: id, kind: 'balance', createdBy: 'staff', staffUserId: c.staffId })
   if (!created.ok) return NextResponse.json({ error: created.message, code: created.code }, { status: 422 })
   const req = created.request
   const url = req.link_url
-  if (!url) return NextResponse.json({ error: 'Cloudbeds created the link but did not return its address.' }, { status: 502 })
+  if (!url) return NextResponse.json({ error: `${c.be.label} created the link but did not return its address.` }, { status: 502 })
   const amount = Number(req.amount)
-  const amountText = `${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MXN`
+  const cur = req.currency || 'MXN'
+  const amountText = `${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${cur}`
   const hours = c.ctx.settings.linkExpiryDays * 24
+  // Lodgify links stay payable; Cloudbeds links expire.
+  const validEs = c.be.kind === 'lodgify' ? '' : ` El link es válido por ${hours} horas.`
+  const validEn = c.be.kind === 'lodgify' ? '' : ` The link is valid for ${hours} hours.`
+  const { data: tenantRow } = await c.supabase.from('tenants').select('name').eq('id', tenantId).single()
+  // Cloudbeds (Soirée) keeps its original wording exactly; other hotels use their own name.
+  const hotel = c.be.kind === 'cloudbeds' ? 'Soirée' : String(tenantRow?.name ?? '').trim() || 'the hotel'
 
-  const out = { url, amount, reused: created.reused, email: { status: 'skipped', detail: '' } as SendState, whatsapp: { status: 'skipped', detail: '' } as SendState }
+  const out = { url, amount, currency: cur, reused: created.reused, email: { status: 'skipped', detail: '' } as SendState, whatsapp: { status: 'skipped', detail: '' } as SendState }
 
   try {
-    const [reservation, contact] = await Promise.all([getReservationDetail(cb, id), getReservationGuestContact(cb, id)])
-    const email = contact.email ?? reservation.guestEmail
-    const phone = contact.phone ?? reservation.guestPhone
-    const country = (contact.country ?? reservation.guestCountry ?? '').toUpperCase()
+    const reservation = await guestContact(c.be.kind, id)
+    const { email, phone, country } = reservation
     const first = reservation.guestName.trim().split(/\s+/)[0] || ''
 
     // The guest's conversation (created if needed) — messages sent here show up on the Messages page.
@@ -76,24 +98,25 @@ export async function POST(_r: Request, { params }: { params: Promise<{ id: stri
             `Te compartimos el link para pagar el saldo de tu reservación #${id}: ${amountText}.`,
             `Haz clic aquí para pagar de forma segura con tarjeta:`,
             url,
-            `El link es válido por ${hours} horas. Ingresa los datos de tu tarjeta únicamente en la página de pago; nunca te los pediremos por mensaje. Si tienes cualquier duda, responde a este correo.`,
-            `Gracias, Soirée`,
+            `${validEs.trim() ? validEs.trim() + ' ' : ''}Ingresa los datos de tu tarjeta únicamente en la página de pago; nunca te los pediremos por mensaje. Si tienes cualquier duda, responde a este correo.`,
+            `Gracias, ${hotel}`,
           ]
         : [
             `Hi${first ? ` ${first}` : ''},`,
             `Here is the link to pay the balance of your reservation #${id}: ${amountText}.`,
             `Click here to pay securely by card:`,
             url,
-            `The link is valid for ${hours} hours. Please enter your card details only on the payment page; we will never ask for them in a message. If you have any questions, just reply to this email.`,
-            `Thank you, Soirée`,
+            `${validEn.trim() ? validEn.trim() + ' ' : ''}Please enter your card details only on the payment page; we will never ask for them in a message. If you have any questions, just reply to this email.`,
+            `Thank you, ${hotel}`,
           ]
       const text = lines.join('\n\n') + (signature ? `\n\n${signature}` : '')
       const html =
         lines.map((l) => (l === url ? `<p><a href="${esc(url)}">${esc(url)}</a></p>` : `<p>${esc(l)}</p>`)).join('') +
         (signature ? `<p style="margin-top:20px">${esc(signature).replace(/\n/g, '<br>')}</p>` : '')
-      const res = await sendTenantEmail(tenantId, email, 'Soiree Payment Link', html, { text })
+      const subject = c.be.kind === 'cloudbeds' ? 'Soiree Payment Link' : `${hotel} Payment Link`
+      const res = await sendTenantEmail(tenantId, email, subject, html, { text })
       out.email = res.success ? { status: 'sent', detail: `Sent to ${email}` } : { status: 'failed', detail: res.error ?? 'The email could not be sent' }
-      if (res.success) await record(`[Email sent to ${email}: Soiree Payment Link]\n\n${lines.join('\n\n')}`)
+      if (res.success) await record(`[Email sent to ${email}: ${subject}]\n\n${lines.join('\n\n')}`)
     }
 
     // ---- WhatsApp ----------------------------------------------------------------
@@ -105,10 +128,14 @@ export async function POST(_r: Request, { params }: { params: Promise<{ id: stri
         out.whatsapp = { status: 'failed', detail: 'WhatsApp integration not fully configured' }
       } else {
         // Lana's payment wording, plus who we are and which reservation: the guest didn't ask for this link in a chat.
-        const short = `${amount.toLocaleString('en-US', { minimumFractionDigits: Number.isInteger(amount) ? 0 : 2, maximumFractionDigits: 2 })} MXN`
+        const short = `${amount.toLocaleString('en-US', { minimumFractionDigits: Number.isInteger(amount) ? 0 : 2, maximumFractionDigits: 2 })} ${cur}`
         const body = es
-          ? `Hola${first ? ` ${first}` : ''}, te escribimos de Soirée, en Zipolite 🌴 Aquí está tu link de pago seguro por **${short}** para tu reservación #${id}. Es válido por ${hours} horas, y ingresarás los datos de tu tarjeta solo en esa página segura.`
-          : `Hi${first ? ` ${first}` : ''}, this is Soirée in Zipolite 🌴 Here's your secure payment link for **${short}** for your reservation #${id}. It's valid for ${hours} hours, and you'll enter your card details only on that secure page.`
+          ? c.be.kind === 'cloudbeds'
+            ? `Hola${first ? ` ${first}` : ''}, te escribimos de Soirée, en Zipolite 🌴 Aquí está tu link de pago seguro por **${short}** para tu reservación #${id}. Es válido por ${hours} horas, y ingresarás los datos de tu tarjeta solo en esa página segura.`
+            : `Hola${first ? ` ${first}` : ''}, te escribimos de ${hotel}, en Zipolite 🌴 Aquí está tu link de pago seguro por **${short}** para tu reservación #${id}. Ingresarás los datos de tu tarjeta solo en esa página segura.`
+          : c.be.kind === 'cloudbeds'
+            ? `Hi${first ? ` ${first}` : ''}, this is Soirée in Zipolite 🌴 Here's your secure payment link for **${short}** for your reservation #${id}. It's valid for ${hours} hours, and you'll enter your card details only on that secure page.`
+            : `Hi${first ? ` ${first}` : ''}, this is ${hotel} in Zipolite 🌴 Here's your secure payment link for **${short}** for your reservation #${id}. You'll enter your card details only on that secure page.`
         const res = await sendWhatsAppInteractiveButton(wa.phoneNumberId, wa.credentials, phone, body, url, es ? 'Pagar ahora' : 'Pay now')
         out.whatsapp = res.success ? { status: 'sent', detail: `Sent to ${phone}` } : { status: 'failed', detail: res.error ?? 'WhatsApp did not deliver it' }
         if (res.success) await record(`${body}\n[Payment button]`)
@@ -117,7 +144,7 @@ export async function POST(_r: Request, { params }: { params: Promise<{ id: stri
       // Outside the 24-hour window: the approved hello template, with the link in its reason sentence.
       const reason = es ? `Aquí está tu link de pago por ${amountText}: ${url}` : `Here is your payment link for ${amountText}: ${url}`
       const res = await sendHelloTemplate(c.supabase, { tenantId, conversationId, phone, firstName: first || (es ? 'hola' : 'there'), reason, lang })
-      out.whatsapp = res.success ? { status: 'sent', detail: `Sent to ${phone} as the Soirée hello message` } : { status: 'failed', detail: res.error ?? 'Could not send' }
+      out.whatsapp = res.success ? { status: 'sent', detail: `Sent to ${phone} as the ${hotel} hello message` } : { status: 'failed', detail: res.error ?? 'Could not send' }
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Could not look up the guest'

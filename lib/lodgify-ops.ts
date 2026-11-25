@@ -302,6 +302,21 @@ export async function reservationDetailLodgify(auth: LodgifyAuth, id: string, to
   const paid = amount(b.amount_paid) ?? null
   const code = (await import('./lodgify')).channelCodes(b)[0] ?? null
   const state = stayState(b, today)
+  // Lodgify's transaction list (type Payment/Refund/…, status Done/Failed/…) and the quote's upcoming schedule.
+  const payments = ((b.transactions as Raw[] | undefined) ?? []).map((t) => ({
+    date: str(t.processed_at) || null,
+    type: str(t.type) || 'Payment',
+    status: str(t.status) || 'Unknown',
+    method: str(t.payment_type) || null,
+    description: str(t.description) || null,
+    amount: amount(t.amount) ?? null,
+  }))
+  const scheduled = ((((b.quote as Raw | null) ?? {}).scheduled_transactions as Raw[] | undefined) ?? []).map((t) => ({
+    dueAt: str(t.due_at) || null,
+    type: str(t.type) || null,
+    status: str(t.status) || null,
+    amount: amount(t.amount) ?? null,
+  }))
   return {
     reservationID: str(b.id),
     guestName: str(g.name),
@@ -331,6 +346,8 @@ export async function reservationDetailLodgify(auth: LodgifyAuth, id: string, to
       taxesFees: (amount(sub.taxes) ?? 0) + (amount(sub.vat) ?? 0),
       paid,
     },
+    payments,
+    scheduled,
   }
 }
 

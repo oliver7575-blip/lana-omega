@@ -235,6 +235,11 @@ export function makePaymentTool(ctx: PaymentToolContext): PaymentTool {
       const el = await s.be.evaluate(r.facts, s.pctx.settings, todayIn(s.pctx.tz))
       if (!el.eligible && ['third_party', 'walk_in', 'manual_source'].includes(el.code)) return ineligible(s.be, r.facts, el.code, el.message)
 
+      // What the PMS shows right now — only ever for bookings that qualify for online payment (never OTA/manual).
+      const cur = r.facts.currency || 'MXN'
+      const account = { paidSoFar: round2(r.facts.paid), remaining: round2(Math.max(0, r.facts.balance)), currency: cur }
+      const accountNote = ` You may tell the guest what the reservation shows: paid so far ${account.paidSoFar.toFixed(2)} ${cur}, remaining ${account.remaining.toFixed(2)} ${cur}.`
+
       const { data } = await db
         .from('payment_requests')
         .select('*')
@@ -243,17 +248,20 @@ export function makePaymentTool(ctx: PaymentToolContext): PaymentTool {
         .order('created_at', { ascending: false })
         .limit(1)
       const last = (data?.[0] ?? null) as PaymentRequestRow | null
-      if (!last) return { status: 'no_payment_link', instruction: 'No payment link has been sent for this reservation. If the guest wants to pay, call get_payment_options.' }
+      if (!last) {
+        if (account.remaining <= 0) return { status: 'paid_in_full', account, instruction: `The reservation shows nothing left to pay (paid ${account.paidSoFar.toFixed(2)} ${cur}). Tell the guest it is fully paid.` }
+        return { status: 'no_payment_link', account, instruction: `No payment link has been sent for this reservation.${accountNote} Only if the guest wants to pay, call get_payment_options — do not create a link just to answer a balance question.` }
+      }
       switch (last.status) {
         case 'paid':
-          return { status: 'paid', option: last.kind, amount: Number(last.amount), currency: last.currency || 'MXN', instruction: 'The payment has been verified. You may confirm it to the guest.' }
+          return { status: 'paid', option: last.kind, amount: Number(last.amount), currency: last.currency || cur, account, instruction: `The payment has been verified. You may confirm it to the guest.${accountNote}` }
         case 'paid_unverified':
         case 'needs_review':
-          return { status: 'verifying', instruction: 'A payment was reported but is still being confirmed in our system. Do NOT tell the guest it is confirmed yet — say it is being verified and the team will confirm shortly.' }
+          return { status: 'verifying', instruction: 'A payment was reported but is still being confirmed in our system. Do NOT tell the guest it is confirmed yet — say it is being verified and the team will confirm shortly. Do not quote amounts paid until it is confirmed.' }
         case 'link_active':
-          return { status: 'awaiting_payment', option: last.kind, amount: Number(last.amount), currency: last.currency || 'MXN', instruction: 'The guest has not completed the payment yet. NEVER say it is paid. They can use the link they were already sent.' }
+          return { status: 'awaiting_payment', option: last.kind, amount: Number(last.amount), currency: last.currency || cur, account, instruction: `The guest has not completed the payment yet. NEVER say it is paid. They can use the link they were already sent.${accountNote}` }
         default:
-          return { status: 'link_expired', instruction: 'The last payment link is no longer valid and nothing was paid. Offer to create a new one if the guest still wants to pay.' }
+          return { status: 'link_expired', account, instruction: `The last payment link is no longer valid and nothing was paid with it.${accountNote} Offer to create a new one if the guest still wants to pay.` }
       }
     },
   }
