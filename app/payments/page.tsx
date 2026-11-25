@@ -24,7 +24,7 @@ interface Lookup {
   pms?: string
   currency?: string
   message?: string | null
-  reservation?: { id: string; guestName: string; source: string; status: string; balance: number; paid: number; startDate: string; endDate: string }
+  reservation?: { id: string; guestName: string; source: string; status: string; balance: number; paid: number; taxes?: number | null; startDate: string; endDate: string }
   eligible?: boolean
   options?: { kind: 'deposit' | 'balance'; amount: number }[]
   code?: string | null
@@ -119,7 +119,7 @@ export default function PaymentsPage() {
     <div className="w-full">
       <h1 className="text-[20px] font-semibold leading-tight tracking-tight text-white">Payments</h1>
       <p className="mt-1 text-sm text-navy/55">
-        Secure payment links for <strong>direct bookings</strong> only — Cloudbeds: Website/Booking Engine; Lodgify: bookings made on the Lodgify booking website, or created through the API with taxes above 0. The PMS hosts the payment page (Stripe) and records the payment on the reservation itself. Booking.com / Airbnb and other
+        Secure payment links for <strong>direct bookings</strong> only — Cloudbeds: Website/Booking Engine; Lodgify: bookings made on the Lodgify booking website, or created through the API / manually with taxes above 0. The PMS hosts the payment page (Stripe) and records the payment on the reservation itself. Booking.com / Airbnb and other
         travel-platform reservations never get a link; Walk-In, manual and other reservations are handled by Billing.
       </p>
 
@@ -145,7 +145,7 @@ export default function PaymentsPage() {
               <p>
                 <span className="font-semibold text-white">{lookup.reservation.guestName}</span> · {lookup.reservation.source} · {lookup.reservation.status} · {lookup.reservation.startDate} → {lookup.reservation.endDate}
               </p>
-              <p className="text-navy/60">Balance in {lookup.pms ?? 'the PMS'}: {money(lookup.reservation.balance, lookup.currency)} · paid: {money(lookup.reservation.paid, lookup.currency)}</p>
+              <p className="text-navy/60">Balance in {lookup.pms ?? 'the PMS'}: {money(lookup.reservation.balance, lookup.currency)} · paid: {money(lookup.reservation.paid, lookup.currency)}{lookup.reservation.taxes != null && ` · taxes: ${money(lookup.reservation.taxes, lookup.currency)}`}</p>
               {lookup.eligible ? (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {lookup.options?.map((o) => (
