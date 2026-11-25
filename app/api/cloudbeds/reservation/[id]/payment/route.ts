@@ -18,8 +18,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     // Lodgify (Lalo) can't record payments, so they are kept in the panel's own table.
     const l = await lodgifyForCaller()
     if (!l) return c.error
-    if (b.kind === 'refund') return NextResponse.json({ error: 'Refunds cannot be recorded for Lodgify bookings.' }, { status: 400 })
     try {
+      if (b.kind === 'refund') {
+        // Lalo: "Refund" cancels the most recent payment entered in the panel; again, the one before it, and so on.
+        const db = createServiceClient()
+        const { data: last } = await db.from('pms_manual_payments').select('id').eq('tenant_id', l.tenantId).eq('reservation_id', id).order('created_at', { ascending: false }).limit(1).maybeSingle()
+        if (!last) return NextResponse.json({ error: 'There is no payment entered in the panel to cancel.' }, { status: 400 })
+        const { error: delError } = await db.from('pms_manual_payments').delete().eq('id', last.id as string)
+        if (delError) throw new Error(delError.message)
+        return NextResponse.json({ reservation: await lodgifyDetail(l, id) })
+      }
       const detail = await lodgifyDetail(l, id)
       if (/airbnb|booking|expedia|homeaway|vrbo|ical/i.test(detail.source ?? '')) {
         return NextResponse.json({ error: 'Channel bookings are prepaid through the channel.' }, { status: 400 })

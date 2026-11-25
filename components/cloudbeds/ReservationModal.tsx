@@ -214,7 +214,9 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
     const preset = (methods: { code: string; name: string }[]) =>
       setMpMethod(kind === 'payment' ? defaultPaymentMethod(r.source, methods) : defaultPaymentMethod('walk-in', methods))
     if (r.hasQuote !== undefined) {
-      setMpMethod(kind === 'payment' ? 'Cash' : '')
+      const last = r.manualPayments?.[r.manualPayments.length - 1]
+      if (kind === 'refund' && last) { setMpAmount(String(last.amount)); setMpMethod(last.method) }
+      else setMpMethod(kind === 'payment' ? 'Cash' : '')
     } else if (mpMethods) preset(mpMethods)
     else {
       cbApi<{ paymentMethods: { code: string; name: string }[] }>('/api/cloudbeds/availability?options=1')
@@ -558,7 +560,7 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
               <button disabled={payBusy} onClick={() => { setMpKind(null); setQuick(null); setPay(null); setPayError(null); setConfirmPayLink((v) => !v) }} className={`${btn} ${bt} ${pay || confirmPayLink ? '!border-[#9fd4c5] !bg-[#d9f0ea]' : '!border-[#c3e5db] !bg-[#e6f5f0]'} !text-[#0e5f47]`}>
                 🔗 {payBusy ? 'Creating…' : 'Payment link'}
               </button>
-              <button onClick={() => openMoney('refund')} className={`${btn} ${bt} !text-[#a3362b] ${mpKind === 'refund' ? '!border-[#e8aaa3] !bg-[#fff0ee]' : ''}`}>↩ Refund</button>
+              {(r.hasQuote === undefined || Boolean(r.manualPayments?.length)) && <button onClick={() => openMoney('refund')} className={`${btn} ${bt} !text-[#a3362b] ${mpKind === 'refund' ? '!border-[#e8aaa3] !bg-[#fff0ee]' : ''}`}>↩ Refund</button>}
               {r.guestPhone && (
                 <button onClick={() => (quick === 'whatsapp' ? setQuick(null) : openQuick('whatsapp'))}
                   className={quick === 'whatsapp' ? `${btn} ${bt} !border-[#128c7e] !bg-[#128c7e] !text-white shadow-[0_3px_8px_rgba(18,140,126,.35)]` : `${btn} ${bt} !border-[#c9d9f7] !text-[#2456b8]`}>
@@ -583,10 +585,15 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
 
             {/* Add payment / refund */}
             {mpKind && (
-              <InlinePanel tone={mpKind === 'refund' ? 'red' : 'green'} title={mpKind === 'refund' ? 'Refund a payment' : 'Add a payment'}
+              <InlinePanel tone={mpKind === 'refund' ? 'red' : 'green'} title={mpKind === 'refund' ? (r.hasQuote !== undefined ? 'Cancel last payment' : 'Refund a payment') : 'Add a payment'}
                 subtitle={mpKind === 'refund' ? <>Paid <b>{money(paidAmt)}</b></> : <>Balance due <b className="text-[#b42318]">{money(r.balance)}</b></>}
                 onClose={() => setMpKind(null)}>
-                <div className="grid grid-cols-2 gap-3">
+                {r.hasQuote !== undefined && mpKind === 'refund' && (
+                  <p className="rounded-xl border border-[#f6d3cd] bg-[#fff4f2] px-3 py-2 text-[13px] leading-snug text-[#8a2a22]">
+                    This cancels the last payment entered in the panel: <b>{mpMethod}</b> · <b>{money(Number(mpAmount))}</b>. Use it again to cancel the one before. Nothing is sent to the guest.
+                  </p>
+                )}
+                <div className={`grid grid-cols-2 gap-3 ${r.hasQuote !== undefined && mpKind === 'refund' ? 'hidden' : ''}`}>
                   <label className={lbl}>Amount (MXN)
                     <input type="number" min="0" step="0.01" inputMode="decimal" value={mpAmount} onChange={(e) => setMpAmount(e.target.value)} autoFocus
                       className={`${field} mt-1.5 !h-11 !text-[17px] !font-semibold normal-case tracking-normal`} />
@@ -618,15 +625,15 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                     <span className="ml-auto text-[12.5px] text-[#667085]">Remaining after: <b className="text-[#0e6b4a]">{money(Math.max(0, (r.balance ?? 0) - (Number(mpAmount) || 0)))}</b></span>
                   </div>
                 )}
-                <label className={lbl}>{mpKind === 'refund' ? 'Reason (optional)' : 'Note (optional)'}
+                <label className={`${lbl} ${r.hasQuote !== undefined && mpKind === 'refund' ? 'hidden' : ''}`}>{mpKind === 'refund' ? 'Reason (optional)' : 'Note (optional)'}
                   <input value={mpNote} onChange={(e) => setMpNote(e.target.value)} placeholder={mpKind === 'refund' ? 'Reason for the refund' : 'e.g. paid at the front desk'} className={`${field} mt-1.5 normal-case tracking-normal`} />
                 </label>
-                {mpKind === 'refund' && <p className="rounded-xl border border-[#f6d3cd] bg-[#fff4f2] px-3 py-2 text-[12.5px] leading-snug text-[#8a2a22]">This records the refund in Cloudbeds only. It does not send money back to the guest, so return it yourself (card, transfer or cash).</p>}
+                {mpKind === 'refund' && r.hasQuote === undefined && <p className="rounded-xl border border-[#f6d3cd] bg-[#fff4f2] px-3 py-2 text-[12.5px] leading-snug text-[#8a2a22]">This records the refund in Cloudbeds only. It does not send money back to the guest, so return it yourself (card, transfer or cash).</p>}
                 {mpErr && <p className="text-sm text-red-700">{mpErr}</p>}
                 <div className="flex justify-end gap-2.5">
                   <button onClick={() => setMpKind(null)} className={btnLg}>Cancel</button>
                   <button disabled={mpBusy || !mpMethod || !(Number(mpAmount) > 0)} onClick={submitMoney} className={mpKind === 'refund' ? priRed : priGreen}>
-                    {mpBusy ? 'Saving…' : mpKind === 'refund' ? 'Record refund' : 'Record payment'}
+                    {mpBusy ? 'Saving…' : mpKind === 'refund' ? (r.hasQuote !== undefined ? 'Cancel this payment' : 'Record refund') : 'Record payment'}
                   </button>
                 </div>
               </InlinePanel>
