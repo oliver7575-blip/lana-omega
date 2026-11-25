@@ -1,7 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { getReservationRaw, type CB } from '../cloudbeds-ops'
-import { evaluate, factsFromRaw, readPaymentSettings, type Eligibility, type PaymentKind, type PaymentSettings } from './rules'
-import { createPayByLink, getPayByLink } from './paylink'
+import { readPaymentSettings, type Eligibility, type PaymentKind, type PaymentSettings } from './rules'
+import type { PaymentBackend } from './backend'
 import { notifyGuestPaid } from './notify'
 
 export type PaymentStatus = 'creating' | 'link_active' | 'paid_unverified' | 'paid' | 'expired' | 'cancelled' | 'failed' | 'needs_review'
@@ -58,14 +57,14 @@ export async function logPaymentEvent(db: SupabaseClient, tenantId: string, requ
 
 export type LookupResult = { found: false; message: string } | { found: true; eligibility: Eligibility }
 
-/** Reads the reservation from Cloudbeds and decides whether (and for how much) a link may be created. */
-export async function lookupReservationForPayment(cb: CB, ctx: PaymentContext, reservationId: string): Promise<LookupResult> {
+/** Reads the reservation from the hotel's PMS and decides whether (and for how much) a link may be created. */
+export async function lookupReservationForPayment(be: PaymentBackend, ctx: PaymentContext, reservationId: string): Promise<LookupResult> {
   try {
-    const raw = await getReservationRaw(cb, reservationId)
-    if (!raw.reservationID) return { found: false, message: 'Reservation not found in Cloudbeds.' }
-    return { found: true, eligibility: evaluate(factsFromRaw(raw), ctx.settings, todayIn(ctx.tz)) }
+    const raw = await be.getRaw(reservationId)
+    if (!raw) return { found: false, message: `Reservation not found in ${be.label}.` }
+    return { found: true, eligibility: await be.evaluate(be.facts(raw), ctx.settings, todayIn(ctx.tz)) }
   } catch (err) {
-    return { found: false, message: err instanceof Error ? err.message : 'Cloudbeds is not reachable right now.' }
+    return { found: false, message: err instanceof Error ? err.message : `${be.label} is not reachable right now.` }
   }
 }
 
@@ -87,11 +86,11 @@ export type CreateResult =
 const fail = (code: string, message: string): CreateResult => ({ ok: false, code, message })
 
 /**
- * Creates (or reuses) a payment link. The amount ALWAYS comes from Cloudbeds
+ * Creates (or reuses) a payment link. The amount ALWAYS comes from the PMS
  * through the rules — callers only choose "deposit" or "balance".
  */
-export async function createPaymentLink(db: SupabaseClient, cb: CB, ctx: PaymentContext, input: CreateInput): Promise<CreateResult> {
-  const found = await lookupReservationForPayment(cb, ctx, input.reservationId)
+export async function createPaymentLink(db: SupabaseClient, be: PaymentBackend, ctx: PaymentContext, input: CreateInput): Promise<CreateResult> {
+  const found = await lookupReservationForPayment(be, ctx, input.reservationId)
   if (!found.found) return fail('not_found', found.message)
   const el = found.eligibility
   if (!el.eligible) return fail(el.code, el.message)
@@ -118,7 +117,7 @@ export async function createPaymentLink(db: SupabaseClient, cb: CB, ctx: Payment
       return { ok: true, request: row, reused: true }
     }
     await db.from('payment_requests').update({ status: 'cancelled', error: 'Replaced by a newer link', updated_at: new Date().toISOString() }).eq('id', row.id)
-    await logPaymentEvent(db, ctx.tenantId, row.id, 'superseded', { note: 'Cloudbeds cannot cancel API-created links; the old one may stay payable until it expires.' })
+    await logPaymentEvent(db, ctx.tenantId, row.id, 'superseded', { note: `${be.label} cannot cancel API-created links; the old one may stay payable until it expires.` })
   }
 
   const since = new Date(Date.now() - 24 * 3600_000).toISOString()
@@ -142,7 +141,7 @@ export async function createPaymentLink(db: SupabaseClient, cb: CB, ctx: Payment
       guest_name: el.facts.guestName,
       kind: input.kind,
       amount: option.amount,
-      currency: 'MXN',
+      currency: el.facts.currency || 'MXN',
       status: 'creating',
       paid_before: el.facts.paid,
       created_by: input.createdBy,
@@ -157,17 +156,18 @@ export async function createPaymentLink(db: SupabaseClient, cb: CB, ctx: Payment
   if (insertError || !inserted) return fail('conflict', 'A link for this reservation is already being created.')
   const row = inserted as PaymentRequestRow
 
-  const created = await createPayByLink(cb, {
-    reservationId: el.facts.reservationId,
+  const created = await be.createLink({
+    facts: el.facts,
+    kind: input.kind,
     amount: option.amount,
-    description: `Soirée payment link (${input.kind}) ${row.id.slice(0, 8)}`,
+    description: `Payment link (${input.kind}) ${row.id.slice(0, 8)}`,
     expiresAfterDays: ctx.settings.linkExpiryDays,
   })
   if (!created.ok) {
-    await db.from('payment_requests').update({ status: 'failed', error: `Cloudbeds (${created.status}): ${created.message}`, updated_at: new Date().toISOString() }).eq('id', row.id)
+    await db.from('payment_requests').update({ status: 'failed', error: `${be.label} (${created.status}): ${created.message}`, updated_at: new Date().toISOString() }).eq('id', row.id)
     await logPaymentEvent(db, ctx.tenantId, row.id, 'failed', { status: created.status, message: created.message })
-    const hint = created.status === 401 || created.status === 403 ? ' The Cloudbeds API key probably lacks permission to create payment links.' : ''
-    return fail('cloudbeds_error', `Cloudbeds could not create the link (${created.status}).${hint} ${created.message}`.trim())
+    const hint = created.status === 401 || created.status === 403 ? ` The ${be.label} API key probably lacks permission to create payment links.` : ''
+    return fail('pms_error', `${be.label} could not create the link (${created.status}).${hint} ${created.message}`.trim())
   }
 
   const expiresAt = created.expiresAt && !Number.isNaN(Date.parse(created.expiresAt)) ? new Date(created.expiresAt).toISOString() : new Date(Date.now() + ctx.settings.linkExpiryDays * 86400_000).toISOString()
@@ -182,26 +182,27 @@ export async function createPaymentLink(db: SupabaseClient, cb: CB, ctx: Payment
 }
 
 /** True once the folio shows the money: paid amount rose by at least the link amount. */
-async function folioShowsPayment(cb: CB, row: PaymentRequestRow): Promise<boolean> {
+async function folioShowsPayment(be: PaymentBackend, row: PaymentRequestRow): Promise<boolean> {
   try {
-    const facts = factsFromRaw(await getReservationRaw(cb, row.reservation_id))
-    return facts.paid >= Number(row.paid_before ?? 0) + Number(row.amount) - 0.01
+    const paid = await be.paidNow(row.reservation_id)
+    return paid !== null && paid >= Number(row.paid_before ?? 0) + Number(row.amount) - 0.01
   } catch {
     return false
   }
 }
 
 /**
- * One status check. A request becomes "paid" only when Cloudbeds says the link
- * was paid AND the reservation's folio shows the payment.
+ * One status check. A request becomes "paid" only when the reservation in the
+ * PMS shows the payment (Cloudbeds: the link is paid AND the folio shows it;
+ * Lodgify, which has no link status: amount_paid rose by the link amount).
  */
-export async function pollPayment(db: SupabaseClient, cb: CB, ctx: PaymentContext, row: PaymentRequestRow): Promise<PaymentRequestRow> {
+export async function pollPayment(db: SupabaseClient, be: PaymentBackend, ctx: PaymentContext, row: PaymentRequestRow): Promise<PaymentRequestRow> {
   const nowIso = new Date().toISOString()
   const patch: Record<string, unknown> = { last_checked_at: nowIso, check_count: (row.check_count ?? 0) + 1, updated_at: nowIso }
   let event: { name: string; detail?: Record<string, unknown> } | null = null
 
   const confirmPaid = async (firstSeen: string) => {
-    if (await folioShowsPayment(cb, row)) {
+    if (await folioShowsPayment(be, row)) {
       patch.status = 'paid'
       patch.paid_at = firstSeen
       patch.error = null
@@ -209,12 +210,12 @@ export async function pollPayment(db: SupabaseClient, cb: CB, ctx: PaymentContex
     } else {
       patch.status = 'paid_unverified'
       patch.paid_at = firstSeen
-      event = { name: 'paid_unverified', detail: { note: 'Cloudbeds says the link was paid; waiting for the folio to show it.' } }
+      event = { name: 'paid_unverified', detail: { note: `${be.label} says the link was paid; waiting for the reservation to show it.` } }
     }
   }
 
   if (row.status === 'link_active' && row.link_id) {
-    const r = await getPayByLink(cb, row.link_id)
+    const r = await be.linkState(row.link_id)
     if (!r.ok) {
       patch.error = `Status check failed (${r.status}): ${r.message}`
       const tooOld = row.expires_at && Date.parse(row.expires_at) < Date.now() - 24 * 3600_000
@@ -223,29 +224,39 @@ export async function pollPayment(db: SupabaseClient, cb: CB, ctx: PaymentContex
         event = { name: 'needs_review', detail: { reason: 'Could not read the link status for over a day after it expired.' } }
       }
     } else {
-      patch.link_status = r.status
       patch.error = null
-      const s = r.status.toLowerCase()
-      if (r.paid || s === 'paid') await confirmPaid(nowIso)
-      else if (s === 'expired') {
+      if (r.state !== 'unknown') patch.link_status = r.raw
+      if (r.state === 'unknown') {
+        // No link status at the PMS (Lodgify): the reservation's paid amount is the only truth.
+        if (await folioShowsPayment(be, row)) {
+          patch.status = 'paid'
+          patch.paid_at = nowIso
+          event = { name: 'paid', detail: { amount: Number(row.amount), verified: 'reservation' } }
+        } else if (row.expires_at && Date.parse(row.expires_at) < Date.now() - 15 * 60_000) {
+          patch.status = 'expired'
+          event = { name: 'expired', detail: { note: `Past its expiry time in Omega. ${be.label} may still accept a payment on this link.` } }
+        }
+      } else if (r.state === 'paid') {
+        await confirmPaid(nowIso)
+      } else if (r.state === 'expired') {
         patch.status = 'expired'
         event = { name: 'expired' }
-      } else if (s === 'cancelled' || s === 'canceled') {
+      } else if (r.state === 'cancelled') {
         patch.status = 'cancelled'
-        event = { name: 'cancelled', detail: { by: 'cloudbeds' } }
-      } else if (row.expires_at && Date.parse(row.expires_at) < Date.now() - 15 * 60_000 && !r.readyForPayment && s !== '3dsprocessing') {
+        event = { name: 'cancelled', detail: { by: be.kind } }
+      } else if (row.expires_at && Date.parse(row.expires_at) < Date.now() - 15 * 60_000 && !r.readyForPayment) {
         patch.status = 'expired'
         event = { name: 'expired', detail: { note: 'Past its expiry time.' } }
       }
     }
   } else if (row.status === 'paid_unverified') {
-    if (await folioShowsPayment(cb, row)) {
+    if (await folioShowsPayment(be, row)) {
       patch.status = 'paid'
       patch.error = null
       event = { name: 'paid', detail: { amount: Number(row.amount), verified: 'folio' } }
     } else if (row.paid_at && Date.now() - Date.parse(row.paid_at) > 20 * 60_000) {
       patch.status = 'needs_review'
-      patch.error = 'Cloudbeds reports the link as paid but the folio does not show the payment yet. Please check the reservation in Cloudbeds.'
+      patch.error = `${be.label} reports the link as paid but the reservation does not show the payment yet. Please check the reservation in ${be.label}.`
       event = { name: 'needs_review', detail: { reason: 'folio mismatch after 20 minutes' } }
     }
   }
@@ -261,8 +272,8 @@ export async function pollPayment(db: SupabaseClient, cb: CB, ctx: PaymentContex
   return result
 }
 
-/** Staff closes a request on our side. Cloudbeds cannot cancel API links, so a closed link may still be payable until it expires. */
+/** Staff closes a request on our side. Neither PMS can cancel API links, so a closed link may still be payable until it expires. */
 export async function closePaymentRequest(db: SupabaseClient, ctx: PaymentContext, row: PaymentRequestRow, by: string): Promise<void> {
   await db.from('payment_requests').update({ status: 'cancelled', error: null, updated_at: new Date().toISOString() }).eq('id', row.id)
-  await logPaymentEvent(db, ctx.tenantId, row.id, 'closed', { by, note: 'Closed in Omega; the Cloudbeds link may remain payable until it expires.' })
+  await logPaymentEvent(db, ctx.tenantId, row.id, 'closed', { by, note: 'Closed in Omega; the link at the PMS may remain payable until it expires.' })
 }

@@ -437,8 +437,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
 
   const roomPhotosTool = pms ? buildRoomPhotosTool(pms) : undefined
 
-  // Cloudbeds Pay-by-Link only for now — other PMSs get no payment tool.
-  const paymentTool = pms?.cloudbeds
+  // Payment links: Cloudbeds Pay-by-Link or Lodgify (direct bookings only — the server decides who qualifies).
+  const paymentTool = pms?.cloudbeds || pms?.lodgify
     ? makePaymentTool({
         tenantId,
         conversationId: conversationId as string,

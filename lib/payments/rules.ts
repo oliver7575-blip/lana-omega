@@ -58,6 +58,8 @@ export interface ReservationFacts {
   suggestedDeposit: number
   startDate: string
   endDate: string
+  /** ISO currency of the reservation (Cloudbeds: always MXN here). */
+  currency?: string
 }
 
 export function factsFromRaw(d: Record<string, unknown>): ReservationFacts {
@@ -119,4 +121,44 @@ export function evaluate(facts: ReservationFacts, settings: PaymentSettings, tod
     options.unshift({ kind: 'deposit', amount: depositLeft })
   }
   return { eligible: true, options, facts }
+}
+
+// ---- Lodgify -----------------------------------------------------------------------
+
+/**
+ * Lodgify `source` values (Lodgify API enum): Manual, OH, NineFlats, Airbnb,
+ * AirbnbIntegration, HomeAway, BookingCom, Expedia, ICal, Email,
+ * FacebookMessenger, PublicApi, Other.
+ *
+ * "OH" is Lodgify's own booking website / booking engine. That is the ONLY
+ * source that may get a payment link — this is a hard rule, not a setting.
+ */
+export const LODGIFY_DIRECT_SOURCE = 'oh'
+const LODGIFY_OTA_SOURCES = ['airbnb', 'airbnbintegration', 'bookingcom', 'expedia', 'homeaway', 'nineflats', 'ical']
+
+/** Lodgify reservation facts. `balance` = amount_due, `paid` = amount_paid. No suggested deposit (Lodgify's payment schedule decides). */
+export function evaluateLodgify(facts: ReservationFacts, settings: PaymentSettings, today: string): Eligibility {
+  const no = (code: IneligibleCode, message: string): Eligibility => ({ eligible: false, code, message, facts })
+  const source = facts.source.trim().toLowerCase()
+
+  // Third-party first: an OTA source (or an OTA name anywhere in it) is decisive.
+  if (LODGIFY_OTA_SOURCES.includes(source) || OTA_PATTERN.test(facts.source)) {
+    return no('third_party', 'Booked through a travel platform: payment is handled by the platform, so no link is created.')
+  }
+  // Only Lodgify's own booking website qualifies. Manual, PublicApi, Email, Other … and unknown → staff.
+  if (source !== LODGIFY_DIRECT_SOURCE) {
+    return no('manual_source', `Source "${facts.source || 'unknown'}" is not a booking made on the Lodgify booking website — handled manually by Billing.`)
+  }
+  if (facts.status !== 'confirmed') {
+    return no('inactive', `The reservation is ${facts.status || 'not active'}.`)
+  }
+  if (facts.endDate && facts.endDate < today) {
+    return no('ended', 'The stay has already ended.')
+  }
+  if (facts.balance <= 0) return no('no_balance', 'There is no balance to pay.')
+  if (facts.balance < settings.minAmount) {
+    return no('below_minimum', `The balance is below the minimum payment (${settings.minAmount.toFixed(2)}).`)
+  }
+  // Options are filled in by the Lodgify backend from Lodgify's own payment schedule.
+  return { eligible: true, options: [{ kind: 'balance', amount: round2(facts.balance) }], facts }
 }

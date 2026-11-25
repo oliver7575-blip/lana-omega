@@ -92,4 +92,7 @@ export interface PmsAdapter {
    * how those features know to switch themselves off.
    */
   cloudbeds?: { apiKey: string; propertyId: string }
+
+  /** Raw Lodgify access for Lodgify-only features (payment links). Undefined for every other PMS. */
+  lodgify?: { apiKey: string; propertyId?: string }
 }
