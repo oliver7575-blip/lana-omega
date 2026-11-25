@@ -60,6 +60,8 @@ export interface ReservationFacts {
   endDate: string
   /** ISO currency of the reservation (Cloudbeds: always MXN here). */
   currency?: string
+  /** Taxes on the reservation (Lodgify: subtotals.taxes + subtotals.vat). */
+  taxes?: number
 }
 
 export function factsFromRaw(d: Record<string, unknown>): ReservationFacts {
@@ -130,10 +132,14 @@ export function evaluate(facts: ReservationFacts, settings: PaymentSettings, tod
  * AirbnbIntegration, HomeAway, BookingCom, Expedia, ICal, Email,
  * FacebookMessenger, PublicApi, Other.
  *
- * "OH" is Lodgify's own booking website / booking engine. That is the ONLY
- * source that may get a payment link — this is a hard rule, not a setting.
+ * Hard rules (not settings) for who may get a payment link:
+ *  - "OH" = Lodgify's own booking website / booking engine → yes.
+ *  - "PublicApi" = created through the API (e.g. from the Lana panel) → only
+ *    when the booking's taxes are more than 0.
+ *  - Everything else → no.
  */
 export const LODGIFY_DIRECT_SOURCE = 'oh'
+export const LODGIFY_API_SOURCE = 'publicapi'
 const LODGIFY_OTA_SOURCES = ['airbnb', 'airbnbintegration', 'bookingcom', 'expedia', 'homeaway', 'nineflats', 'ical']
 
 /** Lodgify reservation facts. `balance` = amount_due, `paid` = amount_paid. No suggested deposit (Lodgify's payment schedule decides). */
@@ -145,8 +151,12 @@ export function evaluateLodgify(facts: ReservationFacts, settings: PaymentSettin
   if (LODGIFY_OTA_SOURCES.includes(source) || OTA_PATTERN.test(facts.source)) {
     return no('third_party', 'Booked through a travel platform: payment is handled by the platform, so no link is created.')
   }
-  // Only Lodgify's own booking website qualifies. Manual, PublicApi, Email, Other … and unknown → staff.
-  if (source !== LODGIFY_DIRECT_SOURCE) {
+  // Lodgify booking website always qualifies; an API booking only with taxes > 0. Manual, Email, Other … and unknown → staff.
+  if (source === LODGIFY_API_SOURCE) {
+    if (!((facts.taxes ?? 0) > 0)) {
+      return no('manual_source', 'Created through the API without taxes — handled manually by Billing.')
+    }
+  } else if (source !== LODGIFY_DIRECT_SOURCE) {
     return no('manual_source', `Source "${facts.source || 'unknown'}" is not a booking made on the Lodgify booking website — handled manually by Billing.`)
   }
   if (facts.status !== 'confirmed') {
