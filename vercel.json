@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/ota-prepaid-payments",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/sync-revenue",
+      "schedule": "30 9 * * *"
     }
   ]
 }

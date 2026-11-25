@@ -563,3 +563,76 @@ export async function cancelBookingLodgify(auth: LodgifyAuth, id: string): Promi
   if (!p.ok) throw new Error(p.error)
   cache.clear()
 }
+
+/**
+ * Copies Lodgify bookings into booking_revenue (the revenue ledger Lana reports from), a slice at a time.
+ * Every real booking is stored with its status; only confirmed (Booked) ones count as revenue, so a booking
+ * that is cancelled later flips to "not revenue" the next time it is synced. Owner blocks are skipped.
+ */
+export async function syncRevenueLodgify(
+  auth: LodgifyAuth,
+  tenantId: string,
+  db: import('@supabase/supabase-js').SupabaseClient,
+  offset: number,
+  limit: number,
+): Promise<{ total: number; processed: number; nextOffset: number | null; revenueRows: number; withoutBreakdown: number }> {
+  const [props, listed] = await Promise.all([loadProps(auth), listBookings(auth, 'stayFilter=All&includeCount=false')])
+  if (!listed.ok) throw new Error(listed.error)
+  const all = listed.rows.filter((b) => b.is_unavailable !== true).sort((a, b) => Number(a.id) - Number(b.id))
+  const slice = all.slice(offset, offset + limit)
+  let revenueRows = 0
+  let withoutBreakdown = 0
+
+  const rows: Record<string, unknown>[] = []
+  const queue = [...slice]
+  async function worker() {
+    for (let b = queue.shift(); b; b = queue.shift()) {
+      const status = mapLodgifyStatus(b)
+      const counts = status === 'confirmed'
+      let full = b
+      let hasSub = b.subtotals != null
+      if (counts && !hasSub) {
+        const d = await lodgifyFetch(auth, `/v2/reservations/bookings/${encodeURIComponent(str(b.id))}`)
+        if (d.ok && d.data) { full = d.data as Raw; hasSub = full.subtotals != null }
+      }
+      const sub = (full.subtotals as Raw | undefined) ?? {}
+      const arrival = day(full.arrival)
+      const departure = day(full.departure)
+      const pid = str(full.property_id)
+      if (counts) revenueRows++
+      if (counts && !hasSub) withoutBreakdown++
+      rows.push({
+        tenant_id: tenantId,
+        reservation_id: str(full.id),
+        guest_name: str(guestOf(full).name) || null,
+        source: sourceLabel(full) ?? null,
+        channel_code: (await import('./lodgify')).channelCodes(full)[0] ?? null,
+        property_id: pid || null,
+        room_type: props.find((p) => p.id === pid)?.name ?? null,
+        arrival: arrival || null,
+        departure: departure || null,
+        nights: arrival && departure ? nights(arrival, departure) : null,
+        booked_on: day(full.created_at) || null,
+        pms_status: status,
+        counts_as_revenue: counts,
+        currency: str(full.currency_code) || str((full.total_amount as Raw | undefined)?.currency_code) || 'MXN',
+        // Without a breakdown the whole total is treated as the stay subtotal (no tax split known).
+        stay_subtotal: hasSub ? amount(sub.stay) ?? null : amount(full.total_amount) ?? null,
+        addons: hasSub ? amount(sub.addons) ?? 0 : 0,
+        fees: hasSub ? amount(sub.fees) ?? 0 : 0,
+        taxes: hasSub ? amount(sub.taxes) ?? 0 : 0,
+        vat: hasSub ? amount(sub.vat) ?? 0 : 0,
+        total: amount(full.total_amount) ?? null,
+        raw_subtotals: hasSub ? sub : null,
+        synced_at: new Date().toISOString(),
+      })
+    }
+  }
+  await Promise.all([worker(), worker(), worker(), worker()])
+  if (rows.length) {
+    const { error } = await db.from('booking_revenue').upsert(rows, { onConflict: 'tenant_id,reservation_id' })
+    if (error) throw new Error(error.message)
+  }
+  const next = offset + limit
+  return { total: all.length, processed: slice.length, nextOffset: next < all.length ? next : null, revenueRows, withoutBreakdown }
+}
