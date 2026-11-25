@@ -588,7 +588,7 @@ export async function syncRevenueLodgify(
   async function worker() {
     for (let b = queue.shift(); b; b = queue.shift()) {
       const status = mapLodgifyStatus(b)
-      const counts = status === 'confirmed'
+      let counts = status === 'confirmed'
       let full = b
       let hasSub = b.subtotals != null
       if (counts && !hasSub) {
@@ -596,6 +596,9 @@ export async function syncRevenueLodgify(
         if (d.ok && d.data) { full = d.data as Raw; hasSub = full.subtotals != null }
       }
       const sub = (full.subtotals as Raw | undefined) ?? {}
+      // Discounted bookings are kept off the books.
+      let excluded: string | null = null
+      if (counts && (amount(sub.promotions) ?? 0) !== 0) { counts = false; excluded = 'discount' }
       const arrival = day(full.arrival)
       const departure = day(full.departure)
       const pid = str(full.property_id)
@@ -615,6 +618,7 @@ export async function syncRevenueLodgify(
         booked_on: day(full.created_at) || null,
         pms_status: status,
         counts_as_revenue: counts,
+        excluded_reason: excluded,
         currency: str(full.currency_code) || str((full.total_amount as Raw | undefined)?.currency_code) || 'MXN',
         // Without a breakdown the whole total is treated as the stay subtotal (no tax split known).
         stay_subtotal: hasSub ? amount(sub.stay) ?? null : amount(full.total_amount) ?? null,
