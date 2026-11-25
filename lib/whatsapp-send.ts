@@ -26,6 +26,34 @@ export function toWhatsAppFormat(text: string): string {
     .trim()
 }
 
+/**
+ * Shows "typing…" to the guest (and marks their message as read) while Lana works on the reply.
+ * WhatsApp keeps it up to ~25 s or until a message is sent. Best effort: never throws.
+ */
+export async function sendWhatsAppTyping(
+  phoneNumberId: string,
+  encryptedCredentials: EncryptedPayload,
+  guestMessageId: string
+): Promise<void> {
+  try {
+    const { access_token } = decryptCredentials<WhatsAppCredentials>(encryptedCredentials)
+    const res = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${access_token}` },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        status: 'read',
+        message_id: guestMessageId,
+        typing_indicator: { type: 'text' },
+      }),
+      signal: AbortSignal.timeout(5000),
+    })
+    if (!res.ok) console.warn('[whatsapp] typing indicator rejected', res.status, (await res.text()).slice(0, 200))
+  } catch (err) {
+    console.warn('[whatsapp] typing indicator failed', err instanceof Error ? err.message : err)
+  }
+}
+
 export async function sendWhatsAppMessage(
   phoneNumberId: string,
   encryptedCredentials: EncryptedPayload,

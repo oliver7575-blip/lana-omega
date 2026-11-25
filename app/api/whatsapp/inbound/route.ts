@@ -5,7 +5,7 @@ import crypto from 'crypto'
 import { NextResponse, after } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { generateReply, NO_REPLY_TOKEN } from '@/lib/anthropic'
-import { sendWhatsAppMessage, sendWhatsAppInteractiveButton, sendWhatsAppImage } from '@/lib/whatsapp-send'
+import { sendWhatsAppMessage, sendWhatsAppInteractiveButton, sendWhatsAppImage, sendWhatsAppTyping } from '@/lib/whatsapp-send'
 import { downloadWhatsAppMedia, describeImage, transcribeAudio } from '@/lib/whatsapp-media'
 import { verifyMetaSignature } from '@/lib/verify-webhook'
 import { decryptCredentials, type EncryptedPayload } from '@/lib/crypto'
@@ -500,6 +500,7 @@ async function processInbound(msg: ExtractedMessage) {
     guest: guest as GuestRow,
     conversationId,
     profileName: msg.profileName,
+    typingForMessageId: msg.messageId ?? undefined,
   })
 }
 
@@ -520,6 +521,8 @@ async function replyToConversation(args: {
   guest: GuestRow
   conversationId: string
   profileName?: string
+  /** The guest's WhatsApp message id: when set, "typing…" is shown while Lana works on the reply. */
+  typingForMessageId?: string
 }): Promise<ReplyOutcome> {
   const { tenantId, credentials, phoneNumberId, from, guest, conversationId } = args
   const msg = { profileName: args.profileName }
@@ -577,6 +580,9 @@ async function replyToConversation(args: {
     await markSilent(supabase, conversationId, 'whatsapp_replies_off')
     return { answered: false, reason: 'WhatsApp replies are switched off' }
   }
+
+  // Lana is going to answer: show "typing…" now (best effort; no await on failure paths).
+  if (args.typingForMessageId) await sendWhatsAppTyping(phoneNumberId, credentials, args.typingForMessageId)
 
   // ---- Tools & context ------------------------------------------------------
 

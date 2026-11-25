@@ -89,6 +89,12 @@ export async function sendInstagramText(conn: InstagramConnection, recipientId: 
   return { success: true }
 }
 
+/** Shows "typing…" to the guest while Lana works on the reply (best effort, never throws). */
+export async function sendInstagramTyping(conn: InstagramConnection, recipientId: string) {
+  const res = await post(conn, { recipient: { id: recipientId }, sender_action: 'typing_on' })
+  if (!res.success) console.warn('[instagram] typing indicator failed', res.error)
+}
+
 export async function sendInstagramImage(conn: InstagramConnection, recipientId: string, imageUrl: string) {
   return post(conn, {
     recipient: { id: recipientId },

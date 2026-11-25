@@ -20,6 +20,7 @@ import {
   instagramProfile,
   sendInstagramImage,
   sendInstagramText,
+  sendInstagramTyping,
   type InstagramConnection,
 } from '@/lib/instagram'
 
@@ -193,6 +194,8 @@ async function handleMessage(tenantId: string, conn: InstagramConnection, accoun
   ])
   if (convoNow?.status === 'human_takeover' || convoNow?.status === 'closed') return
   if ((tenant?.channel_settings as { instagram?: boolean } | null)?.instagram === false) return
+  // Lana is going to answer: show "typing…" while she works on it.
+  await sendInstagramTyping(conn, senderId)
 
   // ---- Tools ------------------------------------------------------------------
   const [{ data: integrations }, pms] = await Promise.all([
