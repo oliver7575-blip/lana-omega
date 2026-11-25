@@ -68,8 +68,11 @@ export async function GET(request: Request) {
       )
     }
     try {
-      return NextResponse.json({ templates: await listTemplates(ctx.wa.wabaId, ctx.wa.credentials) })
+      const templates = await listTemplates(ctx.wa.wabaId, ctx.wa.credentials)
+      console.log('[templates-list] tenant', ctx.tenantId, 'waba', ctx.wa.wabaId, 'count', templates.length, 'usable', templates.filter((t) => t.usable).length)
+      return NextResponse.json({ templates })
     } catch (err) {
+      console.error('[templates-list] failed for tenant', ctx.tenantId, 'waba', ctx.wa.wabaId, err instanceof Error ? err.message : err)
       return NextResponse.json(
         { error: err instanceof Error ? err.message : 'Could not reach WhatsApp' },
         { status: 502 }
