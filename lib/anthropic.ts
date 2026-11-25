@@ -40,6 +40,9 @@ export interface RoomPhotosResult {
   focus?: string
   /** A specific angle was asked for but none of the room's photos shows it. */
   noPhotoOfThat?: boolean
+  /** Every photo of this room (or of that part) has already been sent in this chat. */
+  allAlreadySent?: boolean
+  moreAvailable?: boolean
   photosShow?: string[]
 }
 
@@ -354,7 +357,7 @@ export async function generateReply(
     tools.push({
       name: 'send_room_photos',
       description:
-        "Send the guest real photos of one room type. Use this when a guest asks to see photos or pictures of a room or unit. The photos are sent automatically after your reply — just write a short, warm line introducing them and do not paste any image links. If the result says the room type wasn't found, tell the guest which room types exist (from availableRoomTypes) and ask which one they'd like to see. If the result has noPhotoOfThat, tell the guest honestly that there is no photo of that part of the room (you may mention what the photos do show, from photosShow) and that the team can help.",
+        "Send the guest real photos of one room type. Use this when a guest asks to see photos or pictures of a room or unit. The photos are sent automatically after your reply — just write a short, warm line introducing them and do not paste any image links. If the result says the room type wasn't found, tell the guest which room types exist (from availableRoomTypes) and ask which one they'd like to see. Each call sends photos the guest hasn't received yet in this chat, so when a guest asks for more photos, call this again for the same room: they get new ones. If the result has allAlreadySent, tell the guest that is every photo available of that room (or that part). If moreAvailable is true you may offer to send more. If the result has noPhotoOfThat, tell the guest honestly that there is no photo of that part of the room (you may mention what the photos do show, from photosShow) and that the team can help.",
       input_schema: {
         type: 'object',
         properties: {

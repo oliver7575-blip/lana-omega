@@ -727,7 +727,7 @@ async function replyToConversation(args: {
     },
   }
 
-  const roomPhotosTool = pms ? buildRoomPhotosTool(pms) : undefined
+  const roomPhotosTool = pms ? buildRoomPhotosTool(pms, conversationId as string) : undefined
 
   const contactDirectory = (tenant?.contact_directory as ContactDirectoryEntry[]) ?? []
   const contactButtonTool = contactDirectory.length > 0 ? { enabled: true as const } : undefined

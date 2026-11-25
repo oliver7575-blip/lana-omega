@@ -66,11 +66,23 @@ async function labelsFor(cacheKey: string, urls: string[]): Promise<Map<string, 
   return known
 }
 
+
+/** Photos already sent in this conversation, so "more photos" sends new ones. */
+async function alreadySent(conversationId: string | undefined, urls: string[]): Promise<Set<string>> {
+  if (!conversationId || !urls.length) return new Set()
+  const { data } = await createServiceClient().from('room_photos_sent').select('url').eq('conversation_id', conversationId).in('url', urls)
+  return new Set((data ?? []).map((r) => r.url as string))
+}
+async function markSent(conversationId: string | undefined, urls: string[]) {
+  if (!conversationId || !urls.length) return
+  await createServiceClient().from('room_photos_sent').upsert(urls.map((url) => ({ conversation_id: conversationId, url })), { onConflict: 'conversation_id,url' })
+}
+
 /**
  * Builds the concierge's room-photos tool for one connected property.
  * Undefined when the hotel's PMS can't supply room photos.
  */
-export function buildRoomPhotosTool(pms: PmsAdapter) {
+export function buildRoomPhotosTool(pms: PmsAdapter, conversationId?: string) {
   const fetchPhotos = pms.getRoomTypePhotos?.bind(pms)
   if (!fetchPhotos) return undefined
   return {
@@ -96,18 +108,26 @@ export function buildRoomPhotosTool(pms: PmsAdapter) {
         if (labels) {
           // WhatsApp refuses images over 5 MB and PNG photos are often that big, so JPEGs go first.
           const isPng = (u: string) => /\.png(\?|$)/i.test(u)
-          const hits = pool
-            .filter((u) => labels.get(u) === focus)
-            .sort((a, b) => Number(isPng(a)) - Number(isPng(b)))
-            .slice(0, MAX_FOCUS_PHOTOS)
-          if (hits.length) return { found: true, roomTypeName: match.roomTypeName, photoCount: hits.length, photoUrls: hits, focus }
+          const matching = pool.filter((u) => labels.get(u) === focus).sort((a, b) => Number(isPng(a)) - Number(isPng(b)))
+          const sent = await alreadySent(conversationId, matching)
+          const hits = matching.filter((u) => !sent.has(u)).slice(0, MAX_FOCUS_PHOTOS)
+          if (hits.length) {
+            await markSent(conversationId, hits)
+            return { found: true, roomTypeName: match.roomTypeName, photoCount: hits.length, photoUrls: hits, focus }
+          }
+          if (matching.length) return { found: true, roomTypeName: match.roomTypeName, photoCount: 0, focus, allAlreadySent: true }
           const shown = [...new Set(pool.map((u) => labels.get(u)).filter((l) => l && l !== 'other'))]
           return { found: true, roomTypeName: match.roomTypeName, photoCount: 0, focus, noPhotoOfThat: true, photosShow: shown as string[] }
         }
         // Couldn't look at the photos: fall through and send the general set.
       }
-      const photoUrls = match.photos.slice(0, MAX_PHOTOS)
-      return { found: true, roomTypeName: match.roomTypeName, photoCount: photoUrls.length, photoUrls }
+      // General photos: the next set the guest hasn't been sent yet in this chat.
+      const sentAlready = await alreadySent(conversationId, match.photos)
+      const fresh = match.photos.filter((u) => !sentAlready.has(u))
+      if (!fresh.length) return { found: true, roomTypeName: match.roomTypeName, photoCount: 0, allAlreadySent: true }
+      const photoUrls = fresh.slice(0, MAX_PHOTOS)
+      await markSent(conversationId, photoUrls)
+      return { found: true, roomTypeName: match.roomTypeName, photoCount: photoUrls.length, photoUrls, moreAvailable: fresh.length > photoUrls.length }
     },
   }
 }
