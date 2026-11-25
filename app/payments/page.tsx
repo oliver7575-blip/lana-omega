@@ -119,7 +119,7 @@ export default function PaymentsPage() {
     <div className="w-full">
       <h1 className="text-[20px] font-semibold leading-tight tracking-tight text-white">Payments</h1>
       <p className="mt-1 text-sm text-navy/55">
-        Secure payment links for <strong>direct bookings</strong> only — Cloudbeds: Website/Booking Engine; Lodgify: bookings made on the Lodgify booking website. The PMS hosts the payment page (Stripe) and records the payment on the reservation itself. Booking.com / Airbnb and other
+        Secure payment links for <strong>direct bookings</strong> only — Cloudbeds: Website/Booking Engine; Lodgify: bookings made on the Lodgify booking website, or created through the API with taxes above 0. The PMS hosts the payment page (Stripe) and records the payment on the reservation itself. Booking.com / Airbnb and other
         travel-platform reservations never get a link; Walk-In, manual and other reservations are handled by Billing.
       </p>
 

@@ -65,6 +65,11 @@ export function lodgifyPaymentBackend(auth: LodgifyAuth): PaymentBackend {
     return r.ok ? readLink(r.data) : null
   }
 
+  const taxesOf = (raw: Json) => {
+    const sub = (raw.subtotals as Json | undefined) ?? {}
+    return round2((amount(sub.taxes) ?? 0) + (amount(sub.vat) ?? 0))
+  }
+
   const facts = (raw: Json): ReservationFacts => ({
     reservationId: str(raw.id),
     guestName: str(guestOf(raw).name),
@@ -78,6 +83,7 @@ export function lodgifyPaymentBackend(auth: LodgifyAuth): PaymentBackend {
     startDate: str(raw.arrival).slice(0, 10),
     endDate: str(raw.departure).slice(0, 10),
     currency: str(raw.currency_code).toUpperCase() || 'MXN',
+    taxes: taxesOf(raw),
   })
 
   return {
