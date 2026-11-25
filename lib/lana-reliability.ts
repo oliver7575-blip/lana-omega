@@ -74,7 +74,9 @@ export async function looksLikeBotLoop(db: SupabaseClient, conversationId: strin
     .limit(40)
   const rows = data ?? []
   const lanaCount = rows.filter((m) => m.sender_type === 'lana').length
-  if (lanaCount >= 6) return true
+  // A quick real chat can easily have 6 answers in 10 minutes (photos, availability, follow-ups), so this
+  // is only a backstop for a true runaway loop; everything else needs a bot phrase or repeated identical messages.
+  if (lanaCount >= 14) return true
   if (lanaCount < 3) return false
   const guest = rows.filter((m) => m.sender_type === 'guest').map((m) => String(m.content ?? ''))
   if (guest.some((t) => BOT_PATTERNS.test(t))) return true
