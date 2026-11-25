@@ -299,7 +299,9 @@ export async function reservationDetailLodgify(auth: LodgifyAuth, id: string, to
   )
   const sub = (b.subtotals as Raw | undefined) ?? {}
   const total = amount(b.total_amount) ?? null
-  const paid = amount(b.amount_paid) ?? null
+  // Booking.com and Airbnb bookings are prepaid through the channel: show them as paid in full.
+  const prepaid = /airbnb|booking/i.test(sourceLabel(b) ?? '')
+  const paid = prepaid && total !== null ? total : amount(b.amount_paid) ?? null
   const code = (await import('./lodgify')).channelCodes(b)[0] ?? null
   const state = stayState(b, today)
   return {
@@ -315,7 +317,7 @@ export async function reservationDetailLodgify(auth: LodgifyAuth, id: string, to
     children: breakdown.children,
     rooms: [{ subReservationID: str(b.id), reservationRoomID: null, roomID: pid, roomTypeID: pid, roomTypeName: room?.name ?? '', roomName: room?.name ?? null, roomStatus: state, startDate: a, endDate: d, adults: breakdown.adults || 1, children: breakdown.children }],
     total,
-    balance: amount(b.amount_due) ?? null,
+    balance: prepaid ? 0 : amount(b.amount_due) ?? null,
     // Lodgify's check_in.time is just the property's standard check-in time, not a time the guest gave: the real
     // estimated arrival lives in pms_arrival_times and is merged in by the route.
     estimatedArrivalTime: null as string | null,
