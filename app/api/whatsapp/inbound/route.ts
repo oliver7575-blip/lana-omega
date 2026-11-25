@@ -33,7 +33,7 @@ const DEBOUNCE_MS = 12000
 
 // How many past messages to give the AI. Keeps long-running conversations
 // from growing without limit.
-const HISTORY_LIMIT = 40
+const HISTORY_LIMIT = 50
 
 // Marks messages a person on the team wrote, so Lana knows what was already said.
 const STAFF_PREFIX = '[Written by a staff member:]'

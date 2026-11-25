@@ -27,7 +27,7 @@ import {
 export const maxDuration = 60
 
 const DEBOUNCE_MS = 8000
-const HISTORY_LIMIT = 40
+const HISTORY_LIMIT = 50
 
 interface IgEvent {
   sender?: { id?: string }
