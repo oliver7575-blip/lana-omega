@@ -94,7 +94,12 @@ export function buildRoomPhotosTool(pms: PmsAdapter) {
         const pool = match.photos.slice(0, MAX_LABELLED)
         const labels = await labelsFor(pms.cacheKey, pool)
         if (labels) {
-          const hits = pool.filter((u) => labels.get(u) === focus).slice(0, MAX_FOCUS_PHOTOS)
+          // WhatsApp refuses images over 5 MB and PNG photos are often that big, so JPEGs go first.
+          const isPng = (u: string) => /\.png(\?|$)/i.test(u)
+          const hits = pool
+            .filter((u) => labels.get(u) === focus)
+            .sort((a, b) => Number(isPng(a)) - Number(isPng(b)))
+            .slice(0, MAX_FOCUS_PHOTOS)
           if (hits.length) return { found: true, roomTypeName: match.roomTypeName, photoCount: hits.length, photoUrls: hits, focus }
           const shown = [...new Set(pool.map((u) => labels.get(u)).filter((l) => l && l !== 'other'))]
           return { found: true, roomTypeName: match.roomTypeName, photoCount: 0, focus, noPhotoOfThat: true, photosShow: shown as string[] }

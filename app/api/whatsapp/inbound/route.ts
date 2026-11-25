@@ -894,7 +894,8 @@ async function replyToConversation(args: {
       paymentTool,
       pms ? buildAvailabilityTool(pms) : undefined
     )
-    replyText = result.text
+    // Lana sometimes copies the bookkeeping notes kept in the chat history ("[Sent 3 room photos]") into her reply.
+    replyText = result.text.replace(/\[Sent (?:\d+ room photos?|a secure payment button)\]\s*/gi, '').trim()
     noReply = Boolean(result.noReply)
     photoUrls = result.photoUrls ?? []
     contactButton = result.contactButton
@@ -1005,6 +1006,10 @@ async function replyToConversation(args: {
   for (const url of photoUrls) {
     const res = await sendWhatsAppImage(phoneNumberId, credentials, from, url)
     if (!res.success) console.error('[whatsapp-inbound] photo send failed', res.error)
+    // A plain record of every photo send, so a photo that never arrives can be explained afterwards.
+    try {
+      await supabase.from('welcome_log').insert({ tenant_id: tenantId, reservation_id: null, source: 'photo_send', result: { url, ok: res.success, error: res.success ? undefined : res.error } })
+    } catch {}
   }
   await supabase
     .from('conversations')
