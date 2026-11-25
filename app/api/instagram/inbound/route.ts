@@ -14,6 +14,7 @@ import { buildKnowledgeBaseSection } from '@/lib/knowledge-base'
 import { buildLiveNotesSection } from '@/lib/live-notes'
 import { buildBookingLinkInstruction } from '@/lib/booking-link'
 import { AVAILABILITY_INSTRUCTION, buildAvailabilityTool } from '@/lib/availability-tool'
+import { linkIfVerified } from '@/lib/reservation-link'
 import { describeImage } from '@/lib/whatsapp-media'
 import {
   instagramConnection,
@@ -211,10 +212,13 @@ async function handleMessage(tenantId: string, conn: InstagramConnection, accoun
 
   const reservationTool = pms
     ? {
-        lookupReservation: async (confirmationNumber?: string) =>
-          confirmationNumber
-            ? pms.lookupReservation(confirmationNumber)
-            : { found: false, note: 'On Instagram there is no phone number to match — ask the guest for their confirmation number.' },
+        lookupReservation: async (confirmationNumber?: string, lastName?: string) => {
+          if (!confirmationNumber) return { found: false, note: 'On Instagram there is no phone number to match — ask the guest for their confirmation number.' }
+          const found = (await pms.lookupReservation(confirmationNumber)) as { found?: boolean; [k: string]: unknown }
+          if (!found?.found) return found
+          const by = await linkIfVerified(supabase, tenantId, guest.id as string, found, { lastName })
+          return by ? { ...found, linkedToGuest: true } : { ...found, linkedToGuest: false, note: 'Not saved as this guest\'s reservation yet: ask for the surname on the booking and look it up again with lastName.' }
+        },
       }
     : undefined
   const roomPhotosTool = pms ? buildRoomPhotosTool(pms) : undefined

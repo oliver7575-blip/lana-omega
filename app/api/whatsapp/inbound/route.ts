@@ -5,6 +5,7 @@ import crypto from 'crypto'
 import { NextResponse, after } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { generateReply, NO_REPLY_TOKEN } from '@/lib/anthropic'
+import { linkIfVerified } from '@/lib/reservation-link'
 import { sendWhatsAppMessage, sendWhatsAppInteractiveButton, sendWhatsAppImage, sendWhatsAppTyping } from '@/lib/whatsapp-send'
 import { downloadWhatsAppMedia, describeImage, transcribeAudio } from '@/lib/whatsapp-media'
 import { verifyMetaSignature } from '@/lib/verify-webhook'
@@ -595,9 +596,10 @@ async function replyToConversation(args: {
   // The hotel's PMS (Cloudbeds, …) — null if none is connected.
   const pms = await pmsForTenant(supabase, tenantId)
 
+  const verifiedReservations = new Set<string>()
   const reservationTool = pms
     ? {
-        lookupReservation: async (confirmationNumber?: string) => {
+        lookupReservation: async (confirmationNumber?: string, lastName?: string) => {
           if (!confirmationNumber) {
             const byPhone = await pms.findReservationByPhone(from)
             if (!byPhone.found && !byPhone.error) {
@@ -611,7 +613,11 @@ async function replyToConversation(args: {
             }
             return byPhone
           }
-          return pms.lookupReservation(confirmationNumber)
+          const found = (await pms.lookupReservation(confirmationNumber)) as { found?: boolean; reservationID?: string; [k: string]: unknown }
+          if (!found?.found) return found
+          const by = await linkIfVerified(supabase, tenantId, guest.id as string, found, { phone: from, lastName })
+          if (by && found.reservationID) verifiedReservations.add(String(found.reservationID))
+          return by ? { ...found, linkedToGuest: true } : { ...found, linkedToGuest: false, note: 'Not saved as this guest\'s reservation yet: ask for the surname on the booking and look it up again with lastName.' }
         },
       }
     : undefined
@@ -720,6 +726,10 @@ async function replyToConversation(args: {
 
   const registerReservationTool = {
     registerReservation: async (confirmationNumber: string) => {
+      // Only a booking whose surname or phone matched in this chat can be saved as the guest's.
+      if (!verifiedReservations.has(String(confirmationNumber).trim())) {
+        return { success: false, error: 'Not verified: look the reservation up with lookup_reservation passing the surname on the booking first.' }
+      }
       const { error: upsertError } = await supabase
         .from('guest_reservations')
         .upsert(

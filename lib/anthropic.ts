@@ -13,7 +13,7 @@ interface ClaudeMessage {
 
 interface ReservationTool {
   /** No confirmation number = find the guest's reservation from their phone (WhatsApp only). */
-  lookupReservation: (confirmationNumber?: string) => Promise<unknown>
+  lookupReservation: (confirmationNumber?: string, lastName?: string) => Promise<unknown>
 }
 
 interface EscalationToolInput {
@@ -200,6 +200,10 @@ export async function generateReply(
           confirmationNumber: {
             type: 'string',
             description: "The guest's reservation confirmation number",
+          },
+          lastName: {
+            type: 'string',
+            description: "The surname the guest says is on the booking. When a guest gives a confirmation number, also ask for the last name on the booking (unless their phone number already matched) and pass it here: the reservation is saved as theirs only when the surname or their phone matches. If the result says linkedToGuest:false, ask for the surname and look up again with lastName.",
           },
         },
         required: [],
@@ -443,7 +447,7 @@ export async function generateReply(
 
         if (block.name === 'lookup_reservation' && reservationTool) {
           const num = String(block.input.confirmationNumber ?? '').trim()
-          result = await reservationTool.lookupReservation(num || undefined)
+          result = await reservationTool.lookupReservation(num || undefined, String(block.input.lastName ?? '').trim() || undefined)
         } else if (block.name === 'escalate_to_staff' && escalationTool) {
           result = await escalationTool.escalateToStaff(block.input as unknown as EscalationToolInput)
         } else if (block.name === 'update_arrival_time' && arrivalUpdateTool) {
