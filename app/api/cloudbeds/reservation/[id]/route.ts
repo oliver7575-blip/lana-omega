@@ -19,6 +19,18 @@ async function lodgifyNotes(tenantId: string, id: string) {
   return (data ?? []).map((n) => ({ id: String(n.id), author: String(n.author ?? ''), date: String(n.created_at ?? ''), text: String(n.text ?? '') }))
 }
 
+/** The arrival time someone actually gave (panel, Lana or an email) for a Lodgify booking; null when none. */
+async function lodgifyArrival(tenantId: string, id: string): Promise<string | null> {
+  const { data } = await createServiceClient().from('pms_arrival_times').select('arrival_time').eq('tenant_id', tenantId).eq('reservation_id', id).maybeSingle()
+  return (data?.arrival_time as string | null) ?? null
+}
+
+async function lodgifyDetail(l: { auth: Parameters<typeof reservationDetailLodgify>[0]; tz: string; tenantId: string }, id: string) {
+  const reservation = await reservationDetailLodgify(l.auth, id, localDate(new Date(), l.tz))
+  reservation.estimatedArrivalTime = await lodgifyArrival(l.tenantId, id)
+  return reservation
+}
+
 export async function GET(_r: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const c = await cloudbedsForCaller()
@@ -26,7 +38,7 @@ export async function GET(_r: Request, { params }: { params: Promise<{ id: strin
     const l = await lodgifyForCaller()
     if (!l) return c.error
     try {
-      const reservation = await reservationDetailLodgify(l.auth, id, localDate(new Date(), l.tz))
+      const reservation = await lodgifyDetail(l, id)
       return NextResponse.json({ reservation, notes: await lodgifyNotes(l.tenantId, id), link: '' })
     } catch (err) {
       return NextResponse.json({ error: err instanceof Error ? err.message : 'Lodgify error' }, { status: 502 })
@@ -96,10 +108,24 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       }
       return NextResponse.json({ ok: true, notes: await lodgifyNotes(l.tenantId, id) })
     }
+    if (lb.action === 'arrival_time') {
+      // Lodgify has no arrival-time field, so the time is kept in Omega's own table.
+      const t = String((lb as { time?: string }).time ?? '').trim()
+      const db = createServiceClient()
+      if (!t) await db.from('pms_arrival_times').delete().eq('tenant_id', l.tenantId).eq('reservation_id', id)
+      else if (/^([01]\d|2[0-3]):[0-5]\d$/.test(t)) {
+        await db.from('pms_arrival_times').upsert({ tenant_id: l.tenantId, reservation_id: id, arrival_time: t, source: 'panel', updated_at: new Date().toISOString() }, { onConflict: 'tenant_id,reservation_id' })
+      } else return NextResponse.json({ error: 'Use the format HH:MM, e.g. 15:00.' }, { status: 400 })
+      try {
+        return NextResponse.json({ ok: true, reservation: await lodgifyDetail(l, id) })
+      } catch (err) {
+        return NextResponse.json({ error: err instanceof Error ? err.message : 'Lodgify error' }, { status: 502 })
+      }
+    }
     if (lb.action === 'cancel') {
       try {
         await cancelBookingLodgify(l.auth, id)
-        return NextResponse.json({ ok: true, reservation: await reservationDetailLodgify(l.auth, id, localDate(new Date(), l.tz)) })
+        return NextResponse.json({ ok: true, reservation: await lodgifyDetail(l, id) })
       } catch (err) {
         return NextResponse.json({ error: err instanceof Error ? err.message : 'Lodgify error' }, { status: 502 })
       }
@@ -111,7 +137,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         await createServiceClient().from('pms_reservation_notes').update({ reservation_id: newId }).eq('tenant_id', l.tenantId).eq('reservation_id', id)
         const { data: at } = await createServiceClient().from('pms_arrival_times').select('arrival_time').eq('tenant_id', l.tenantId).eq('reservation_id', id).maybeSingle()
         if (at?.arrival_time) await createServiceClient().from('pms_arrival_times').upsert({ tenant_id: l.tenantId, reservation_id: newId, arrival_time: at.arrival_time, source: 'panel', updated_at: new Date().toISOString() }, { onConflict: 'tenant_id,reservation_id' })
-        return NextResponse.json({ ok: true, newId, reservation: await reservationDetailLodgify(l.auth, newId, localDate(new Date(), l.tz)) })
+        return NextResponse.json({ ok: true, newId, reservation: await lodgifyDetail(l, newId) })
       } catch (err) {
         return NextResponse.json({ error: err instanceof Error ? err.message : 'Lodgify error' }, { status: 502 })
       }
@@ -119,7 +145,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (lb.action === 'quote') {
       try {
         await createQuoteLodgify(l.auth, id)
-        return NextResponse.json({ ok: true, reservation: await reservationDetailLodgify(l.auth, id, localDate(new Date(), l.tz)) })
+        return NextResponse.json({ ok: true, reservation: await lodgifyDetail(l, id) })
       } catch (err) {
         return NextResponse.json({ error: err instanceof Error ? err.message : 'Lodgify error' }, { status: 502 })
       }

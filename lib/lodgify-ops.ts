@@ -316,7 +316,9 @@ export async function reservationDetailLodgify(auth: LodgifyAuth, id: string, to
     rooms: [{ subReservationID: str(b.id), reservationRoomID: null, roomID: pid, roomTypeID: pid, roomTypeName: room?.name ?? '', roomName: room?.name ?? null, roomStatus: state, startDate: a, endDate: d, adults: breakdown.adults || 1, children: breakdown.children }],
     total,
     balance: amount(b.amount_due) ?? null,
-    estimatedArrivalTime: str((b.check_in as Raw | undefined)?.time).slice(0, 5) || null,
+    // Lodgify's check_in.time is just the property's standard check-in time, not a time the guest gave: the real
+    // estimated arrival lives in pms_arrival_times and is merged in by the route.
+    estimatedArrivalTime: null as string | null,
     guestCountry: str(g.country_code) || null,
     guestID: null,
     dateCreated: str(b.created_at) || null,
