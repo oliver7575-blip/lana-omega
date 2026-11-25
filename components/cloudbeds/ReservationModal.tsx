@@ -515,10 +515,13 @@ export default function ReservationModal({ id, today, onClose, onChanged, onChec
                   <p className={`text-[9.5px] font-bold tracking-[.06em] ${owes ? 'text-[#b42318]' : 'text-[#0e6b4a]'}`}>{owes ? 'BALANCE DUE' : 'PAID IN FULL'}</p>
                   <p className={`text-[16px] font-bold tracking-tight ${owes ? 'text-[#b42318]' : 'text-[#0e6b4a]'}`}>MXN {(r.balance ?? 0).toLocaleString('en-US')}</p>
                 </div>
-                <button onClick={() => openMoney('payment')}
-                  className={`h-[28px] whitespace-nowrap rounded-full px-3 text-[11.5px] font-semibold text-white transition ${mpKind === 'payment' ? 'bg-[#0e5f47] ring-4 ring-[#1f9d78]/25' : 'bg-gradient-to-b from-[#27ad86] to-[#1a8f6c] shadow-[0_4px_10px_rgba(31,157,120,.35),inset_0_1px_0_rgba(255,255,255,.25)] hover:brightness-95'}`}>
-                  + Add payment
-                </button>
+                {/* Lodgify (Lalo) has no way to record a payment from here: hasQuote is only set for Lodgify bookings. */}
+                {r.hasQuote === undefined && (
+                  <button onClick={() => openMoney('payment')}
+                    className={`h-[28px] whitespace-nowrap rounded-full px-3 text-[11.5px] font-semibold text-white transition ${mpKind === 'payment' ? 'bg-[#0e5f47] ring-4 ring-[#1f9d78]/25' : 'bg-gradient-to-b from-[#27ad86] to-[#1a8f6c] shadow-[0_4px_10px_rgba(31,157,120,.35),inset_0_1px_0_rgba(255,255,255,.25)] hover:brightness-95'}`}>
+                    + Add payment
+                  </button>
+                )}
               </div>
               </div>
             </>
