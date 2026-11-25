@@ -20,10 +20,10 @@ export async function POST(request: Request) {
   if (!c.canManage) return NextResponse.json({ error: 'Only owners or admins can create payment links' }, { status: 403 })
   const body = (await request.json().catch(() => ({}))) as { reservationId?: string; kind?: string }
   const reservationId = String(body.reservationId ?? '').trim()
-  if (!/^\d{6,}$/.test(reservationId) || (body.kind !== 'deposit' && body.kind !== 'balance')) {
-    return NextResponse.json({ error: 'Enter a Cloudbeds reservation number and choose deposit or balance' }, { status: 400 })
+  if (!/^\d{4,}$/.test(reservationId) || (body.kind !== 'deposit' && body.kind !== 'balance')) {
+    return NextResponse.json({ error: 'Enter the reservation number and choose deposit or balance' }, { status: 400 })
   }
-  const result = await createPaymentLink(c.supabase, c.cb, c.ctx, { reservationId, kind: body.kind, createdBy: 'staff', staffUserId: c.staffId })
+  const result = await createPaymentLink(c.supabase, c.be, c.ctx, { reservationId, kind: body.kind, createdBy: 'staff', staffUserId: c.staffId })
   if (!result.ok) return NextResponse.json({ error: result.message, code: result.code }, { status: 422 })
   return NextResponse.json({ request: result.request, reused: result.reused })
 }

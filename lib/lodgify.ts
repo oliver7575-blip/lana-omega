@@ -128,6 +128,13 @@ const SOURCE_LABELS: Record<string, string> = {
   other: 'Other',
 }
 
+const OTA_SOURCES = ['airbnb', 'airbnbintegration', 'bookingcom', 'expedia', 'homeaway', 'nineflats', 'ical']
+
+/** True when the booking came from a travel platform (Airbnb, Booking.com, Expedia, Vrbo, iCal …). */
+export function isOtaSource(b: Raw): boolean {
+  return OTA_SOURCES.includes(String(b.source ?? '').trim().toLowerCase())
+}
+
 export function sourceLabel(b: Raw): string | undefined {
   const source = str(b.source)
   if (!source) return undefined
@@ -171,7 +178,8 @@ export function toLookupResult(b: Raw, roomNames?: Map<string, string>): Reserva
     status: mapLodgifyStatus(b),
     roomTypeName: roomTypeId ? (roomNames?.get(roomTypeId) ?? undefined) : undefined,
     ...peopleOf(b),
-    balance: amount(b.amount_due),
+    // OTA payments are handled by the platform: never show Lana a balance for them.
+    balance: isOtaSource(b) ? undefined : amount(b.amount_due),
     sourceName: sourceLabel(b),
     channelConfirmation: channelCodes(b)[0],
   }

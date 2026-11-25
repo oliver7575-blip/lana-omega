@@ -21,6 +21,8 @@ interface Req {
 
 interface Lookup {
   found: boolean
+  pms?: string
+  currency?: string
   message?: string | null
   reservation?: { id: string; guestName: string; source: string; status: string; balance: number; paid: number; startDate: string; endDate: string }
   eligible?: boolean
@@ -28,7 +30,7 @@ interface Lookup {
   code?: string | null
 }
 
-const money = (n: number | string) => `${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MXN`
+const money = (n: number | string, cur = 'MXN') => `${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${cur || 'MXN'}`
 
 const STATUS: Record<string, { label: string; cls: string }> = {
   creating: { label: 'Creating…', cls: 'bg-white/10 text-navy/70' },
@@ -87,7 +89,7 @@ export default function PaymentsPage() {
   }
 
   async function act(id: string, action: 'recheck' | 'close') {
-    if (action === 'close' && !confirm('Close this request here?\n\nCloudbeds cannot cancel links created from Omega, so the link may stay payable until it expires.')) return
+    if (action === 'close' && !confirm('Close this request here?\n\nThe PMS cannot cancel links created from Omega, so the link may stay payable until it expires.')) return
     setBusy(id)
     await fetch(`/api/payments/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) })
     setBusy(null)
@@ -103,9 +105,11 @@ export default function PaymentsPage() {
     setPermission(
       j.verdict === 'allowed'
         ? `✓ The API key is allowed to create payment links (Cloudbeds answered ${j.status}: ${j.message}).`
+        : j.verdict === 'not_applicable'
+          ? `ℹ ${j.message}`
         : j.verdict === 'denied'
           ? `✗ Cloudbeds refused (${j.status}): the API key lacks permission to create payment links. A new key with payment permissions is needed.`
-          : (j.error ?? j.note ?? 'Unexpected result')
+            : (j.error ?? j.note ?? 'Unexpected result')
     )
   }
 
@@ -115,8 +119,8 @@ export default function PaymentsPage() {
     <div className="w-full">
       <h1 className="text-[20px] font-semibold leading-tight tracking-tight text-white">Payments</h1>
       <p className="mt-1 text-sm text-navy/55">
-        Secure payment links for <strong>direct bookings</strong> (Website/Booking Engine). Cloudbeds hosts the payment page and posts the payment to the reservation itself. Booking.com / Airbnb and other travel-platform
-        reservations never get a link; Walk-In and other manual reservations are handled by Billing.
+        Secure payment links for <strong>direct bookings</strong> only — Cloudbeds: Website/Booking Engine; Lodgify: bookings made on the Lodgify booking website. The PMS hosts the payment page (Stripe) and records the payment on the reservation itself. Booking.com / Airbnb and other
+        travel-platform reservations never get a link; Walk-In, manual and other reservations are handled by Billing.
       </p>
 
       {canManage && (
@@ -127,7 +131,7 @@ export default function PaymentsPage() {
               value={reservation}
               onChange={(e) => setReservation(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && reservation.trim() && doLookup()}
-              placeholder="Cloudbeds reservation number"
+              placeholder="Reservation number"
               className="min-w-[240px] flex-1 rounded-md border border-line bg-black/20 px-2 py-1.5 text-sm text-white"
             />
             <button type="button" disabled={!reservation.trim() || busy === 'lookup'} onClick={doLookup} className="rounded-md border border-line px-3 py-1.5 text-sm text-navy hover:bg-line/40">
@@ -141,12 +145,12 @@ export default function PaymentsPage() {
               <p>
                 <span className="font-semibold text-white">{lookup.reservation.guestName}</span> · {lookup.reservation.source} · {lookup.reservation.status} · {lookup.reservation.startDate} → {lookup.reservation.endDate}
               </p>
-              <p className="text-navy/60">Balance in Cloudbeds: {money(lookup.reservation.balance)} · paid: {money(lookup.reservation.paid)}</p>
+              <p className="text-navy/60">Balance in {lookup.pms ?? 'the PMS'}: {money(lookup.reservation.balance, lookup.currency)} · paid: {money(lookup.reservation.paid, lookup.currency)}</p>
               {lookup.eligible ? (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {lookup.options?.map((o) => (
                     <button key={o.kind} type="button" disabled={busy !== null} onClick={() => create(o.kind)} className="rounded-lg bg-clay px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
-                      {busy === o.kind ? 'Creating…' : `Create ${o.kind} link — ${money(o.amount)}`}
+                      {busy === o.kind ? 'Creating…' : `Create ${o.kind} link — ${money(o.amount, lookup.currency)}`}
                     </button>
                   ))}
                 </div>
@@ -170,7 +174,7 @@ export default function PaymentsPage() {
 
           <div className="mt-3 border-t border-line pt-2">
             <button type="button" disabled={busy === 'perm'} onClick={checkPermission} className="text-xs text-navy/70 underline hover:text-white">
-              {busy === 'perm' ? 'Checking…' : 'Check that the Cloudbeds key may create links (creates nothing)'}
+              {busy === 'perm' ? 'Checking…' : 'Check that the PMS key may create links (creates nothing)'}
             </button>
             {permission && <p className="mt-1 text-xs text-navy/80">{permission}</p>}
           </div>
@@ -193,7 +197,7 @@ export default function PaymentsPage() {
                   <td className="px-3 py-2 text-navy/70">{new Date(r.created_at).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}<span className="block text-[11px] text-navy/40">{r.created_by}</span></td>
                   <td className="px-3 py-2"><span className="text-white">#{r.reservation_id}</span><span className="block text-xs text-navy/55">{r.guest_name}</span></td>
                   <td className="px-3 py-2 capitalize text-navy/80">{r.kind}</td>
-                  <td className="px-3 py-2 text-white">{money(r.amount)}</td>
+                  <td className="px-3 py-2 text-white">{money(r.amount, r.currency)}</td>
                   <td className="px-3 py-2">
                     <span className={`rounded-md px-2 py-0.5 text-xs ${s.cls}`}>{s.label}</span>
                     {r.error && <span className="mt-1 block max-w-[260px] text-[11px] text-red-300">{r.error}</span>}

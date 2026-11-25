@@ -25,6 +25,7 @@ export function lodgifyAdapter(tenantId: string, auth: LodgifyAuth): PmsAdapter 
     kind: 'lodgify',
     label: 'Lodgify',
     cacheKey: `lodgify:${tenantId}:${auth.propertyId ?? 'all'}`,
+    lodgify: auth,
 
     lookupReservation: (confirmationNumber) => lookupReservation(auth, confirmationNumber),
     findReservationByPhone: (phone) => findReservationByPhone(auth, phone),

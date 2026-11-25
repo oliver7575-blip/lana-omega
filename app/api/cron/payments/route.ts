@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { cloudbedsForTenant } from '@/lib/cloudbeds-tenant'
+import { pmsForTenant } from '@/lib/pms'
+import { paymentBackendFor } from '@/lib/payments/backend'
 import { loadPaymentContext, pollPayment, type PaymentRequestRow } from '@/lib/payments/service'
 
 export const maxDuration = 60
 
-/** Every minute: checks open payment links and verifies paid ones against the folio. */
+/** Every minute: checks open payment links (Cloudbeds and Lodgify hotels) and verifies paid ones against the reservation. */
 export async function GET(request: Request) {
   if (!process.env.CRON_SECRET || request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -27,12 +28,12 @@ export async function GET(request: Request) {
   for (const r of (open ?? []) as PaymentRequestRow[]) byTenant.set(r.tenant_id, [...(byTenant.get(r.tenant_id) ?? []), r])
   const started = Date.now()
   for (const [tenantId, rows] of byTenant) {
-    const cb = await cloudbedsForTenant(db, tenantId)
-    if (!cb) continue
+    const be = await paymentBackendFor(await pmsForTenant(db, tenantId))
+    if (!be) continue
     const ctx = await loadPaymentContext(db, tenantId)
     for (const row of rows) {
       if (Date.now() - started > 45_000) break
-      const updated = await pollPayment(db, cb, ctx, row)
+      const updated = await pollPayment(db, be, ctx, row)
       results.push({ id: updated.id, status: updated.status })
     }
   }

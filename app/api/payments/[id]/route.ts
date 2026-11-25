@@ -16,7 +16,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!row) return NextResponse.json({ error: 'Payment request not found' }, { status: 404 })
 
   if (action === 'recheck') {
-    const updated = await pollPayment(c.supabase, c.cb, c.ctx, row as PaymentRequestRow)
+    const updated = await pollPayment(c.supabase, c.be, c.ctx, row as PaymentRequestRow)
     return NextResponse.json({ request: updated })
   }
   if (action === 'close') {

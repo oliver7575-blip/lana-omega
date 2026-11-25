@@ -5,7 +5,7 @@ import { logPaymentEvent, type PaymentRequestRow } from './service'
 
 /**
  * Tells the guest their payment arrived — only ever called once the payment is
- * VERIFIED (Cloudbeds says paid and the folio shows it). Sent once per payment.
+ * VERIFIED (the reservation in the PMS shows the payment). Sent once per payment.
  */
 export async function notifyGuestPaid(row: PaymentRequestRow): Promise<void> {
   if (row.guest_notified_at || !row.conversation_id) return
@@ -23,10 +23,11 @@ export async function notifyGuestPaid(row: PaymentRequestRow): Promise<void> {
 
   const first = (row.guest_name ?? '').trim().split(/\s+/)[0] ?? ''
   const amount = Number(row.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const cur = row.currency || 'MXN'
   const spanish = (row.language ?? 'es').toLowerCase().startsWith('es')
   const text = spanish
-    ? `¡Pago recibido! ✅ Recibimos tu pago de ${amount} MXN para tu reservación #${row.reservation_id}. Gracias${first ? `, ${first}` : ''}. ¡Te esperamos en Zipolite! 🌴`
-    : `Payment received! ✅ We received your payment of ${amount} MXN for reservation #${row.reservation_id}. Thank you${first ? `, ${first}` : ''} — we look forward to welcoming you in Zipolite! 🌴`
+    ? `¡Pago recibido! ✅ Recibimos tu pago de ${amount} ${cur} para tu reservación #${row.reservation_id}. Gracias${first ? `, ${first}` : ''}. ¡Te esperamos en Zipolite! 🌴`
+    : `Payment received! ✅ We received your payment of ${amount} ${cur} for reservation #${row.reservation_id}. Thank you${first ? `, ${first}` : ''} — we look forward to welcoming you in Zipolite! 🌴`
 
   await db.from('messages').insert({ tenant_id: row.tenant_id, conversation_id: row.conversation_id, sender_type: 'lana', content: text })
 

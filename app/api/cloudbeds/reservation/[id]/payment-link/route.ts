@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { paymentsCaller } from '@/lib/payments/caller'
+import { cloudbedsForCaller } from '@/lib/cloudbeds-caller'
 import { createPaymentLink } from '@/lib/payments/service'
 import { getReservationDetail, getReservationGuestContact } from '@/lib/cloudbeds-ops'
 import { findOrCreateGuest, ensureConversation } from '@/lib/guest-records'
@@ -25,8 +26,12 @@ export async function POST(_r: Request, { params }: { params: Promise<{ id: stri
   if ('error' in c) return c.error
   if (!c.canManage) return NextResponse.json({ error: 'Only owners or admins can create payment links' }, { status: 403 })
   const tenantId = c.ctx.tenantId
+  if (c.be.kind !== 'cloudbeds') return NextResponse.json({ error: 'This button is for Cloudbeds reservations — use the Payments page.' }, { status: 400 })
+  const cbc = await cloudbedsForCaller()
+  if ('error' in cbc) return cbc.error
+  const cb = cbc.cb
 
-  const created = await createPaymentLink(c.supabase, c.cb, c.ctx, { reservationId: id, kind: 'balance', createdBy: 'staff', staffUserId: c.staffId })
+  const created = await createPaymentLink(c.supabase, c.be, c.ctx, { reservationId: id, kind: 'balance', createdBy: 'staff', staffUserId: c.staffId })
   if (!created.ok) return NextResponse.json({ error: created.message, code: created.code }, { status: 422 })
   const req = created.request
   const url = req.link_url
@@ -38,7 +43,7 @@ export async function POST(_r: Request, { params }: { params: Promise<{ id: stri
   const out = { url, amount, reused: created.reused, email: { status: 'skipped', detail: '' } as SendState, whatsapp: { status: 'skipped', detail: '' } as SendState }
 
   try {
-    const [reservation, contact] = await Promise.all([getReservationDetail(c.cb, id), getReservationGuestContact(c.cb, id)])
+    const [reservation, contact] = await Promise.all([getReservationDetail(cb, id), getReservationGuestContact(cb, id)])
     const email = contact.email ?? reservation.guestEmail
     const phone = contact.phone ?? reservation.guestPhone
     const country = (contact.country ?? reservation.guestCountry ?? '').toUpperCase()

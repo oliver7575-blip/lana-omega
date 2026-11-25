@@ -1,9 +1,8 @@
 import { createServiceClient } from '../supabase/service'
-import { cloudbedsForTenant } from '../cloudbeds-tenant'
-import { findReservationByConfirmation, getReservationRaw, type CB } from '../cloudbeds-ops'
-import { findReservationByPhone } from '../cloudbeds'
+import { pmsForTenant } from '../pms'
 import { samePhone } from '../phone'
-import { evaluate, factsFromRaw, round2, type PaymentKind, type ReservationFacts } from './rules'
+import { round2, type PaymentKind, type ReservationFacts } from './rules'
+import { paymentBackendFor, type PaymentBackend } from './backend'
 import { createPaymentLink, loadPaymentContext, type PaymentContext, type PaymentRequestRow } from './service'
 
 /**
@@ -41,19 +40,6 @@ export interface PaymentTool {
 
 const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()
 
-/** The guest's phone on the Cloudbeds reservation, if the record carries one. */
-function phoneFromRaw(raw: Json): string | null {
-  const list = (raw.guestList ?? {}) as Record<string, Json>
-  const main = list[String(raw.guestID ?? '')]
-  const candidates = [main, ...Object.values(list)].filter(Boolean) as Json[]
-  for (const g of candidates) {
-    const p = String(g.guestPhone ?? g.guestCellPhone ?? '').trim()
-    if (p) return p
-  }
-  const direct = String(raw.guestPhone ?? raw.guestCellPhone ?? '').trim()
-  return direct || null
-}
-
 /** A last name must match a NON-first word of the guest's name (a first name alone is not enough). */
 function lastNameMatches(given: string | undefined, guestName: string): boolean {
   const g = norm(given ?? '')
@@ -71,43 +57,31 @@ type Resolved = { ok: true; raw: Json; facts: ReservationFacts } | { ok: false; 
 export function makePaymentTool(ctx: PaymentToolContext): PaymentTool {
   const db = createServiceClient()
 
-  async function setup(): Promise<{ cb: CB; pctx: PaymentContext } | { error: Json }> {
-    const cb = await cloudbedsForTenant(db, ctx.tenantId)
-    if (!cb) {
+  async function setup(): Promise<{ be: PaymentBackend; pctx: PaymentContext } | { error: Json }> {
+    const be = await paymentBackendFor(await pmsForTenant(db, ctx.tenantId))
+    if (!be) {
       return { error: { status: 'unavailable', instruction: 'Payments are not available right now. Tell the guest a team member will help with the payment shortly.' } }
     }
-    return { cb, pctx: await loadPaymentContext(db, ctx.tenantId) }
+    return { be, pctx: await loadPaymentContext(db, ctx.tenantId) }
   }
 
   /** Finds the reservation AND proves it belongs to this guest. Reveals nothing until identity is established. */
-  async function resolve(cb: CB, input: PaymentToolInput): Promise<Resolved> {
+  async function resolve(be: PaymentBackend, input: PaymentToolInput): Promise<Resolved> {
     const number = String(input.confirmationNumber ?? '').trim()
     if (number) {
       let raw: Json | null = null
-      if (/^\d{6,}$/.test(number)) {
-        try {
-          const r = await getReservationRaw(cb, number)
-          if (r.reservationID) raw = r
-        } catch {
-          /* not a Cloudbeds id */
-        }
+      try {
+        raw = await be.findRaw(number)
+      } catch {
+        raw = null
       }
       if (!raw) {
-        const found = await findReservationByConfirmation(cb, number)
-        if (found) {
-          try {
-            raw = await getReservationRaw(cb, found.reservationID)
-          } catch {
-            raw = null
-          }
-        }
-      }
-      if (!raw || !raw.reservationID) {
         return { ok: false, result: { status: 'not_found', instruction: 'No reservation was found with that number. Ask the guest to double-check the confirmation number.' } }
       }
-      const resPhone = phoneFromRaw(raw)
+      const facts = be.facts(raw)
+      const resPhone = be.phoneOf(raw)
       const phoneOk = Boolean(ctx.senderPhone && resPhone && samePhone(ctx.senderPhone, resPhone))
-      if (!phoneOk && !lastNameMatches(input.lastName, String(raw.guestName ?? ''))) {
+      if (!phoneOk && !lastNameMatches(input.lastName, facts.guestName)) {
         return {
           ok: false,
           result: {
@@ -116,19 +90,16 @@ export function makePaymentTool(ctx: PaymentToolContext): PaymentTool {
           },
         }
       }
-      return { ok: true, raw, facts: factsFromRaw(raw) }
+      return { ok: true, raw, facts }
     }
 
     // No number: use the guest's own WhatsApp number.
     if (ctx.senderPhone) {
-      const byPhone = await findReservationByPhone(cb.apiKey, cb.propertyId, ctx.senderPhone)
-      if (byPhone.found && byPhone.reservationID) {
-        try {
-          const raw = await getReservationRaw(cb, byPhone.reservationID)
-          if (raw.reservationID) return { ok: true, raw, facts: factsFromRaw(raw) }
-        } catch {
-          /* fall through */
-        }
+      try {
+        const raw = await be.findRawByPhone(ctx.senderPhone)
+        if (raw) return { ok: true, raw, facts: be.facts(raw) }
+      } catch {
+        /* fall through */
       }
     }
     return {
@@ -160,11 +131,11 @@ export function makePaymentTool(ctx: PaymentToolContext): PaymentTool {
     }
   }
 
-  const staffSummary = (facts: ReservationFacts, why: string) =>
-    `Pago: el huésped quiere pagar. Reserva #${facts.reservationId} (origen: ${facts.source || 'desconocido'}) — ${why}. Saldo en Cloudbeds: ${round2(facts.balance).toFixed(2)} MXN. Contactar al huésped.`
+  const staffSummary = (be: PaymentBackend, facts: ReservationFacts, why: string) =>
+    `Pago: el huésped quiere pagar. Reserva #${facts.reservationId} (origen: ${facts.source || 'desconocido'}) — ${why}. Saldo en ${be.label}: ${round2(facts.balance).toFixed(2)} ${facts.currency || 'MXN'}. Contactar al huésped.`
 
   /** What Lana may do for a reservation that can't get a link. */
-  async function ineligible(facts: ReservationFacts, code: string, message: string): Promise<Json> {
+  async function ineligible(be: PaymentBackend, facts: ReservationFacts, code: string, message: string): Promise<Json> {
     switch (code) {
       case 'third_party':
         return {
@@ -175,7 +146,7 @@ export function makePaymentTool(ctx: PaymentToolContext): PaymentTool {
       case 'walk_in':
       case 'manual_source':
       case 'below_minimum':
-        await escalateOnce(staffSummary(facts, code === 'walk_in' ? 'reserva Walk-In, se gestiona manualmente' : 'se gestiona manualmente'))
+        await escalateOnce(staffSummary(be, facts, code === 'walk_in' ? 'reserva Walk-In, se gestiona manualmente' : 'se gestiona manualmente'))
         return {
           status: 'handled_by_staff',
           instruction:
@@ -192,18 +163,19 @@ export function makePaymentTool(ctx: PaymentToolContext): PaymentTool {
     async paymentOptions(input) {
       const s = await setup()
       if ('error' in s) return s.error
-      const r = await resolve(s.cb, input)
+      const r = await resolve(s.be, input)
       if (!r.ok) return r.result
-      const el = evaluate(r.facts, s.pctx.settings, todayIn(s.pctx.tz))
-      if (!el.eligible) return ineligible(r.facts, el.code, el.message)
+      const el = await s.be.evaluate(r.facts, s.pctx.settings, todayIn(s.pctx.tz))
+      if (!el.eligible) return ineligible(s.be, r.facts, el.code, el.message)
+      const cur = r.facts.currency || 'MXN'
       return {
         status: 'ok',
         confirmationNumber: r.facts.reservationId,
         guestFirstName: r.facts.guestName.split(' ')[0] ?? '',
-        currency: 'MXN',
+        currency: cur,
         balance: round2(r.facts.balance),
         options: el.options.map((o) => ({ option: o.kind, amount: o.amount })),
-        instruction: 'Tell the guest the balance and offer the available options (amounts in MXN). When they choose, call request_payment_link with that option. Never invent or change an amount.',
+        instruction: `Tell the guest the balance and offer the available options (amounts in ${cur}). When they choose, call request_payment_link with that option. Never invent or change an amount.`,
       }
     },
 
@@ -213,13 +185,13 @@ export function makePaymentTool(ctx: PaymentToolContext): PaymentTool {
       if (!option) return fail({ status: 'error', instruction: 'option must be "deposit" or "balance".' })
       const s = await setup()
       if ('error' in s) return fail(s.error)
-      const r = await resolve(s.cb, input)
+      const r = await resolve(s.be, input)
       if (!r.ok) return fail(r.result)
-      const el = evaluate(r.facts, s.pctx.settings, todayIn(s.pctx.tz))
-      if (!el.eligible) return fail(await ineligible(r.facts, el.code, el.message))
+      const el = await s.be.evaluate(r.facts, s.pctx.settings, todayIn(s.pctx.tz))
+      if (!el.eligible) return fail(await ineligible(s.be, r.facts, el.code, el.message))
 
       const language = (input.language ?? '').toLowerCase().slice(0, 5) || null
-      const created = await createPaymentLink(db, s.cb, s.pctx, {
+      const created = await createPaymentLink(db, s.be, s.pctx, {
         reservationId: r.facts.reservationId,
         kind: option,
         createdBy: 'lana',
@@ -235,7 +207,7 @@ export function makePaymentTool(ctx: PaymentToolContext): PaymentTool {
         if (created.code === 'option_unavailable') {
           return fail({ status: 'option_unavailable', instruction: 'That option is not available. Call get_payment_options to see what can be paid.' })
         }
-        await escalateOnce(staffSummary(r.facts, `no se pudo crear el link de pago (${created.code})`))
+        await escalateOnce(staffSummary(s.be, r.facts, `no se pudo crear el link de pago (${created.code})`))
         return fail({ status: 'link_failed', instruction: 'Tell the guest warmly that a member of the team will help with the payment shortly (the team has been notified). Do not mention technical details.' })
       }
       const req: PaymentRequestRow = created.request
@@ -247,10 +219,10 @@ export function makePaymentTool(ctx: PaymentToolContext): PaymentTool {
           status: 'link_ready',
           option,
           amount: Number(req.amount),
-          currency: 'MXN',
+          currency: req.currency || 'MXN',
           validForHours: s.pctx.settings.linkExpiryDays * 24,
           instruction:
-            'The secure payment button is sent automatically right after your message — do NOT write, copy or paraphrase any URL. Tell the guest the amount (in MXN), that the link is valid for 24 hours, and that they enter their card details only on the secure payment page. Never ask for card details in chat. Do NOT say the payment is done: that is only known once check_payment_status says so.',
+            `The secure payment button is sent automatically right after your message — do NOT write, copy or paraphrase any URL. Tell the guest the amount (in ${req.currency || 'MXN'}), that the link is valid for ${s.pctx.settings.linkExpiryDays * 24} hours, and that they enter their card details only on the secure payment page. Never ask for card details in chat. Do NOT say the payment is done: that is only known once check_payment_status says so.`,
         },
       }
     },
@@ -258,10 +230,10 @@ export function makePaymentTool(ctx: PaymentToolContext): PaymentTool {
     async paymentStatus(input) {
       const s = await setup()
       if ('error' in s) return s.error
-      const r = await resolve(s.cb, input)
+      const r = await resolve(s.be, input)
       if (!r.ok) return r.result
-      const el = evaluate(r.facts, s.pctx.settings, todayIn(s.pctx.tz))
-      if (!el.eligible && ['third_party', 'walk_in', 'manual_source'].includes(el.code)) return ineligible(r.facts, el.code, el.message)
+      const el = await s.be.evaluate(r.facts, s.pctx.settings, todayIn(s.pctx.tz))
+      if (!el.eligible && ['third_party', 'walk_in', 'manual_source'].includes(el.code)) return ineligible(s.be, r.facts, el.code, el.message)
 
       const { data } = await db
         .from('payment_requests')
@@ -274,12 +246,12 @@ export function makePaymentTool(ctx: PaymentToolContext): PaymentTool {
       if (!last) return { status: 'no_payment_link', instruction: 'No payment link has been sent for this reservation. If the guest wants to pay, call get_payment_options.' }
       switch (last.status) {
         case 'paid':
-          return { status: 'paid', option: last.kind, amount: Number(last.amount), currency: 'MXN', instruction: 'The payment has been verified. You may confirm it to the guest.' }
+          return { status: 'paid', option: last.kind, amount: Number(last.amount), currency: last.currency || 'MXN', instruction: 'The payment has been verified. You may confirm it to the guest.' }
         case 'paid_unverified':
         case 'needs_review':
           return { status: 'verifying', instruction: 'A payment was reported but is still being confirmed in our system. Do NOT tell the guest it is confirmed yet — say it is being verified and the team will confirm shortly.' }
         case 'link_active':
-          return { status: 'awaiting_payment', option: last.kind, amount: Number(last.amount), currency: 'MXN', instruction: 'The guest has not completed the payment yet. NEVER say it is paid. They can use the link they were already sent.' }
+          return { status: 'awaiting_payment', option: last.kind, amount: Number(last.amount), currency: last.currency || 'MXN', instruction: 'The guest has not completed the payment yet. NEVER say it is paid. They can use the link they were already sent.' }
         default:
           return { status: 'link_expired', instruction: 'The last payment link is no longer valid and nothing was paid. Offer to create a new one if the guest still wants to pay.' }
       }
