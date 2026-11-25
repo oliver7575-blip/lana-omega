@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/post-stay-feedback",
       "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/ota-prepaid-payments",
+      "schedule": "0 9 * * *"
     }
   ]
 }
