@@ -150,6 +150,9 @@ export default function SalesPage() {
   const input = 'rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-navy focus:outline-none'
   const th = 'px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-navy/60'
   const td = 'px-3 py-2 text-[13px] text-navy tabular-nums'
+  // Tighter cells for the wide breakdown table so it fits without sideways scrolling.
+  const thc = 'px-1.5 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-navy/60'
+  const tdc = 'px-1.5 py-2 text-[12px] text-navy tabular-nums'
 
   const currency = rows.find((r) => r.currency)?.currency ?? 'MXN'
 
@@ -293,49 +296,51 @@ export default function SalesPage() {
           </p>
 
           <div className="mt-4 overflow-x-auto rounded-xl border border-line">
-            <table className="w-full min-w-[1100px] border-collapse">
+            <table className="w-full border-collapse">
               <thead className="border-b border-line">
                 <tr>
-                  <th className={`${th} text-right`}>Total</th>
-                  <th className={`${th} text-right`}>Taxes</th>
-                  <th className={`${th} text-right`}>Commission</th>
-                  <th className={`${th} text-right`}>Payment fee</th>
-                  <th className={`${th} text-right`}>Left for us</th>
-                  <th className={th}>Source</th>
-                  <th className={`${th} text-right`}>Nights</th>
-                  <th className={th}>Check-in</th>
-                  <th className={th}>Guest</th>
-                  <th className={th}>Rental</th>
+                  <th className={`${thc} text-right`}>Total</th>
+                  <th className={`${thc} text-right`}>Taxes</th>
+                  <th className={`${thc} text-right`}>Commission</th>
+                  <th className={`${thc} text-right`}>Payment fee</th>
+                  <th className={`${thc} text-right`}>Left for us</th>
+                  <th className={thc}>Source</th>
+                  <th className={`${thc} text-right`}>Nights</th>
+                  <th className={thc}>Check-in</th>
+                  <th className={thc}>Check-out</th>
+                  <th className={thc}>Guest</th>
+                  <th className={thc}>Rental</th>
                 </tr>
               </thead>
               <tbody>
                 {channel.rows.map((b) => (
                   <tr key={b.r.reservation_id} className="border-b border-line/60">
-                    <td className={`${td} text-right font-semibold`}>{money(b.total)}</td>
-                    <td className={`${td} text-right`}>{money(b.taxes)}</td>
-                    <td className={`${td} text-right`}>{b.ota ? money(b.commission) : '—'}</td>
-                    <td className={`${td} text-right`}>{b.isBooking ? money(b.fee) : '—'}</td>
-                    <td className={`${td} text-right font-semibold`}>{money(b.left)}</td>
-                    <td className={td}>{b.source}</td>
-                    <td className={`${td} text-right`}>{b.r.nights}</td>
-                    <td className={td}>{day(b.r.arrival)}</td>
-                    <td className={td}>{b.r.guest_name ?? ''}</td>
-                    <td className={td}>{b.r.room_type ?? ''}</td>
+                    <td className={`${tdc} text-right font-semibold`}>{money(b.total)}</td>
+                    <td className={`${tdc} text-right`}>{money(b.taxes)}</td>
+                    <td className={`${tdc} text-right`}>{b.ota ? money(b.commission) : '—'}</td>
+                    <td className={`${tdc} text-right`}>{b.isBooking ? money(b.fee) : '—'}</td>
+                    <td className={`${tdc} text-right font-semibold`}>{money(b.left)}</td>
+                    <td className={tdc}>{b.source}</td>
+                    <td className={`${tdc} text-right`}>{b.r.nights}</td>
+                    <td className={`${tdc} whitespace-nowrap`}>{day(b.r.arrival)}</td>
+                    <td className={`${tdc} whitespace-nowrap`}>{day(b.r.departure)}</td>
+                    <td className={tdc}>{b.r.guest_name ?? ''}</td>
+                    <td className={tdc}>{b.r.room_type ?? ''}</td>
                   </tr>
                 ))}
                 {channel.rows.length === 0 && (
-                  <tr><td className={td} colSpan={12}>No bookings in this selection.</td></tr>
+                  <tr><td className={tdc} colSpan={11}>No bookings in this selection.</td></tr>
                 )}
                 {channel.rows.length > 0 && (
                   <tr className="bg-white/5">
-                    <td className={`${td} text-right font-semibold`}>{money(channel.sum((b) => b.total))}</td>
-                    <td className={`${td} text-right font-semibold`}>{money(channel.sum((b) => b.taxes))}</td>
-                    <td className={`${td} text-right font-semibold`}>{money(channel.sum((b) => b.commission))}</td>
-                    <td className={`${td} text-right font-semibold`}>{money(channel.sum((b) => b.fee))}</td>
-                    <td className={`${td} text-right font-semibold`}>{money(channel.sum((b) => b.left))}</td>
-                    <td className={`${td} font-semibold`}>Total ({channel.rows.length})</td>
-                    <td className={`${td} text-right font-semibold`}>{channel.sum((b) => num(b.r.nights))}</td>
-                    <td className={td} colSpan={3} />
+                    <td className={`${tdc} text-right font-semibold`}>{money(channel.sum((b) => b.total))}</td>
+                    <td className={`${tdc} text-right font-semibold`}>{money(channel.sum((b) => b.taxes))}</td>
+                    <td className={`${tdc} text-right font-semibold`}>{money(channel.sum((b) => b.commission))}</td>
+                    <td className={`${tdc} text-right font-semibold`}>{money(channel.sum((b) => b.fee))}</td>
+                    <td className={`${tdc} text-right font-semibold`}>{money(channel.sum((b) => b.left))}</td>
+                    <td className={`${tdc} font-semibold`}>Total ({channel.rows.length})</td>
+                    <td className={`${tdc} text-right font-semibold`}>{channel.sum((b) => num(b.r.nights))}</td>
+                    <td className={tdc} colSpan={4} />
                   </tr>
                 )}
               </tbody>
