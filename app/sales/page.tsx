@@ -35,6 +35,9 @@ export default function SalesPage() {
   const [showTaxable, setShowTaxable] = useState(true)
   const [showNon, setShowNon] = useState(true)
   const [openRoom, setOpenRoom] = useState<string | null>(null)
+  // Channel rules, as percent of the room rate (payment fee: percent of the guest total). Editable.
+  const [rates, setRates] = useState({ iva: 16, state: 3, commission: 15, fee: 4, ivaRet: 8, isrRet: 4, airIva: 8, airState: 3 })
+  const setRate = (k: keyof typeof rates, v: string) => setRates((r) => ({ ...r, [k]: Number(v) || 0 }))
 
   useEffect(() => {
     fetch('/api/sales', { cache: 'no-store' })
@@ -87,6 +90,37 @@ export default function SalesPage() {
     const sum = (k: 'bookings' | 'nights' | 'pretax' | 'taxes' | 'nonTaxable' | 'total') => on.reduce((s, p) => s + p[k], 0)
     return { bookings: sum('bookings'), nights: sum('nights'), pretax: sum('pretax'), taxes: sum('taxes'), nonTaxable: sum('nonTaxable'), total: sum('total') }
   }, [perRoom, off])
+
+  const channel = useMemo(() => {
+    const pc = (n: number) => n / 100
+    const booking = selected
+      .filter((r) => /booking/i.test(r.source ?? ''))
+      .map((r) => {
+        const room = num(r.stay_subtotal)
+        const total = num(r.total)
+        const iva = room * pc(rates.iva)
+        const state = room * pc(rates.state)
+        const commission = room * pc(rates.commission)
+        const fee = total * pc(rates.fee)
+        const ivaRet = room * pc(rates.ivaRet)
+        const isrRet = room * pc(rates.isrRet)
+        const received = total - commission - fee - ivaRet - isrRet
+        const ivaFund = iva - ivaRet
+        const left = received - ivaFund - state
+        return { r, room, total, iva, state, commission, fee, ivaRet, isrRet, received, ivaFund, stateFund: state, left }
+      })
+    const airbnb = selected
+      .filter((r) => /airbnb/i.test(r.source ?? ''))
+      .map((r) => {
+        const room = num(r.stay_subtotal)
+        const total = num(r.total)
+        const ivaFund = room * pc(rates.airIva)
+        const stateFund = room * pc(rates.airState)
+        return { r, room, total, ivaFund, stateFund, left: total - ivaFund - stateFund }
+      })
+    const sum = <T,>(a: T[], f: (x: T) => number) => a.reduce((s, x) => s + f(x), 0)
+    return { booking, airbnb, sum }
+  }, [selected, rates])
 
   const toggleRoom = (room: string) =>
     setOff((s) => {
@@ -234,6 +268,129 @@ export default function SalesPage() {
             </div>
           )}
           <p className="mt-3 text-[11px] text-navy/50">Click a rental row to see its bookings.</p>
+
+          <h2 className="mt-10 text-lg font-semibold text-navy">What is left after channel costs and tax funds</h2>
+          <p className="mt-1 text-[13px] text-navy/60">
+            Uses the same dates, rentals and filters as above. Rates are percent of the room rate, except the payment fee, which is percent of the guest total. You can change them here.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-3 rounded-xl border border-line p-3">
+            {([
+              ['iva', 'Booking IVA'], ['state', 'State tax'], ['commission', 'Commission'], ['fee', 'Payment fee (of total)'],
+              ['ivaRet', 'IVA retention'], ['isrRet', 'ISR retention'], ['airIva', 'Airbnb IVA kept'], ['airState', 'Airbnb state tax kept'],
+            ] as [keyof typeof rates, string][]).map(([k, label]) => (
+              <label key={k} className="text-[11px] text-navy/60">
+                {label} %
+                <input type="number" step="0.1" min="0" className={`${input} mt-1 block w-24`} value={rates[k]} onChange={(e) => setRate(k, e.target.value)} />
+              </label>
+            ))}
+          </div>
+
+          <h3 className="mt-6 text-[15px] font-semibold text-navy">Booking.com</h3>
+          <div className="mt-2 overflow-x-auto rounded-xl border border-line">
+            <table className="w-full min-w-[1100px] border-collapse">
+              <thead className="border-b border-line">
+                <tr>
+                  <th className={th}>Check-in</th>
+                  <th className={th}>Guest</th>
+                  <th className={th}>Rental</th>
+                  <th className={`${th} text-right`}>Room rate</th>
+                  <th className={`${th} text-right`}>Guest paid</th>
+                  <th className={`${th} text-right`}>Commission</th>
+                  <th className={`${th} text-right`}>Payment fee</th>
+                  <th className={`${th} text-right`}>IVA ret.</th>
+                  <th className={`${th} text-right`}>ISR ret.</th>
+                  <th className={`${th} text-right`}>After Booking.com</th>
+                  <th className={`${th} text-right`}>IVA fund</th>
+                  <th className={`${th} text-right`}>State tax fund</th>
+                  <th className={`${th} text-right`}>Left for us</th>
+                </tr>
+              </thead>
+              <tbody>
+                {channel.booking.map((b) => (
+                  <tr key={b.r.reservation_id} className="border-b border-line/60">
+                    <td className={td}>{day(b.r.arrival)}</td>
+                    <td className={td}>{b.r.guest_name ?? ''}</td>
+                    <td className={td}>{b.r.room_type ?? ''}</td>
+                    <td className={`${td} text-right`}>{money(b.room)}</td>
+                    <td className={`${td} text-right`}>{money(b.total)}</td>
+                    <td className={`${td} text-right`}>{money(b.commission)}</td>
+                    <td className={`${td} text-right`}>{money(b.fee)}</td>
+                    <td className={`${td} text-right`}>{money(b.ivaRet)}</td>
+                    <td className={`${td} text-right`}>{money(b.isrRet)}</td>
+                    <td className={`${td} text-right`}>{money(b.received)}</td>
+                    <td className={`${td} text-right`}>{money(b.ivaFund)}</td>
+                    <td className={`${td} text-right`}>{money(b.stateFund)}</td>
+                    <td className={`${td} text-right font-semibold`}>{money(b.left)}</td>
+                  </tr>
+                ))}
+                {channel.booking.length === 0 && (
+                  <tr><td className={td} colSpan={13}>No Booking.com bookings in this selection.</td></tr>
+                )}
+                {channel.booking.length > 0 && (
+                  <tr className="bg-white/5">
+                    <td className={`${td} font-semibold`} colSpan={3}>Total ({channel.booking.length})</td>
+                    {([
+                      (b: (typeof channel.booking)[number]) => b.room, (b: (typeof channel.booking)[number]) => b.total,
+                      (b: (typeof channel.booking)[number]) => b.commission, (b: (typeof channel.booking)[number]) => b.fee,
+                      (b: (typeof channel.booking)[number]) => b.ivaRet, (b: (typeof channel.booking)[number]) => b.isrRet,
+                      (b: (typeof channel.booking)[number]) => b.received, (b: (typeof channel.booking)[number]) => b.ivaFund,
+                      (b: (typeof channel.booking)[number]) => b.stateFund, (b: (typeof channel.booking)[number]) => b.left,
+                    ]).map((f, i) => (
+                      <td key={i} className={`${td} text-right font-semibold`}>{money(channel.sum(channel.booking, f))}</td>
+                    ))}
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <h3 className="mt-6 text-[15px] font-semibold text-navy">Airbnb</h3>
+          <p className="mt-1 text-[12px] text-navy/60">The reservation amount is what Airbnb pays after its fees and the 4% and 8% retentions, so only the tax funds are set aside.</p>
+          <div className="mt-2 overflow-x-auto rounded-xl border border-line">
+            <table className="w-full min-w-[820px] border-collapse">
+              <thead className="border-b border-line">
+                <tr>
+                  <th className={th}>Check-in</th>
+                  <th className={th}>Guest</th>
+                  <th className={th}>Rental</th>
+                  <th className={`${th} text-right`}>Room rate</th>
+                  <th className={`${th} text-right`}>Reservation amount</th>
+                  <th className={`${th} text-right`}>IVA fund</th>
+                  <th className={`${th} text-right`}>State tax fund</th>
+                  <th className={`${th} text-right`}>Left for us</th>
+                </tr>
+              </thead>
+              <tbody>
+                {channel.airbnb.map((b) => (
+                  <tr key={b.r.reservation_id} className="border-b border-line/60">
+                    <td className={td}>{day(b.r.arrival)}</td>
+                    <td className={td}>{b.r.guest_name ?? ''}</td>
+                    <td className={td}>{b.r.room_type ?? ''}</td>
+                    <td className={`${td} text-right`}>{money(b.room)}</td>
+                    <td className={`${td} text-right`}>{money(b.total)}</td>
+                    <td className={`${td} text-right`}>{money(b.ivaFund)}</td>
+                    <td className={`${td} text-right`}>{money(b.stateFund)}</td>
+                    <td className={`${td} text-right font-semibold`}>{money(b.left)}</td>
+                  </tr>
+                ))}
+                {channel.airbnb.length === 0 && (
+                  <tr><td className={td} colSpan={8}>No Airbnb bookings in this selection.</td></tr>
+                )}
+                {channel.airbnb.length > 0 && (
+                  <tr className="bg-white/5">
+                    <td className={`${td} font-semibold`} colSpan={3}>Total ({channel.airbnb.length})</td>
+                    {([
+                      (b: (typeof channel.airbnb)[number]) => b.room, (b: (typeof channel.airbnb)[number]) => b.total,
+                      (b: (typeof channel.airbnb)[number]) => b.ivaFund, (b: (typeof channel.airbnb)[number]) => b.stateFund,
+                      (b: (typeof channel.airbnb)[number]) => b.left,
+                    ]).map((f, i) => (
+                      <td key={i} className={`${td} text-right font-semibold`}>{money(channel.sum(channel.airbnb, f))}</td>
+                    ))}
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
     </div>
