@@ -25,7 +25,7 @@ const money = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 
 const day = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
 const todayIso = () => new Date().toISOString().slice(0, 10)
 
-type Rates = { iva: number; state: number; commission: number; fee: number; ivaRet: number; isrRet: number; airIva: number; airState: number }
+type Rates = { iva: number; state: number; commission: number; fee: number; ivaRet: number; isrRet: number; airIva: number; airState: number; airCommission: number }
 
 /** One booking's money split. Booking.com and Airbnb follow the channel rules; other bookings owe the taxes charged on them. */
 function calcFor(r: Row, rates: Rates) {
@@ -39,7 +39,8 @@ function calcFor(r: Row, rates: Rates) {
   const taxes = ota ? room * pc(rates.iva + rates.state) : charged
   const taxesPaid = ota ? room * pc(rates.ivaRet + rates.isrRet) : 0
   const taxesOwed = isAirbnb ? room * pc(rates.airIva + rates.airState) : isBooking ? room * pc(rates.iva - rates.ivaRet + rates.state) : charged
-  const commission = isBooking ? room * pc(rates.commission) : 0
+  // Airbnb's commission is only an estimate for reporting: its amount is already after fees, so it is never taken off again.
+  const commission = isBooking ? room * pc(rates.commission) : isAirbnb ? room * pc(rates.airCommission) : 0
   const fee = isBooking ? total * pc(rates.fee) : 0
   const subtotal = total - taxesOwed
   const left = isBooking ? total - taxesPaid - commission - fee - taxesOwed : subtotal
@@ -57,7 +58,7 @@ export default function SalesPage() {
   const [showNon, setShowNon] = useState(true)
   const [openRoom, setOpenRoom] = useState<string | null>(null)
   // Channel rules, as percent of the room rate (payment fee: percent of the guest total). Editable.
-  const [rates, setRates] = useState<Rates>({ iva: 16, state: 3, commission: 15, fee: 4, ivaRet: 8, isrRet: 4, airIva: 8, airState: 3 })
+  const [rates, setRates] = useState<Rates>({ iva: 16, state: 3, commission: 15, fee: 4, ivaRet: 8, isrRet: 4, airIva: 8, airState: 3, airCommission: 15 })
   const setRate = (k: keyof typeof rates, v: string) => setRates((r) => ({ ...r, [k]: Number(v) || 0 }))
 
   useEffect(() => {
@@ -296,7 +297,7 @@ export default function SalesPage() {
           <div className="mt-3 flex flex-wrap gap-3 rounded-xl border border-line p-3">
             {([
               ['iva', 'Booking IVA'], ['state', 'State tax'], ['commission', 'Commission'], ['fee', 'Payment fee (of total)'],
-              ['ivaRet', 'IVA retention'], ['isrRet', 'ISR retention'], ['airIva', 'Airbnb IVA kept'], ['airState', 'Airbnb state tax kept'],
+              ['ivaRet', 'IVA retention'], ['isrRet', 'ISR retention'], ['airIva', 'Airbnb IVA kept'], ['airState', 'Airbnb state tax kept'], ['airCommission', 'Airbnb commission (est.)'],
             ] as [keyof typeof rates, string][]).map(([k, label]) => (
               <label key={k} className="text-[11px] text-navy/60">
                 {label} %
@@ -330,7 +331,7 @@ export default function SalesPage() {
                     <td className={`${td} text-right`}>{money(b.taxes)}</td>
                     <td className={`${td} text-right`}>{money(b.taxesPaid)}</td>
                     <td className={`${td} text-right`}>{money(b.taxesOwed)}</td>
-                    <td className={`${td} text-right`}>{b.source === 'Airbnb' ? '—' : money(b.commission)}</td>
+                    <td className={`${td} text-right`}>{money(b.commission)}{b.source === 'Airbnb' ? ' (est.)' : ''}</td>
                     <td className={`${td} text-right`}>{b.source === 'Airbnb' ? '—' : money(b.fee)}</td>
                     <td className={`${td} text-right font-semibold`}>{money(b.left)}</td>
                     <td className={td}>{b.source}</td>
@@ -361,7 +362,7 @@ export default function SalesPage() {
             </table>
           </div>
           <p className="mt-2 text-[11px] text-navy/50">
-            Taxes = IVA 16% + state tax 3% on the room rate. Taxes paid = IVA 8% + ISR 4% retained. Taxes owed = what is still ours to pay (IVA 8% + state tax 3%). Commission is on the room rate; payment fee is on the guest total. For Airbnb the total is already after its retentions and fees, so Taxes paid is shown for reference and is not taken off again; its own fees are not visible, so Commission and Payment fee are blank.
+            Taxes = IVA 16% + state tax 3% on the room rate. Taxes paid = IVA 8% + ISR 4% retained. Taxes owed = what is still ours to pay (IVA 8% + state tax 3%). Commission is on the room rate; payment fee is on the guest total. For Airbnb the total is already after its retentions and fees, so Taxes paid is shown for reference and is not taken off again. Airbnb's commission is an estimate (15% of the room rate) shown only so it can be measured; it is already inside the amount and is not deducted again. Payment fee does not apply to Airbnb.
           </p>
         </>
       )}
