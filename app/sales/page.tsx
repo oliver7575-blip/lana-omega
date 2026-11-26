@@ -299,33 +299,33 @@ export default function SalesPage() {
             <table className="w-full border-collapse">
               <thead className="border-b border-line">
                 <tr>
-                  <th className={`${thc} text-right`}>Total</th>
-                  <th className={`${thc} text-right`}>Taxes</th>
-                  <th className={`${thc} text-right`}>Commission</th>
-                  <th className={`${thc} text-right`}>Payment fee</th>
-                  <th className={`${thc} text-right`}>Left for us</th>
-                  <th className={thc}>Source</th>
+                  <th className={thc}>Rental</th>
+                  <th className={thc}>Guest</th>
                   <th className={`${thc} text-right`}>Nights</th>
                   <th className={thc}>Check-in</th>
                   <th className={thc}>Check-out</th>
-                  <th className={thc}>Guest</th>
-                  <th className={thc}>Rental</th>
+                  <th className={thc}>Source</th>
+                  <th className={`${thc} text-right`}>Subtotal</th>
+                  <th className={`${thc} text-right`}>Taxes</th>
+                  <th className={`${thc} text-right`}>Commission</th>
+                  <th className={`${thc} text-right`}>Payment fee</th>
+                  <th className={`${thc} text-right`}>Net total</th>
                 </tr>
               </thead>
               <tbody>
                 {channel.rows.map((b) => (
                   <tr key={b.r.reservation_id} className="border-b border-line/60">
+                    <td className={tdc}>{b.r.room_type ?? ''}</td>
+                    <td className={tdc}>{b.r.guest_name ?? ''}</td>
+                    <td className={`${tdc} text-right`}>{b.r.nights}</td>
+                    <td className={`${tdc} whitespace-nowrap`}>{day(b.r.arrival)}</td>
+                    <td className={`${tdc} whitespace-nowrap`}>{day(b.r.departure)}</td>
+                    <td className={tdc}>{b.source}</td>
                     <td className={`${tdc} text-right font-semibold`}>{money(b.total)}</td>
                     <td className={`${tdc} text-right`}>{money(b.taxes)}</td>
                     <td className={`${tdc} text-right`}>{b.ota ? money(b.commission) : '—'}</td>
                     <td className={`${tdc} text-right`}>{b.isBooking ? money(b.fee) : '—'}</td>
                     <td className={`${tdc} text-right font-semibold`}>{money(b.left)}</td>
-                    <td className={tdc}>{b.source}</td>
-                    <td className={`${tdc} text-right`}>{b.r.nights}</td>
-                    <td className={`${tdc} whitespace-nowrap`}>{day(b.r.arrival)}</td>
-                    <td className={`${tdc} whitespace-nowrap`}>{day(b.r.departure)}</td>
-                    <td className={tdc}>{b.r.guest_name ?? ''}</td>
-                    <td className={tdc}>{b.r.room_type ?? ''}</td>
                   </tr>
                 ))}
                 {channel.rows.length === 0 && (
@@ -333,14 +333,15 @@ export default function SalesPage() {
                 )}
                 {channel.rows.length > 0 && (
                   <tr className="bg-white/5">
+                    <td className={`${tdc} font-semibold`}>Total ({channel.rows.length})</td>
+                    <td className={tdc} />
+                    <td className={`${tdc} text-right font-semibold`}>{channel.sum((b) => num(b.r.nights))}</td>
+                    <td className={tdc} colSpan={3} />
                     <td className={`${tdc} text-right font-semibold`}>{money(channel.sum((b) => b.total))}</td>
                     <td className={`${tdc} text-right font-semibold`}>{money(channel.sum((b) => b.taxes))}</td>
                     <td className={`${tdc} text-right font-semibold`}>{money(channel.sum((b) => b.commission))}</td>
                     <td className={`${tdc} text-right font-semibold`}>{money(channel.sum((b) => b.fee))}</td>
                     <td className={`${tdc} text-right font-semibold`}>{money(channel.sum((b) => b.left))}</td>
-                    <td className={`${tdc} font-semibold`}>Total ({channel.rows.length})</td>
-                    <td className={`${tdc} text-right font-semibold`}>{channel.sum((b) => num(b.r.nights))}</td>
-                    <td className={tdc} colSpan={4} />
                   </tr>
                 )}
               </tbody>
