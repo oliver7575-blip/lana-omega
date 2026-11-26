@@ -241,7 +241,9 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
         {item('/payments', 'Payments', CardIcon, pathname.startsWith('/payments'), info?.paymentsAttention)}
         {item('/automations', 'Templates', TemplateIcon, pathname.startsWith('/automations'))}
         {item('/integrations', 'Integrations', ShareIcon, pathname.startsWith('/integrations'))}
-        {item('/reviews', 'Reviews', StarIcon, pathname.startsWith('/reviews'), info?.unreadReviews)}
+        {info?.brand === 'lalo'
+          ? item('/sales', 'Sales', DollarIcon, pathname.startsWith('/sales'))
+          : item('/reviews', 'Reviews', StarIcon, pathname.startsWith('/reviews'), info?.unreadReviews)}
         {item('/maintenance', 'Maintenance', HammerIcon, pathname.startsWith('/maintenance'))}
       </div>
 
