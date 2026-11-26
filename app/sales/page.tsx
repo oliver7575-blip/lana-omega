@@ -64,9 +64,13 @@ export default function SalesPage() {
       .then(({ ok, j }) => {
         if (!ok) throw new Error(j.error ?? 'Could not load sales')
         setRows(j.rows ?? [])
-        const first = (j.rows ?? [])[0]?.arrival as string | undefined
-        setFrom(first ?? todayIso())
-        setTo(todayIso())
+        // Start on the current month: the 1st to the last day.
+        const now = new Date()
+        const pad = (n: number) => String(n).padStart(2, '0')
+        const y = now.getFullYear()
+        const m = now.getMonth()
+        setFrom(`${y}-${pad(m + 1)}-01`)
+        setTo(`${y}-${pad(m + 1)}-${pad(new Date(y, m + 1, 0).getDate())}`)
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Could not load sales'))
       .finally(() => setLoading(false))
