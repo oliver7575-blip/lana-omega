@@ -182,10 +182,6 @@ export default function SalesPage() {
                 To
                 <input type="date" className={`${input} mt-1 block`} value={to} min={from || earliest} onChange={(e) => setTo(e.target.value)} />
               </label>
-              <div className="flex gap-2 pb-0.5 text-[12px]">
-                <button className="text-clay hover:underline" onClick={() => { setFrom(earliest); setTo(todayIso()) }}>All to today</button>
-                <button className="text-clay hover:underline" onClick={() => { setFrom(earliest); setTo(latest) }}>Everything</button>
-              </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 md:justify-end" role="group" aria-label="Sales type">
               <button className={chip(showTaxable)} aria-pressed={showTaxable} onClick={() => setShowTaxable((v) => !v)}>Taxable</button>
