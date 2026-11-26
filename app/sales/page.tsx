@@ -25,7 +25,7 @@ const money = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 
 const day = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
 const todayIso = () => new Date().toISOString().slice(0, 10)
 
-type Rates = { iva: number; state: number; commission: number; fee: number; airIva: number; airState: number; airCommission: number }
+type Rates = { ivaRet: number; isrRet: number; extraIva: number; commission: number; fee: number; airIva: number; airCommission: number }
 
 /** One booking's money split. Booking.com and Airbnb follow the channel rules; other bookings owe the taxes charged on them. */
 function calcFor(r: Row, rates: Rates) {
@@ -36,8 +36,8 @@ function calcFor(r: Row, rates: Rates) {
   const room = num(r.stay_subtotal)
   const total = num(r.total)
   const charged = num(r.taxes) + num(r.vat)
-  // Booking.com: IVA + state tax on the room rate. Airbnb: only the IVA and state tax still inside its (after-retention) amount.
-  const taxes = isAirbnb ? room * pc(rates.airIva + rates.airState) : isBooking ? room * pc(rates.iva + rates.state) : charged
+  // Booking.com: IVA 8% + ISR 4% retention, plus an extra 4% IVA, all on the room rate. Airbnb: its amount is already after the retentions, so only another 8% IVA. Others: the tax on the booking.
+  const taxes = isAirbnb ? room * pc(rates.airIva) : isBooking ? room * pc(rates.ivaRet + rates.isrRet + rates.extraIva) : charged
   // Airbnb's commission is only an estimate for reporting: its amount is already after fees, so it is never taken off again.
   const commission = isBooking ? room * pc(rates.commission) : isAirbnb ? room * pc(rates.airCommission) : 0
   const fee = isBooking ? total * pc(rates.fee) : 0
@@ -56,7 +56,7 @@ export default function SalesPage() {
   const [showNon, setShowNon] = useState(true)
   const [openRoom, setOpenRoom] = useState<string | null>(null)
   // Channel rules, as percent of the room rate (payment fee: percent of the guest total). Editable.
-  const [rates, setRates] = useState<Rates>({ iva: 16, state: 3, commission: 15, fee: 4, airIva: 8, airState: 3, airCommission: 15 })
+  const [rates, setRates] = useState<Rates>({ ivaRet: 8, isrRet: 4, extraIva: 4, commission: 15, fee: 4, airIva: 8, airCommission: 15 })
   const setRate = (k: keyof typeof rates, v: string) => setRates((r) => ({ ...r, [k]: Number(v) || 0 }))
 
   useEffect(() => {
@@ -285,8 +285,8 @@ export default function SalesPage() {
           </p>
           <div className="mt-3 flex flex-wrap gap-3 rounded-xl border border-line p-3">
             {([
-              ['iva', 'Booking IVA'], ['state', 'State tax'], ['commission', 'Commission'], ['fee', 'Payment fee (of total)'],
-              ['airIva', 'Airbnb IVA kept'], ['airState', 'Airbnb state tax kept'], ['airCommission', 'Airbnb commission (est.)'],
+              ['ivaRet', 'Booking IVA retention'], ['isrRet', 'Booking ISR retention'], ['extraIva', 'Booking extra IVA'], ['commission', 'Booking commission'], ['fee', 'Payment fee (of total)'],
+              ['airIva', 'Airbnb IVA'], ['airCommission', 'Airbnb commission (est.)'],
             ] as [keyof typeof rates, string][]).map(([k, label]) => (
               <label key={k} className="text-[11px] text-navy/60">
                 {label} %
@@ -345,7 +345,7 @@ export default function SalesPage() {
             </table>
           </div>
           <p className="mt-2 text-[11px] text-navy/50">
-            Left for us = Total minus Taxes, Commission and Payment fee. Taxes: Booking.com = IVA 16% + state tax 3% on the room rate; Airbnb = the IVA 8% + state tax 3% still inside its amount (its 8% IVA and 4% ISR are already retained); other bookings = the tax on the booking. Commission is on the room rate; payment fee is on the guest total (Booking.com only). Airbnb's commission is an estimate shown for measuring; it is already inside the amount and is not deducted again.
+            Left for us = Total minus Taxes, Commission and Payment fee. Taxes: Booking.com = IVA 8% + ISR 4% retention + an extra 4% IVA, on the room rate; Airbnb = another 8% IVA on the room rate (its amount is already after its retentions); other bookings = the tax on the booking. Booking.com commission is 15% of the room rate and the payment fee is 4% of the guest total. Airbnb's commission is an estimate shown for measuring; it is already inside the amount and is not deducted again.
           </p>
         </>
       )}
