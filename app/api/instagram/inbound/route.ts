@@ -7,7 +7,7 @@ import { verifyMetaSignature } from '@/lib/verify-webhook'
 import { generateReply, NO_REPLY_TOKEN } from '@/lib/anthropic'
 import { type EncryptedPayload } from '@/lib/crypto'
 import { pmsForTenant } from '@/lib/pms'
-import { notifyStaff } from '@/lib/escalation'
+import { dispatchEscalation } from '@/lib/escalation'
 import { parseEscalationContacts, findEscalationContact } from '@/lib/escalation-contacts'
 import { buildRoomPhotosTool } from '@/lib/room-photos'
 import { buildKnowledgeBaseSection } from '@/lib/knowledge-base'
@@ -233,26 +233,19 @@ async function handleMessage(tenantId: string, conn: InstagramConnection, accoun
           escalateToStaff: async (input: { category: string; roomNumber?: string; summary: string; urgency?: string }) => {
             const contact = findEscalationContact(contacts, input.category)
             if (!contact) return { success: false, error: `No ${input.category} contact configured` }
-            const result = await notifyStaff(
-              waPhoneId,
-              whatsapp.credentials as EncryptedPayload,
-              contact.phone,
-              `Instagram ${guestName ?? ''}`.trim(),
+            return dispatchEscalation({
+              db: supabase,
+              tenantId,
+              contact,
+              phoneNumberId: waPhoneId,
+              credentials: whatsapp.credentials as EncryptedPayload,
+              guestIdentifier: `Instagram ${guestName ?? ''}`.trim(),
               input,
-              tenant?.message_templates,
-              guestName
-            )
-            await supabase.from('escalations').insert({
-              tenant_id: tenantId,
-              conversation_id: conversationId,
-              guest_id: guest.id,
-              category: input.category,
-              urgency: input.urgency ?? 'normal',
-              summary: input.summary,
-              room: input.roomNumber ?? null,
-              delivered: result.success,
+              messageTemplates: tenant?.message_templates,
+              guestName,
+              conversationId: conversationId as string,
+              guestId: guest.id as string,
             })
-            return result
           },
         }
       : undefined

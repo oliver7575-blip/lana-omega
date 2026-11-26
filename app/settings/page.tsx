@@ -64,7 +64,7 @@ export default function SettingsPage() {
   const [activating, setActivating] = useState(false)
   const [activateError, setActivateError] = useState<string | null>(null)
 
-  const [contacts, setContacts] = useState<{ key: string; phone: string; description: string }[]>([])
+  const [contacts, setContacts] = useState<{ key: string; phone: string; description: string; hours?: { start: string; end: string } }[]>([])
   const [postStayEnabled, setPostStayEnabled] = useState(false)
   const [savingPostStay, setSavingPostStay] = useState(false)
   const [postStayMessage, setPostStayMessage] = useState<string | null>(null)
@@ -94,10 +94,11 @@ export default function SettingsPage() {
       const raw = json.tenant.escalation_contacts
       setContacts(
         Array.isArray(raw)
-          ? raw.map((c: { key?: string; phone?: string; description?: string }) => ({
+          ? raw.map((c: { key?: string; phone?: string; description?: string; hours?: { start: string; end: string } }) => ({
               key: c.key ?? '',
               phone: c.phone ?? '',
               description: c.description ?? '',
+              ...(c.hours ? { hours: c.hours } : {}),
             }))
           : Object.entries((raw ?? {}) as Record<string, string>).map(([key, phone]) => ({
               key,

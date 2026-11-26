@@ -17,6 +17,10 @@
       "schedule": "0 9 * * *"
     },
     {
+      "path": "/api/cron/held-escalations",
+      "schedule": "0 14 * * *"
+    },
+    {
       "path": "/api/cron/sync-revenue",
       "schedule": "30 9 * * *"
     }

@@ -4,6 +4,8 @@ export interface EscalationContact {
   phone: string
   /** Tells the AI when to use this contact. */
   description?: string
+  /** When set, alerts for this contact are only sent inside these local hours; others wait for the next opening. */
+  hours?: { start: string; end: string }
 }
 
 /** Turns a label into a safe category key: "Front desk" → "front_desk". */
@@ -28,7 +30,9 @@ export function parseEscalationContacts(raw: unknown): EscalationContact[] {
       const c = item as Partial<EscalationContact>
       const key = toCategoryKey(c?.key ?? '')
       const phone = (c?.phone ?? '').trim()
-      if (key && phone) out.push({ key, phone, description: c.description?.trim() || undefined })
+      const h = (c as { hours?: { start?: string; end?: string } }).hours
+      const hours = h && /^\d{1,2}:\d{2}$/.test(h.start ?? '') && /^\d{1,2}:\d{2}$/.test(h.end ?? '') ? { start: h.start as string, end: h.end as string } : undefined
+      if (key && phone) out.push({ key, phone, description: c.description?.trim() || undefined, ...(hours ? { hours } : {}) })
     }
   } else if (raw && typeof raw === 'object') {
     for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {

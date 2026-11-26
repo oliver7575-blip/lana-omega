@@ -10,7 +10,7 @@ export async function GET() {
 
   const { data, count, error } = await supabase
     .from('escalations')
-    .select('id, conversation_id, category, urgency, summary, room, delivered, status, created_at, handled_at, handled_by, staff_reply, replied_at, replied_by, guest_informed', { count: 'exact' })
+    .select('id, conversation_id, category, urgency, summary, room, delivered, held, status, created_at, handled_at, handled_by, staff_reply, replied_at, replied_by, guest_informed', { count: 'exact' })
     .order('created_at', { ascending: false })
     .limit(300)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

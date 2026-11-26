@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { generateReply } from '@/lib/anthropic'
 import { pmsForTenant } from '@/lib/pms'
-import { notifyStaff } from '@/lib/escalation'
+import { notifyStaff, dispatchEscalation } from '@/lib/escalation'
 import { parseEscalationContacts, findEscalationContact } from '@/lib/escalation-contacts'
 import { buildRoomPhotosTool } from '@/lib/room-photos'
 import { buildBookingLinkInstruction } from '@/lib/booking-link'
@@ -226,8 +226,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
             summary: string
             urgency?: string
           }) => {
-            const staffNumber = findEscalationContact(escalationContacts, input.category)?.phone
-            if (!staffNumber) {
+            const contact = findEscalationContact(escalationContacts, input.category)
+            if (!contact) {
               return { success: false, error: `No ${input.category} contact configured` }
             }
             const phoneNumberId = (whatsappForEscalation.config as { phone_number_id?: string })
@@ -235,25 +235,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
             if (!phoneNumberId) {
               return { success: false, error: 'No phone_number_id configured for WhatsApp' }
             }
-            const result = await notifyStaff(
+            return dispatchEscalation({
+              db: supabase,
+              tenantId,
+              contact,
               phoneNumberId,
-              whatsappForEscalation.credentials,
-              staffNumber,
-              'website chat',
+              credentials: whatsappForEscalation.credentials,
+              guestIdentifier: 'website chat',
               input,
-              tenant.message_templates
-            )
-            await supabase.from('escalations').insert({
-              tenant_id: tenantId,
-              conversation_id: conversationId,
-              guest_id: guest.id,
-              category: input.category,
-              urgency: input.urgency ?? 'normal',
-              summary: input.summary,
-              room: input.roomNumber ?? null,
-              delivered: result.success,
+              messageTemplates: tenant.message_templates,
+              conversationId: conversationId as string,
+              guestId: guest.id as string,
             })
-            return result
           },
         }
       : undefined

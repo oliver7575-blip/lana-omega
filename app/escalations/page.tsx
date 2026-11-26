@@ -11,6 +11,7 @@ interface Escalation {
   summary: string
   room: string | null
   delivered: boolean
+  held?: boolean
   status: 'new' | 'read'
   created_at: string
   handled_at: string | null
@@ -162,7 +163,7 @@ export default function EscalationsPage() {
                   </span>
                   <span className="text-xs uppercase tracking-wide text-navy/50">{e.urgency === 'urgent' ? 'high' : e.urgency}</span>
                   {e.room && <span className="text-xs text-navy/50">Room {e.room}</span>}
-                  {!e.delivered && <span className="text-xs text-amber-300">alert not delivered</span>}
+                  {e.held ? <span className="text-xs text-amber-300">on hold until working hours</span> : !e.delivered && <span className="text-xs text-amber-300">alert not delivered</span>}
                   <span className="ml-auto text-xs text-navy/50">{fmt(e.created_at)}</span>
                 </div>
                 <p className="text-sm text-navy">{e.summary}</p>

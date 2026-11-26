@@ -11,7 +11,7 @@ import { downloadWhatsAppMedia, describeImage, transcribeAudio } from '@/lib/wha
 import { verifyMetaSignature } from '@/lib/verify-webhook'
 import { decryptCredentials, type EncryptedPayload } from '@/lib/crypto'
 import { pmsForTenant } from '@/lib/pms'
-import { notifyStaff } from '@/lib/escalation'
+import { notifyStaff, dispatchEscalation } from '@/lib/escalation'
 import { parseEscalationContacts, findEscalationContact } from '@/lib/escalation-contacts'
 import { buildRoomPhotosTool } from '@/lib/room-photos'
 import { buildBookingLinkInstruction } from '@/lib/booking-link'
@@ -645,26 +645,19 @@ async function replyToConversation(args: {
             if (!contact) {
               return { success: false, error: `No ${input.category} contact configured` }
             }
-            const result = await notifyStaff(
+            return dispatchEscalation({
+              db: supabase,
+              tenantId,
+              contact,
               phoneNumberId,
               credentials,
-              contact.phone,
-              from,
+              guestIdentifier: from,
               input,
               messageTemplates,
-              guestName
-            )
-            await supabase.from('escalations').insert({
-              tenant_id: tenantId,
-              conversation_id: conversationId,
-              guest_id: guest.id,
-              category: input.category,
-              urgency: input.urgency ?? 'normal',
-              summary: input.summary,
-              room: input.roomNumber ?? null,
-              delivered: result.success,
+              guestName,
+              conversationId: conversationId as string,
+              guestId: guest.id as string,
             })
-            return result
           },
         }
       : undefined
