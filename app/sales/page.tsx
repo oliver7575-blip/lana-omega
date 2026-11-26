@@ -215,7 +215,6 @@ export default function SalesPage() {
                   <th className={th}>Rental</th>
                   <th className={`${th} text-right`}>Bookings</th>
                   <th className={`${th} text-right`}>Nights</th>
-                  <th className={`${th} text-right`}>Subtotal</th>
                   <th className={`${th} text-right`}>Total</th>
                   <th className={`${th} text-right`}>Taxes</th>
                   <th className={`${th} text-right`}>Taxes paid</th>
@@ -232,7 +231,6 @@ export default function SalesPage() {
                       <td className={td}>{p.room}</td>
                       <td className={`${td} text-right`}>{p.bookings}</td>
                       <td className={`${td} text-right`}>{p.nights}</td>
-                      <td className={`${td} text-right`}>{money(p.subtotal)}</td>
                       <td className={`${td} text-right font-semibold`}>{money(p.total)}</td>
                       <td className={`${td} text-right`}>{money(p.taxes)}</td>
                       <td className={`${td} text-right`}>{money(p.taxesPaid)}</td>
@@ -246,7 +244,6 @@ export default function SalesPage() {
                   <td className={`${td} font-semibold`}>Total</td>
                   <td className={`${td} text-right font-semibold`}>{totals.bookings}</td>
                   <td className={`${td} text-right font-semibold`}>{totals.nights}</td>
-                  <td className={`${td} text-right font-semibold`}>{money(totals.subtotal)}</td>
                   <td className={`${td} text-right font-semibold`}>{money(totals.total)}</td>
                   <td className={`${td} text-right font-semibold`}>{money(totals.taxes)}</td>
                   <td className={`${td} text-right font-semibold`}>{money(totals.taxesPaid)}</td>
@@ -287,7 +284,7 @@ export default function SalesPage() {
               </table>
             </div>
           )}
-          <p className="mt-3 text-[11px] text-navy/50">Click a rental row to see its bookings. Total includes the taxes still owed; Subtotal is Total minus those taxes. Rates are set in the box under the channel breakdown.</p>
+          <p className="mt-3 text-[11px] text-navy/50">Click a rental row to see its bookings. Total includes the taxes still owed. Rates are set in the box under the channel breakdown.</p>
 
           <h2 className="mt-10 text-lg font-semibold text-navy">What is left after channel costs and tax funds</h2>
           <p className="mt-1 text-[13px] text-navy/60">
