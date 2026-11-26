@@ -25,7 +25,7 @@ const money = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 
 const day = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
 const todayIso = () => new Date().toISOString().slice(0, 10)
 
-type Rates = { iva: number; state: number; commission: number; fee: number; ivaRet: number; isrRet: number; airIva: number; airState: number; airCommission: number }
+type Rates = { iva: number; state: number; commission: number; fee: number; airIva: number; airState: number; airCommission: number }
 
 /** One booking's money split. Booking.com and Airbnb follow the channel rules; other bookings owe the taxes charged on them. */
 function calcFor(r: Row, rates: Rates) {
@@ -36,15 +36,13 @@ function calcFor(r: Row, rates: Rates) {
   const room = num(r.stay_subtotal)
   const total = num(r.total)
   const charged = num(r.taxes) + num(r.vat)
-  const taxes = ota ? room * pc(rates.iva + rates.state) : charged
-  const taxesPaid = ota ? room * pc(rates.ivaRet + rates.isrRet) : 0
-  const taxesOwed = isAirbnb ? room * pc(rates.airIva + rates.airState) : isBooking ? room * pc(rates.iva - rates.ivaRet + rates.state) : charged
+  // Booking.com: IVA + state tax on the room rate. Airbnb: only the IVA and state tax still inside its (after-retention) amount.
+  const taxes = isAirbnb ? room * pc(rates.airIva + rates.airState) : isBooking ? room * pc(rates.iva + rates.state) : charged
   // Airbnb's commission is only an estimate for reporting: its amount is already after fees, so it is never taken off again.
   const commission = isBooking ? room * pc(rates.commission) : isAirbnb ? room * pc(rates.airCommission) : 0
   const fee = isBooking ? total * pc(rates.fee) : 0
-  const subtotal = total - taxesOwed
-  const left = isBooking ? total - taxesPaid - commission - fee - taxesOwed : subtotal
-  return { isAirbnb, isBooking, ota, total, taxes, taxesPaid, taxesOwed, commission, fee, subtotal, left }
+  const left = total - taxes - commission * (isBooking ? 1 : 0) - fee
+  return { isAirbnb, isBooking, ota, total, taxes, commission, fee, left }
 }
 
 export default function SalesPage() {
@@ -58,7 +56,7 @@ export default function SalesPage() {
   const [showNon, setShowNon] = useState(true)
   const [openRoom, setOpenRoom] = useState<string | null>(null)
   // Channel rules, as percent of the room rate (payment fee: percent of the guest total). Editable.
-  const [rates, setRates] = useState<Rates>({ iva: 16, state: 3, commission: 15, fee: 4, ivaRet: 8, isrRet: 4, airIva: 8, airState: 3, airCommission: 15 })
+  const [rates, setRates] = useState<Rates>({ iva: 16, state: 3, commission: 15, fee: 4, airIva: 8, airState: 3, airCommission: 15 })
   const setRate = (k: keyof typeof rates, v: string) => setRates((r) => ({ ...r, [k]: Number(v) || 0 }))
 
   useEffect(() => {
@@ -103,10 +101,8 @@ export default function SalesPage() {
         nights: mine.reduce((s, r) => s + num(r.nights), 0),
         pretax: mine.filter((r) => r.tax_class === 'taxable').reduce((s, r) => s + num(r.total) - num(r.taxes) - num(r.vat), 0),
         nonTaxable: mine.filter((r) => r.tax_class === 'non_taxable').reduce((s, r) => s + num(r.total), 0),
-        subtotal: add((x) => x.subtotal),
         total: add((x) => x.total),
         taxes: add((x) => x.taxes),
-        taxesPaid: add((x) => x.taxesPaid),
         commission: add((x) => x.commission),
         fee: add((x) => x.fee),
         left: add((x) => x.left),
@@ -116,10 +112,10 @@ export default function SalesPage() {
 
   const totals = useMemo(() => {
     const on = perRoom.filter((p) => !off.has(p.room))
-    const sum = (k: 'bookings' | 'nights' | 'pretax' | 'nonTaxable' | 'subtotal' | 'total' | 'taxes' | 'taxesPaid' | 'commission' | 'fee' | 'left') => on.reduce((s, p) => s + p[k], 0)
+    const sum = (k: 'bookings' | 'nights' | 'pretax' | 'nonTaxable' | 'total' | 'taxes' | 'commission' | 'fee' | 'left') => on.reduce((s, p) => s + p[k], 0)
     return {
-      bookings: sum('bookings'), nights: sum('nights'), pretax: sum('pretax'), nonTaxable: sum('nonTaxable'), subtotal: sum('subtotal'),
-      total: sum('total'), taxes: sum('taxes'), taxesPaid: sum('taxesPaid'), commission: sum('commission'), fee: sum('fee'), left: sum('left'),
+      bookings: sum('bookings'), nights: sum('nights'), pretax: sum('pretax'), nonTaxable: sum('nonTaxable'),
+      total: sum('total'), taxes: sum('taxes'), commission: sum('commission'), fee: sum('fee'), left: sum('left'),
     }
   }, [perRoom, off])
 
@@ -217,7 +213,6 @@ export default function SalesPage() {
                   <th className={`${th} text-right`}>Nights</th>
                   <th className={`${th} text-right`}>Total</th>
                   <th className={`${th} text-right`}>Taxes</th>
-                  <th className={`${th} text-right`}>Taxes paid</th>
                   <th className={`${th} text-right`}>Commission</th>
                   <th className={`${th} text-right`}>Payment fee</th>
                   <th className={`${th} text-right`}>Left for us</th>
@@ -233,7 +228,6 @@ export default function SalesPage() {
                       <td className={`${td} text-right`}>{p.nights}</td>
                       <td className={`${td} text-right font-semibold`}>{money(p.total)}</td>
                       <td className={`${td} text-right`}>{money(p.taxes)}</td>
-                      <td className={`${td} text-right`}>{money(p.taxesPaid)}</td>
                       <td className={`${td} text-right`}>{money(p.commission)}</td>
                       <td className={`${td} text-right`}>{money(p.fee)}</td>
                       <td className={`${td} text-right font-semibold`}>{money(p.left)}</td>
@@ -246,7 +240,6 @@ export default function SalesPage() {
                   <td className={`${td} text-right font-semibold`}>{totals.nights}</td>
                   <td className={`${td} text-right font-semibold`}>{money(totals.total)}</td>
                   <td className={`${td} text-right font-semibold`}>{money(totals.taxes)}</td>
-                  <td className={`${td} text-right font-semibold`}>{money(totals.taxesPaid)}</td>
                   <td className={`${td} text-right font-semibold`}>{money(totals.commission)}</td>
                   <td className={`${td} text-right font-semibold`}>{money(totals.fee)}</td>
                   <td className={`${td} text-right font-semibold`}>{money(totals.left)}</td>
@@ -293,7 +286,7 @@ export default function SalesPage() {
           <div className="mt-3 flex flex-wrap gap-3 rounded-xl border border-line p-3">
             {([
               ['iva', 'Booking IVA'], ['state', 'State tax'], ['commission', 'Commission'], ['fee', 'Payment fee (of total)'],
-              ['ivaRet', 'IVA retention'], ['isrRet', 'ISR retention'], ['airIva', 'Airbnb IVA kept'], ['airState', 'Airbnb state tax kept'], ['airCommission', 'Airbnb commission (est.)'],
+              ['airIva', 'Airbnb IVA kept'], ['airState', 'Airbnb state tax kept'], ['airCommission', 'Airbnb commission (est.)'],
             ] as [keyof typeof rates, string][]).map(([k, label]) => (
               <label key={k} className="text-[11px] text-navy/60">
                 {label} %
@@ -308,8 +301,6 @@ export default function SalesPage() {
                 <tr>
                   <th className={`${th} text-right`}>Total</th>
                   <th className={`${th} text-right`}>Taxes</th>
-                  <th className={`${th} text-right`}>Taxes paid</th>
-                  <th className={`${th} text-right`}>Taxes owed</th>
                   <th className={`${th} text-right`}>Commission</th>
                   <th className={`${th} text-right`}>Payment fee</th>
                   <th className={`${th} text-right`}>Left for us</th>
@@ -325,8 +316,6 @@ export default function SalesPage() {
                   <tr key={b.r.reservation_id} className="border-b border-line/60">
                     <td className={`${td} text-right font-semibold`}>{money(b.total)}</td>
                     <td className={`${td} text-right`}>{money(b.taxes)}</td>
-                    <td className={`${td} text-right`}>{b.ota ? money(b.taxesPaid) : '—'}</td>
-                    <td className={`${td} text-right`}>{money(b.taxesOwed)}</td>
                     <td className={`${td} text-right`}>{b.ota ? `${money(b.commission)}${b.isAirbnb ? ' (est.)' : ''}` : '—'}</td>
                     <td className={`${td} text-right`}>{b.isBooking ? money(b.fee) : '—'}</td>
                     <td className={`${td} text-right font-semibold`}>{money(b.left)}</td>
@@ -344,8 +333,6 @@ export default function SalesPage() {
                   <tr className="bg-white/5">
                     <td className={`${td} text-right font-semibold`}>{money(channel.sum((b) => b.total))}</td>
                     <td className={`${td} text-right font-semibold`}>{money(channel.sum((b) => b.taxes))}</td>
-                    <td className={`${td} text-right font-semibold`}>{money(channel.sum((b) => b.taxesPaid))}</td>
-                    <td className={`${td} text-right font-semibold`}>{money(channel.sum((b) => b.taxesOwed))}</td>
                     <td className={`${td} text-right font-semibold`}>{money(channel.sum((b) => b.commission))}</td>
                     <td className={`${td} text-right font-semibold`}>{money(channel.sum((b) => b.fee))}</td>
                     <td className={`${td} text-right font-semibold`}>{money(channel.sum((b) => b.left))}</td>
@@ -358,7 +345,7 @@ export default function SalesPage() {
             </table>
           </div>
           <p className="mt-2 text-[11px] text-navy/50">
-            Taxes = IVA 16% + state tax 3% on the room rate. Taxes paid = IVA 8% + ISR 4% retained. Taxes owed = what is still ours to pay (IVA 8% + state tax 3%). Commission is on the room rate; payment fee is on the guest total. For Airbnb the total is already after its retentions and fees, so Taxes paid is shown for reference and is not taken off again. Airbnb's commission is an estimate (15% of the room rate) shown only so it can be measured; it is already inside the amount and is not deducted again. Payment fee does not apply to Airbnb. Direct, website and other bookings show only what is known: the taxes already on the booking count as owed, and the channel columns are left blank.
+            Left for us = Total minus Taxes, Commission and Payment fee. Taxes: Booking.com = IVA 16% + state tax 3% on the room rate; Airbnb = the IVA 8% + state tax 3% still inside its amount (its 8% IVA and 4% ISR are already retained); other bookings = the tax on the booking. Commission is on the room rate; payment fee is on the guest total (Booking.com only). Airbnb's commission is an estimate shown for measuring; it is already inside the amount and is not deducted again.
           </p>
         </>
       )}
