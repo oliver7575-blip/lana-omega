@@ -304,7 +304,7 @@ export default function SalesPage() {
                   <tr key={b.r.reservation_id} className="border-b border-line/60">
                     <td className={`${td} text-right font-semibold`}>{money(b.total)}</td>
                     <td className={`${td} text-right`}>{money(b.taxes)}</td>
-                    <td className={`${td} text-right`}>{b.ota ? `${money(b.commission)}${b.isAirbnb ? ' (est.)' : ''}` : '—'}</td>
+                    <td className={`${td} text-right`}>{b.ota ? money(b.commission) : '—'}</td>
                     <td className={`${td} text-right`}>{b.isBooking ? money(b.fee) : '—'}</td>
                     <td className={`${td} text-right font-semibold`}>{money(b.left)}</td>
                     <td className={td}>{b.source}</td>
