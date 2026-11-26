@@ -25,7 +25,7 @@ const money = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 
 const day = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
 const todayIso = () => new Date().toISOString().slice(0, 10)
 
-type Rates = { retention: number; commission: number; fee: number; airIva: number; airExtra: number; airCommission: number }
+type Rates = { retention: number; commission: number; fee: number; airCommission: number }
 
 /** One booking's money split. Booking.com and Airbnb follow the channel rules; other bookings owe the taxes charged on them. */
 function calcFor(r: Row, rates: Rates) {
@@ -36,8 +36,8 @@ function calcFor(r: Row, rates: Rates) {
   const room = num(r.stay_subtotal)
   const total = num(r.total)
   const charged = num(r.taxes) + num(r.vat)
-  // Booking.com: one 16% retention on the room rate. Airbnb: 8% IVA plus another 8% on the room rate (its amount is already after its own retentions). Others: the tax on the booking.
-  const taxes = isAirbnb ? room * pc(rates.airIva + rates.airExtra) : isBooking ? room * pc(rates.retention) : charged
+  // Booking.com: one 16% retention on the room rate. Airbnb and others: the tax shown on the booking itself.
+  const taxes = isBooking ? room * pc(rates.retention) : charged
   // Airbnb's commission is only an estimate for reporting: its amount is already after fees, so it is never taken off again.
   const commission = isBooking ? room * pc(rates.commission) : isAirbnb ? room * pc(rates.airCommission) : 0
   const fee = isBooking ? total * pc(rates.fee) : 0
@@ -56,7 +56,7 @@ export default function SalesPage() {
   const [showNon, setShowNon] = useState(true)
   const [openRoom, setOpenRoom] = useState<string | null>(null)
   // Channel rules, as percent of the room rate (payment fee: percent of the guest total). Editable.
-  const [rates] = useState<Rates>({ retention: 16, commission: 15, fee: 4, airIva: 8, airExtra: 8, airCommission: 15 })
+  const [rates] = useState<Rates>({ retention: 16, commission: 15, fee: 4, airCommission: 15 })
 
   useEffect(() => {
     fetch('/api/sales', { cache: 'no-store' })
