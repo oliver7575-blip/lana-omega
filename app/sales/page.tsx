@@ -25,6 +25,27 @@ const money = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 
 const day = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
 const todayIso = () => new Date().toISOString().slice(0, 10)
 
+type Rates = { iva: number; state: number; commission: number; fee: number; ivaRet: number; isrRet: number; airIva: number; airState: number }
+
+/** One booking's money split. Booking.com and Airbnb follow the channel rules; other bookings owe the taxes charged on them. */
+function calcFor(r: Row, rates: Rates) {
+  const pc = (n: number) => n / 100
+  const isAirbnb = /airbnb/i.test(r.source ?? '')
+  const isBooking = /booking/i.test(r.source ?? '')
+  const ota = isAirbnb || isBooking
+  const room = num(r.stay_subtotal)
+  const total = num(r.total)
+  const charged = num(r.taxes) + num(r.vat)
+  const taxes = ota ? room * pc(rates.iva + rates.state) : charged
+  const taxesPaid = ota ? room * pc(rates.ivaRet + rates.isrRet) : 0
+  const taxesOwed = isAirbnb ? room * pc(rates.airIva + rates.airState) : isBooking ? room * pc(rates.iva - rates.ivaRet + rates.state) : charged
+  const commission = isBooking ? room * pc(rates.commission) : 0
+  const fee = isBooking ? total * pc(rates.fee) : 0
+  const subtotal = total - taxesOwed
+  const left = isBooking ? total - taxesPaid - commission - fee - taxesOwed : subtotal
+  return { isAirbnb, isBooking, ota, total, taxes, taxesPaid, taxesOwed, commission, fee, subtotal, left }
+}
+
 export default function SalesPage() {
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
@@ -36,7 +57,7 @@ export default function SalesPage() {
   const [showNon, setShowNon] = useState(true)
   const [openRoom, setOpenRoom] = useState<string | null>(null)
   // Channel rules, as percent of the room rate (payment fee: percent of the guest total). Editable.
-  const [rates, setRates] = useState({ iva: 16, state: 3, commission: 15, fee: 4, ivaRet: 8, isrRet: 4, airIva: 8, airState: 3 })
+  const [rates, setRates] = useState<Rates>({ iva: 16, state: 3, commission: 15, fee: 4, ivaRet: 8, isrRet: 4, airIva: 8, airState: 3 })
   const setRate = (k: keyof typeof rates, v: string) => setRates((r) => ({ ...r, [k]: Number(v) || 0 }))
 
   useEffect(() => {
@@ -73,44 +94,40 @@ export default function SalesPage() {
   const perRoom = useMemo(() => {
     return rooms.map((room) => {
       const mine = inRange.filter((r) => (r.room_type ?? 'Unassigned') === room && (r.tax_class === 'taxable' ? showTaxable : showNon))
+      const c = mine.map((r) => calcFor(r, rates))
+      const add = (f: (x: ReturnType<typeof calcFor>) => number) => c.reduce((s, x) => s + f(x), 0)
       return {
         room,
         bookings: mine.length,
         nights: mine.reduce((s, r) => s + num(r.nights), 0),
         pretax: mine.filter((r) => r.tax_class === 'taxable').reduce((s, r) => s + num(r.total) - num(r.taxes) - num(r.vat), 0),
-        taxes: mine.reduce((s, r) => s + num(r.taxes) + num(r.vat), 0),
         nonTaxable: mine.filter((r) => r.tax_class === 'non_taxable').reduce((s, r) => s + num(r.total), 0),
-        total: mine.reduce((s, r) => s + num(r.total), 0),
+        subtotal: add((x) => x.subtotal),
+        total: add((x) => x.total),
+        taxes: add((x) => x.taxes),
+        taxesPaid: add((x) => x.taxesPaid),
+        commission: add((x) => x.commission),
+        fee: add((x) => x.fee),
+        left: add((x) => x.left),
       }
     })
-  }, [rooms, inRange, showTaxable, showNon])
+  }, [rooms, inRange, showTaxable, showNon, rates])
 
   const totals = useMemo(() => {
     const on = perRoom.filter((p) => !off.has(p.room))
-    const sum = (k: 'bookings' | 'nights' | 'pretax' | 'taxes' | 'nonTaxable' | 'total') => on.reduce((s, p) => s + p[k], 0)
-    return { bookings: sum('bookings'), nights: sum('nights'), pretax: sum('pretax'), taxes: sum('taxes'), nonTaxable: sum('nonTaxable'), total: sum('total') }
+    const sum = (k: 'bookings' | 'nights' | 'pretax' | 'nonTaxable' | 'subtotal' | 'total' | 'taxes' | 'taxesPaid' | 'commission' | 'fee' | 'left') => on.reduce((s, p) => s + p[k], 0)
+    return {
+      bookings: sum('bookings'), nights: sum('nights'), pretax: sum('pretax'), nonTaxable: sum('nonTaxable'), subtotal: sum('subtotal'),
+      total: sum('total'), taxes: sum('taxes'), taxesPaid: sum('taxesPaid'), commission: sum('commission'), fee: sum('fee'), left: sum('left'),
+    }
   }, [perRoom, off])
 
   const channel = useMemo(() => {
-    const pc = (n: number) => n / 100
     const rows = selected
       .filter((r) => /booking|airbnb/i.test(r.source ?? ''))
       .map((r) => {
-        const isAirbnb = /airbnb/i.test(r.source ?? '')
-        const room = num(r.stay_subtotal)
-        const total = num(r.total)
-        // Taxes collected from the guest (16% IVA + 3% state tax on the room rate).
-        const taxes = room * pc(rates.iva + rates.state)
-        // Taxes paid or retained by the channel (IVA retention + ISR retention).
-        const taxesPaid = room * pc(rates.ivaRet + rates.isrRet)
-        // Still ours to pay: what remains of the IVA plus the state tax.
-        const taxesOwed = isAirbnb ? room * pc(rates.airIva + rates.airState) : room * pc(rates.iva - rates.ivaRet + rates.state)
-        // Airbnb's own fees are inside its retention and not visible, so only Booking.com has these.
-        const commission = isAirbnb ? 0 : room * pc(rates.commission)
-        const fee = isAirbnb ? 0 : total * pc(rates.fee)
-        // Booking.com: the guest total still includes everything. Airbnb: the amount is already after retentions.
-        const left = isAirbnb ? total - taxesOwed : total - taxesPaid - commission - fee - taxesOwed
-        return { r, source: isAirbnb ? 'Airbnb' : 'Booking.com', total, taxes, taxesPaid, taxesOwed, commission, fee, left }
+        const c = calcFor(r, rates)
+        return { r, source: c.isAirbnb ? 'Airbnb' : 'Booking.com', ...c }
       })
     const sum = (f: (x: (typeof rows)[number]) => number) => rows.reduce((s, x) => s + f(x), 0)
     return { rows, sum }
@@ -192,16 +209,19 @@ export default function SalesPage() {
           </div>
 
           <div className="mt-5 overflow-x-auto rounded-xl border border-line">
-            <table className="w-full min-w-[720px] border-collapse">
+            <table className="w-full min-w-[960px] border-collapse">
               <thead className="border-b border-line">
                 <tr>
                   <th className={th}>Rental</th>
                   <th className={`${th} text-right`}>Bookings</th>
                   <th className={`${th} text-right`}>Nights</th>
-                  <th className={`${th} text-right`}>Before tax</th>
-                  <th className={`${th} text-right`}>Taxes</th>
-                  <th className={`${th} text-right`}>Non-taxable</th>
+                  <th className={`${th} text-right`}>Subtotal</th>
                   <th className={`${th} text-right`}>Total</th>
+                  <th className={`${th} text-right`}>Taxes</th>
+                  <th className={`${th} text-right`}>Taxes paid</th>
+                  <th className={`${th} text-right`}>Commission</th>
+                  <th className={`${th} text-right`}>Payment fee</th>
+                  <th className={`${th} text-right`}>Left for us</th>
                 </tr>
               </thead>
               <tbody>
@@ -212,10 +232,13 @@ export default function SalesPage() {
                       <td className={td}>{p.room}</td>
                       <td className={`${td} text-right`}>{p.bookings}</td>
                       <td className={`${td} text-right`}>{p.nights}</td>
-                      <td className={`${td} text-right`}>{money(p.pretax)}</td>
-                      <td className={`${td} text-right`}>{money(p.taxes)}</td>
-                      <td className={`${td} text-right`}>{money(p.nonTaxable)}</td>
+                      <td className={`${td} text-right`}>{money(p.subtotal)}</td>
                       <td className={`${td} text-right font-semibold`}>{money(p.total)}</td>
+                      <td className={`${td} text-right`}>{money(p.taxes)}</td>
+                      <td className={`${td} text-right`}>{money(p.taxesPaid)}</td>
+                      <td className={`${td} text-right`}>{money(p.commission)}</td>
+                      <td className={`${td} text-right`}>{money(p.fee)}</td>
+                      <td className={`${td} text-right font-semibold`}>{money(p.left)}</td>
                     </tr>
                   )
                 })}
@@ -223,10 +246,13 @@ export default function SalesPage() {
                   <td className={`${td} font-semibold`}>Total</td>
                   <td className={`${td} text-right font-semibold`}>{totals.bookings}</td>
                   <td className={`${td} text-right font-semibold`}>{totals.nights}</td>
-                  <td className={`${td} text-right font-semibold`}>{money(totals.pretax)}</td>
-                  <td className={`${td} text-right font-semibold`}>{money(totals.taxes)}</td>
-                  <td className={`${td} text-right font-semibold`}>{money(totals.nonTaxable)}</td>
+                  <td className={`${td} text-right font-semibold`}>{money(totals.subtotal)}</td>
                   <td className={`${td} text-right font-semibold`}>{money(totals.total)}</td>
+                  <td className={`${td} text-right font-semibold`}>{money(totals.taxes)}</td>
+                  <td className={`${td} text-right font-semibold`}>{money(totals.taxesPaid)}</td>
+                  <td className={`${td} text-right font-semibold`}>{money(totals.commission)}</td>
+                  <td className={`${td} text-right font-semibold`}>{money(totals.fee)}</td>
+                  <td className={`${td} text-right font-semibold`}>{money(totals.left)}</td>
                 </tr>
               </tbody>
             </table>
@@ -261,7 +287,7 @@ export default function SalesPage() {
               </table>
             </div>
           )}
-          <p className="mt-3 text-[11px] text-navy/50">Click a rental row to see its bookings.</p>
+          <p className="mt-3 text-[11px] text-navy/50">Click a rental row to see its bookings. Total includes the taxes still owed; Subtotal is Total minus those taxes. Rates are set in the box under the channel breakdown.</p>
 
           <h2 className="mt-10 text-lg font-semibold text-navy">What is left after channel costs and tax funds</h2>
           <p className="mt-1 text-[13px] text-navy/60">
