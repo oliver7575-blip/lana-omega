@@ -125,10 +125,9 @@ export default function SalesPage() {
 
   const channel = useMemo(() => {
     const rows = selected
-      .filter((r) => /booking|airbnb/i.test(r.source ?? ''))
       .map((r) => {
         const c = calcFor(r, rates)
-        return { r, source: c.isAirbnb ? 'Airbnb' : 'Booking.com', ...c }
+        return { r, source: c.isAirbnb ? 'Airbnb' : c.isBooking ? 'Booking.com' : (r.source ?? 'Unknown'), ...c }
       })
     const sum = (f: (x: (typeof rows)[number]) => number) => rows.reduce((s, x) => s + f(x), 0)
     return { rows, sum }
@@ -329,10 +328,10 @@ export default function SalesPage() {
                   <tr key={b.r.reservation_id} className="border-b border-line/60">
                     <td className={`${td} text-right font-semibold`}>{money(b.total)}</td>
                     <td className={`${td} text-right`}>{money(b.taxes)}</td>
-                    <td className={`${td} text-right`}>{money(b.taxesPaid)}</td>
+                    <td className={`${td} text-right`}>{b.ota ? money(b.taxesPaid) : '—'}</td>
                     <td className={`${td} text-right`}>{money(b.taxesOwed)}</td>
-                    <td className={`${td} text-right`}>{money(b.commission)}{b.source === 'Airbnb' ? ' (est.)' : ''}</td>
-                    <td className={`${td} text-right`}>{b.source === 'Airbnb' ? '—' : money(b.fee)}</td>
+                    <td className={`${td} text-right`}>{b.ota ? `${money(b.commission)}${b.isAirbnb ? ' (est.)' : ''}` : '—'}</td>
+                    <td className={`${td} text-right`}>{b.isBooking ? money(b.fee) : '—'}</td>
                     <td className={`${td} text-right font-semibold`}>{money(b.left)}</td>
                     <td className={td}>{b.source}</td>
                     <td className={`${td} text-right`}>{b.r.nights}</td>
@@ -342,7 +341,7 @@ export default function SalesPage() {
                   </tr>
                 ))}
                 {channel.rows.length === 0 && (
-                  <tr><td className={td} colSpan={12}>No Booking.com or Airbnb bookings in this selection.</td></tr>
+                  <tr><td className={td} colSpan={12}>No bookings in this selection.</td></tr>
                 )}
                 {channel.rows.length > 0 && (
                   <tr className="bg-white/5">
@@ -362,7 +361,7 @@ export default function SalesPage() {
             </table>
           </div>
           <p className="mt-2 text-[11px] text-navy/50">
-            Taxes = IVA 16% + state tax 3% on the room rate. Taxes paid = IVA 8% + ISR 4% retained. Taxes owed = what is still ours to pay (IVA 8% + state tax 3%). Commission is on the room rate; payment fee is on the guest total. For Airbnb the total is already after its retentions and fees, so Taxes paid is shown for reference and is not taken off again. Airbnb's commission is an estimate (15% of the room rate) shown only so it can be measured; it is already inside the amount and is not deducted again. Payment fee does not apply to Airbnb.
+            Taxes = IVA 16% + state tax 3% on the room rate. Taxes paid = IVA 8% + ISR 4% retained. Taxes owed = what is still ours to pay (IVA 8% + state tax 3%). Commission is on the room rate; payment fee is on the guest total. For Airbnb the total is already after its retentions and fees, so Taxes paid is shown for reference and is not taken off again. Airbnb's commission is an estimate (15% of the room rate) shown only so it can be measured; it is already inside the amount and is not deducted again. Payment fee does not apply to Airbnb. Direct, website and other bookings show only what is known: the taxes already on the booking count as owed, and the channel columns are left blank.
           </p>
         </>
       )}
