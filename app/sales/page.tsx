@@ -332,9 +332,6 @@ export default function SalesPage() {
               </tbody>
             </table>
           </div>
-          <p className="mt-2 text-[11px] text-navy/50">
-            Left for us = Total minus Taxes, Commission and Payment fee. Taxes: Booking.com = 16% retention on the room rate; Airbnb = 8% IVA + another 8% on the room rate (its amount is already after its own retentions); other bookings = the tax on the booking. Booking.com commission is 15% of the room rate and the payment fee is 4% of the guest total. Airbnb's commission is an estimate shown for measuring; it is already inside the amount and is not deducted again.
-          </p>
         </>
       )}
     </div>
