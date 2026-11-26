@@ -72,7 +72,16 @@ export default function SalesPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  const rooms = useMemo(() => Array.from(new Set(rows.map((r) => r.room_type ?? 'Unassigned'))).sort(), [rows])
+  // Fixed display order for the rentals; anything not listed goes after them, alphabetically.
+  const rooms = useMemo(() => {
+    const order = ['lalito', 'los periquitos', 'el tabachín', 'el pez volador', 'el sirenito', 'muxe muchacha', 'la chachalaca']
+    const key = (n: string) => n.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    const rank = (n: string) => {
+      const i = order.findIndex((o) => key(o) === key(n))
+      return i === -1 ? order.length : i
+    }
+    return Array.from(new Set(rows.map((r) => r.room_type ?? 'Unassigned'))).sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))
+  }, [rows])
   const earliest = rows[0]?.arrival ?? ''
   const latest = rows.length ? rows[rows.length - 1].arrival : ''
 
