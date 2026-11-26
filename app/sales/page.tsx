@@ -56,8 +56,7 @@ export default function SalesPage() {
   const [showNon, setShowNon] = useState(true)
   const [openRoom, setOpenRoom] = useState<string | null>(null)
   // Channel rules, as percent of the room rate (payment fee: percent of the guest total). Editable.
-  const [rates, setRates] = useState<Rates>({ retention: 16, commission: 15, fee: 4, airIva: 8, airExtra: 8, airCommission: 15 })
-  const setRate = (k: keyof typeof rates, v: string) => setRates((r) => ({ ...r, [k]: Number(v) || 0 }))
+  const [rates] = useState<Rates>({ retention: 16, commission: 15, fee: 4, airIva: 8, airExtra: 8, airCommission: 15 })
 
   useEffect(() => {
     fetch('/api/sales', { cache: 'no-store' })
@@ -277,23 +276,12 @@ export default function SalesPage() {
               </table>
             </div>
           )}
-          <p className="mt-3 text-[11px] text-navy/50">Click a rental row to see its bookings. Total includes the taxes still owed. Rates are set in the box under the channel breakdown.</p>
+          <p className="mt-3 text-[11px] text-navy/50">Click a rental row to see its bookings. Total includes the taxes still owed.</p>
 
           <h2 className="mt-10 text-lg font-semibold text-navy">What is left after channel costs and tax funds</h2>
           <p className="mt-1 text-[13px] text-navy/60">
-            Uses the same dates, rentals and filters as above. Rates are percent of the room rate, except the payment fee, which is percent of the guest total. You can change them here.
+            Uses the same dates, rentals and filters as above. Rates are percent of the room rate, except the payment fee, which is percent of the guest total.
           </p>
-          <div className="mt-3 flex flex-wrap gap-3 rounded-xl border border-line p-3">
-            {([
-              ['retention', 'Booking retention'], ['commission', 'Booking commission'], ['fee', 'Payment fee (of total)'],
-              ['airIva', 'Airbnb IVA'], ['airExtra', 'Airbnb extra tax'], ['airCommission', 'Airbnb commission (est.)'],
-            ] as [keyof typeof rates, string][]).map(([k, label]) => (
-              <label key={k} className="text-[11px] text-navy/60">
-                {label} %
-                <input type="number" step="0.1" min="0" className={`${input} mt-1 block w-24`} value={rates[k]} onChange={(e) => setRate(k, e.target.value)} />
-              </label>
-            ))}
-          </div>
 
           <div className="mt-4 overflow-x-auto rounded-xl border border-line">
             <table className="w-full min-w-[1100px] border-collapse">
