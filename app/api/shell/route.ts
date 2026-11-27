@@ -20,7 +20,7 @@ export async function GET() {
 
   const [{ data: pmsRows }, { data: tenant }, { count: newEscalations }, unreadReservations, unread, { count: paymentsAttention }, { data: tenants }] = await Promise.all([
     supabase.from('tenant_integrations').select('integration_type').in('integration_type', ['pms_cloudbeds', 'pms_lodgify']).eq('status', 'connected'),
-    supabase.from('tenants').select('name, slug').eq('id', staff.tenant_id).single(),
+    supabase.from('tenants').select('name, slug, channel_settings').eq('id', staff.tenant_id).single(),
     supabase.from('escalations').select('id', { count: 'exact', head: true }).eq('status', 'new'),
     unreadConversationIds(supabase, staff.id as string, { reservationsOnly: true }).then((ids) => ids.length),
     unreadCounts(supabase, staff.id as string),
@@ -32,6 +32,7 @@ export async function GET() {
   return NextResponse.json({
     email: user.email ?? '',
     tenantName: tenant?.name ?? '',
+    pos: (tenant?.channel_settings as { pos?: boolean } | null)?.pos === true,
     brand: tenant?.slug === 'lalo' ? 'lalo' : '',
     pms: (pmsRows ?? []).some((r) => r.integration_type === 'pms_cloudbeds') ? 'cloudbeds' : (pmsRows ?? []).some((r) => r.integration_type === 'pms_lodgify') ? 'lodgify' : null,
     tenantId: staff.tenant_id,

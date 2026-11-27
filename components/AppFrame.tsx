@@ -35,6 +35,7 @@ interface ShellInfo {
   tenants?: { id: string; name: string }[]
   pms?: 'cloudbeds' | 'lodgify' | null
   brand?: string
+  pos?: boolean
   unreadReservations: number
   unreadEmails: number
   unreadReviews: number
@@ -245,6 +246,7 @@ export default function AppFrame({ children }: { children: React.ReactNode }) {
           ? item('/sales', 'Sales', DollarIcon, pathname.startsWith('/sales'))
           : item('/reviews', 'Reviews', StarIcon, pathname.startsWith('/reviews'), info?.unreadReviews)}
         {item('/maintenance', 'Maintenance', HammerIcon, pathname.startsWith('/maintenance'))}
+        {info?.pos && item('/pos', 'Bar POS', DollarIcon, pathname.startsWith('/pos'))}
       </div>
 
       <div className="my-4 border-t border-line" />
