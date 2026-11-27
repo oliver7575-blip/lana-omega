@@ -1,3 +1,4 @@
+import { hotelToday } from './tz'
 import { normalizePhone } from './phone'
 
 interface CloudbedsRoom {
@@ -82,7 +83,7 @@ async function fetchReservationPages(
 }
 
 function daysFromToday(offset: number): string {
-  return new Date(Date.now() + offset * 86400000).toISOString().slice(0, 10)
+  return hotelToday(offset)
 }
 
 function toLookupResult(match: Record<string, unknown>): ReservationLookupResult {
@@ -462,7 +463,7 @@ export async function findReservationByPhone(
   phone: string
 ): Promise<ReservationLookupResult & { matches?: number }> {
   try {
-    const today = new Date().toISOString().slice(0, 10)
+    const today = hotelToday()
     const result = await fetchReservationPages(apiKey, propertyId, `&checkOutFrom=${today}`)
     if (!result.ok) return { found: false, error: result.error }
 

@@ -60,3 +60,8 @@ export function hhmmToMinutes(v: string | null | undefined): number | null {
   const m = /^(\d{1,2}):(\d{2})/.exec(v ?? '')
   return m ? Number(m[1]) * 60 + Number(m[2]) : null
 }
+
+/** Today's date ("YYYY-MM-DD") at the hotel (Zipolite), not in UTC: after 6 PM local the UTC date is already tomorrow. */
+export function hotelToday(offsetDays = 0, tz = 'America/Mexico_City'): string {
+  return localDate(new Date(Date.now() + offsetDays * 86400000), tz)
+}

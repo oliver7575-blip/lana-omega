@@ -1,3 +1,4 @@
+import { hotelToday } from './tz'
 /**
  * Cloudbeds reads and actions for the panel's Dashview and Calendar
  * (the same features as Beta's Cloudbeds pages).
@@ -729,7 +730,7 @@ export async function findReservationByConfirmation(
 ): Promise<{ reservationID: string } | null> {
   const num = confirmation.trim()
   if (!num) return null
-  const today = new Date().toISOString().slice(0, 10)
+  const today = hotelToday()
   const windows: Record<string, string>[] = []
   if (checkInHint && /^\d{4}-\d{2}-\d{2}$/.test(checkInHint)) windows.push({ checkInFrom: checkInHint, checkInTo: checkInHint })
   windows.push({ checkInFrom: addDays(today, -2), checkInTo: addDays(today, 540) })

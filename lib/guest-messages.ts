@@ -1,3 +1,4 @@
+import { hotelToday } from './tz'
 import { normalizePhone } from './phone'
 import { createServiceClient } from './supabase/service'
 import type { EncryptedPayload } from './crypto'
@@ -160,7 +161,7 @@ export function daysUntil(date: string | undefined): number | null {
   if (!date) return null
   const target = Date.parse(`${date.slice(0, 10)}T00:00:00Z`)
   if (Number.isNaN(target)) return null
-  const today = Date.parse(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`)
+  const today = Date.parse(`${hotelToday()}T00:00:00Z`)
   return Math.round((target - today) / 86400000)
 }
 

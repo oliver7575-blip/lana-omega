@@ -1,9 +1,11 @@
+import { hotelToday } from './tz'
+
 export function buildBookingLinkInstruction(
   bookingConfig: Record<string, unknown> | null | undefined
 ): string {
   const code = bookingConfig?.booking_engine_code as string | undefined
   const bookingUrl = (bookingConfig?.booking_url as string | undefined)?.trim()
-  const today = new Date().toISOString().slice(0, 10)
+  const today = hotelToday()
 
   // Cloudbeds booking engine: a deep link with the guest's dates filled in.
   if (code) {
