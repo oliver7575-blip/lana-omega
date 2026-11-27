@@ -1,39 +1,58 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 interface Item { id: string; name: string; category: string; price: number | string; active: boolean }
 interface Guest { reservationID: string; guestName: string; room: string }
+interface TabItem { itemId: string; name: string; category: string; price: number; quantity: number }
+interface Tab { id: string; kind: 'table' | 'room'; slot: number; items: TabItem[]; opened_at: string }
+type Sel = { kind: 'table' | 'room'; slot: number }
 
-const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-const newRequestId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}${Math.random().toString(36).slice(2, 10)}`)
+const SLOTS = [1, 2, 3, 4, 5, 6, 7, 8]
+const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+const tabTotal = (t?: Tab) => (t?.items ?? []).reduce((s, i) => s + i.price * i.quantity, 0)
+const tabCount = (t?: Tab) => (t?.items ?? []).reduce((s, i) => s + i.quantity, 0)
+const newId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}${Math.random().toString(36).slice(2, 10)}`)
 
-/** Bar order screen, built for an iPad: pick items, pick the room, charge it. */
+// Olive palette
+const C = {
+  card: 'rgba(255,255,255,0.045)', line: 'rgba(210,220,160,0.16)', olive: '#8c9a3f', oliveHi: '#b3c25f', cream: '#efeede', mute: '#9aa085', ink: '#12150d',
+}
+
+/** Bar board: 8 rooms + 8 tables. Open a tab, add items, slide a table tab onto a room, charge the room. */
 export default function PosPage() {
   const [items, setItems] = useState<Item[]>([])
   const [guests, setGuests] = useState<Guest[] | null>(null)
   const [guestError, setGuestError] = useState<string | null>(null)
+  const [tabs, setTabs] = useState<Tab[]>([])
   const [testMode, setTestMode] = useState(true)
+  const [sel, setSel] = useState<Sel | null>(null)
   const [category, setCategory] = useState<string | null>(null)
-  const [cart, setCart] = useState<Record<string, number>>({})
-  const [guest, setGuest] = useState<Guest | null>(null)
-  const [picking, setPicking] = useState(false)
+  const [manual, setManual] = useState<Record<number, Guest>>({})
+  const [sheet, setSheet] = useState(false)
+  const [picker, setPicker] = useState<null | { for: 'guest' } | { for: 'slide'; tabId: string }>(null)
   const [search, setSearch] = useState('')
-  const [confirming, setConfirming] = useState(false)
-  const [cartOpen, setCartOpen] = useState(false)
-  const [requestId, setRequestId] = useState(newRequestId)
+  const [confirmCharge, setConfirmCharge] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [done, setDone] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
+  const [drag, setDrag] = useState<{ tabId: string; slot: number; x: number; y: number; over: number | null } | null>(null)
+  const dragRef = useRef<{ tabId: string; slot: number; sx: number; sy: number; moved: boolean } | null>(null)
 
+  const flash = (m: string) => { setToast(m); setTimeout(() => setToast(null), 3500) }
+
+  const loadTabs = useCallback(async () => {
+    const res = await fetch('/api/pos/tabs', { cache: 'no-store' })
+    if (res.ok) setTabs((await res.json()).tabs)
+  }, [])
   const loadGuests = useCallback(async () => {
     setGuestError(null)
     try {
       const res = await fetch('/api/pos/guests')
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Could not load guests')
-      setGuests(json.guests)
+      const j = await res.json()
+      if (!res.ok) throw new Error(j.error ?? 'Could not load guests')
+      setGuests(j.guests)
     } catch (e) {
       setGuests([])
       setGuestError(e instanceof Error ? e.message : 'Could not load guests')
@@ -43,196 +62,335 @@ export default function PosPage() {
   useEffect(() => {
     fetch('/api/pos/menu').then((r) => r.json()).then((j) => setItems((j.items ?? []).filter((i: Item) => i.active)))
     fetch('/api/pos/settings').then((r) => r.json()).then((j) => setTestMode(j.testMode !== false))
-    loadGuests()
-  }, [loadGuests])
+    loadTabs(); loadGuests()
+    const t = setInterval(loadTabs, 8000) // other devices' changes show up
+    return () => clearInterval(t)
+  }, [loadTabs, loadGuests])
+
+  const tabOf = (kind: 'table' | 'room', slot: number) => tabs.find((t) => t.kind === kind && t.slot === slot)
+  const guestOfRoom = (slot: number): Guest | null =>
+    manual[slot] ?? (guests ?? []).find((g) => new RegExp(`(^|\\D)${slot}(\\D|$)`).test(g.room)) ?? null
 
   const categories = useMemo(() => [...new Set(items.map((i) => i.category))], [items])
   const activeCat = category && categories.includes(category) ? category : categories[0] ?? null
   const shown = items.filter((i) => i.category === activeCat)
-  const lines = items.filter((i) => cart[i.id] > 0).map((i) => ({ item: i, qty: cart[i.id] }))
-  const total = lines.reduce((s, l) => s + Number(l.item.price) * l.qty, 0)
-  const count = lines.reduce((s, l) => s + l.qty, 0)
+  const cur = sel ? tabOf(sel.kind, sel.slot) : undefined
+  const curQty = (id: string) => cur?.items.find((i) => i.itemId === id)?.quantity ?? 0
 
-  const add = (id: string, d: number) => setCart((c) => {
-    const n = Math.max(0, (c[id] ?? 0) + d)
-    const next = { ...c, [id]: n }
-    if (!n) delete next[id]
-    return next
-  })
+  async function adjust(item: { id: string; name: string; category: string; price: number | string }, delta: 1 | -1) {
+    if (!sel) return
+    const { kind, slot } = sel
+    // Instant on screen, then saved.
+    setTabs((prev) => {
+      const t = prev.find((x) => x.kind === kind && x.slot === slot)
+      const list = (t?.items ?? []).map((i) => ({ ...i }))
+      const hit = list.find((i) => i.itemId === item.id)
+      if (hit) hit.quantity += delta
+      else if (delta > 0) list.push({ itemId: item.id, name: item.name, category: item.category, price: Number(item.price), quantity: 1 })
+      const next = list.filter((i) => i.quantity > 0)
+      const others = prev.filter((x) => x !== t)
+      return next.length ? [...others, { id: t?.id ?? 'pending', kind, slot, items: next, opened_at: t?.opened_at ?? new Date().toISOString() }] : others
+    })
+    await fetch('/api/pos/tabs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, slot, itemId: item.id, delta }) })
+    loadTabs()
+  }
 
-  const filtered = (guests ?? []).filter((g) => `${g.room} ${g.guestName}`.toLowerCase().includes(search.trim().toLowerCase()))
-
-  async function charge() {
-    if (!guest || !lines.length) return
-    setBusy(true)
-    setError(null)
+  async function act(tabId: string, body: Record<string, unknown>): Promise<boolean> {
+    setBusy(true); setError(null)
     try {
-      const res = await fetch('/api/pos/charge', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requestId,
-          reservationId: guest.reservationID,
-          guestName: guest.guestName,
-          room: guest.room,
-          lines: lines.map((l) => ({ itemId: l.item.id, quantity: l.qty })),
-        }),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Could not charge')
-      setDone(`${money(json.total)} ${json.status === 'test' ? 'saved as a TEST charge' : 'charged'} to ${guest.room} · ${guest.guestName}`)
-      setCart({})
-      setGuest(null)
-      setConfirming(false)
-      setCartOpen(false)
-      setRequestId(newRequestId())
-      setTimeout(() => setDone(null), 6000)
+      const res = await fetch(`/api/pos/tabs/${tabId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error ?? 'Something went wrong')
+      await loadTabs()
+      return true
     } catch (e) {
-      // The same requestId is kept, so pressing Charge again can never double-charge.
-      setError(e instanceof Error ? e.message : 'Could not charge')
+      setError(e instanceof Error ? e.message : 'Something went wrong')
+      return false
     } finally {
       setBusy(false)
     }
   }
 
-  const cartPanel = (
-    <>
-            <button onClick={() => { setPicking(true); setSearch('') }}
-              className="w-full rounded-xl border border-white/25 px-4 py-3 text-left text-base">
-              {guest ? <><b>{guest.room}</b> · {guest.guestName}</> : <span className="text-white/70">Choose room / guest…</span>}
-            </button>
-  
-            <ul className="mt-3 space-y-2">
-              {lines.length === 0 && <li className="text-sm text-white/60">Tap items to add them.</li>}
-              {lines.map(({ item, qty }) => (
-                <li key={item.id} className="flex items-center justify-between gap-2">
-                  <span className="min-w-0 flex-1 truncate text-base">{item.name}</span>
-                  <span className="flex items-center gap-2">
-                    <button onClick={() => add(item.id, -1)} className="h-10 w-10 rounded-full bg-white/10 text-xl" aria-label="Remove one">−</button>
-                    <span className="w-5 text-center text-base">{qty}</span>
-                    <button onClick={() => add(item.id, 1)} className="h-10 w-10 rounded-full bg-white/10 text-xl" aria-label="Add one">+</button>
-                  </span>
-                </li>
-              ))}
-            </ul>
-  
-            <div className="mt-4 flex items-center justify-between border-t border-white/15 pt-3 text-lg font-semibold">
-              <span>Total ({count})</span><span>{money(total)}</span>
-            </div>
-            <button disabled={!guest || !lines.length} onClick={() => { setError(null); setConfirming(true) }}
-              className="mt-3 w-full rounded-xl bg-emerald-400 py-4 text-lg font-bold text-black disabled:opacity-30">
-              Charge to room
-            </button>
-            {lines.length > 0 && <button onClick={() => setCart({})} className="mt-2 w-full py-2 text-sm text-white/60">Clear order</button>}
-    </>
+  async function slide(tabId: string, fromSlot: number, toSlot: number) {
+    if (await act(tabId, { action: 'move', toSlot })) {
+      flash(`Table ${fromSlot} → Room ${toSlot}`)
+      setPicker(null); setSel(null); setSheet(false)
+    }
+  }
+
+  async function chargeRoom() {
+    if (!sel || !cur) return
+    const g = guestOfRoom(sel.slot)
+    if (!g) { setError('Choose which guest this room belongs to.'); return }
+    if (await act(cur.id, { action: 'charge', reservationId: g.reservationID, guestName: g.guestName, room: `Room ${sel.slot}` })) {
+      flash(`${money(tabTotal(cur))} ${testMode ? 'saved as a TEST charge' : 'charged'} · Room ${sel.slot} · ${g.guestName}`)
+      setConfirmCharge(false); setSel(null); setSheet(false)
+    }
+  }
+
+  // --- drag a table tab onto a room (touch + mouse) ---
+  function onDown(e: React.PointerEvent, t: Tab) {
+    dragRef.current = { tabId: t.id, slot: t.slot, sx: e.clientX, sy: e.clientY, moved: false }
+    ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
+  }
+  function onMove(e: React.PointerEvent) {
+    const d = dragRef.current
+    if (!d) return
+    if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 10) return
+    d.moved = true
+    const el = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-room-slot]') as HTMLElement | null
+    setDrag({ tabId: d.tabId, slot: d.slot, x: e.clientX, y: e.clientY, over: el ? Number(el.dataset.roomSlot) : null })
+  }
+  function onUp(e: React.PointerEvent) {
+    const d = dragRef.current
+    dragRef.current = null
+    if (!d) return
+    if (!d.moved) { setSel({ kind: 'table', slot: d.slot }); setError(null); return }
+    const el = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-room-slot]') as HTMLElement | null
+    setDrag(null)
+    if (el) slide(d.tabId, d.slot, Number(el.dataset.roomSlot))
+  }
+
+  const filtered = (guests ?? []).filter((g) => `${g.room} ${g.guestName}`.toLowerCase().includes(search.trim().toLowerCase()))
+  const title = sel ? (sel.kind === 'table' ? `Table ${sel.slot}` : `Room ${sel.slot}`) : ''
+  const selGuest = sel?.kind === 'room' ? guestOfRoom(sel.slot) : null
+  const total = tabTotal(cur)
+  const count = tabCount(cur)
+
+  const tabPanel = sel && (
+    <div className="flex flex-col gap-3">
+      {sel.kind === 'room' && (
+        <button onClick={() => { setPicker({ for: 'guest' }); setSearch('') }} className="rounded-xl px-4 py-3 text-left text-base" style={{ border: `1px solid ${C.line}`, background: C.card }}>
+          {selGuest ? <><span style={{ color: C.mute }}>Guest </span><b>{selGuest.guestName}</b></> : <span style={{ color: C.mute }}>Choose the guest in this room…</span>}
+        </button>
+      )}
+      <ul className="space-y-2">
+        {(cur?.items ?? []).length === 0 && <li className="text-sm" style={{ color: C.mute }}>Tap items to add them to the tab.</li>}
+        {(cur?.items ?? []).map((i) => (
+          <li key={i.itemId} className="flex items-center justify-between gap-2">
+            <span className="min-w-0 flex-1 truncate text-base">{i.name}<span className="ml-2 text-sm" style={{ color: C.mute }}>{money(i.price * i.quantity)}</span></span>
+            <span className="flex items-center gap-2">
+              <RoundBtn onClick={() => adjust({ id: i.itemId, name: i.name, category: i.category, price: i.price }, -1)} label="−" />
+              <span className="w-6 text-center text-base">{i.quantity}</span>
+              <RoundBtn onClick={() => adjust({ id: i.itemId, name: i.name, category: i.category, price: i.price }, 1)} label="+" />
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className="flex items-center justify-between pt-3 text-xl font-semibold" style={{ borderTop: `1px solid ${C.line}` }}>
+        <span>Total</span><span>{money(total)}</span>
+      </div>
+      {error && <p className="text-sm text-red-300">{error}</p>}
+      {sel.kind === 'table' ? (
+        <div className="grid grid-cols-2 gap-2">
+          <Btn solid disabled={!cur || busy} onClick={() => cur && setPicker({ for: 'slide', tabId: cur.id })}>Slide to room →</Btn>
+          <Btn disabled={!cur || busy} onClick={async () => { if (cur && await act(cur.id, { action: 'paid' })) { flash(`Table ${sel.slot} paid · ${money(total)}`); setSel(null); setSheet(false) } }}>Paid</Btn>
+        </div>
+      ) : (
+        <Btn solid disabled={!cur || busy || !selGuest} onClick={() => { setError(null); setConfirmCharge(true) }}>Charge to room</Btn>
+      )}
+      {cur && (
+        <button className="py-1 text-sm" style={{ color: C.mute }} onClick={async () => { if (confirm('Clear this tab? The items are discarded.') && await act(cur.id, { action: 'void' })) { setSel(null); setSheet(false) } }}>
+          Clear tab
+        </button>
+      )}
+    </div>
   )
 
   return (
-    <main className="pb-28 lg:pb-0" style={{ touchAction: 'manipulation' }}>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1>Bar</h1>
-        <Link href="/pos/manage" className="text-sm text-white/70 underline">Menu · Charges · Mode</Link>
-      </div>
-      {testMode && (
-        <p className="mt-2 rounded-lg border border-amber-300/40 bg-amber-300/10 px-3 py-2 text-sm text-amber-200">
-          TEST MODE — charges are saved here but not sent to Cloudbeds.
-        </p>
-      )}
-      {done && <p className="mt-2 rounded-lg border border-emerald-300/40 bg-emerald-300/10 px-3 py-2 text-base text-emerald-200">✓ {done}</p>}
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_340px]">
-        <section>
-          {items.length === 0 ? (
-            <p className="text-white/70">No menu yet. Add items in <Link href="/pos/manage" className="underline">Menu</Link>.</p>
-          ) : (
-            <>
-              <div className="flex gap-2 overflow-x-auto pb-2">
-                {categories.map((c) => (
-                  <button key={c} onClick={() => setCategory(c)}
-                    className={`shrink-0 rounded-full px-5 py-3 text-base font-semibold ${c === activeCat ? 'bg-white text-black' : 'bg-white/10 text-white'}`}>
-                    {c}
-                  </button>
-                ))}
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
-                {shown.map((i) => (
-                  <button key={i.id} onClick={() => add(i.id, 1)}
-                    className="relative flex min-h-[96px] flex-col justify-between rounded-2xl border border-white/15 bg-white/[0.06] p-3 text-left active:bg-white/20">
-                    <span className="text-base font-semibold leading-tight">{i.name}</span>
-                    <span className="text-sm text-white/70">{money(Number(i.price))}</span>
-                    {cart[i.id] > 0 && <span className="absolute right-2 top-2 rounded-full bg-emerald-400 px-2 py-0.5 text-sm font-bold text-black">{cart[i.id]}</span>}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </section>
-
-        <aside className="hidden h-fit rounded-2xl border border-white/15 bg-black/20 p-4 lg:sticky lg:top-4 lg:block">
-          {cartPanel}
-        </aside>
-      </div>
-      {/* Phone / iPad portrait: a bottom bar opens the order as a sheet. */}
-      {count > 0 && !cartOpen && (
-        <div className="fixed inset-x-0 bottom-0 z-40 p-3 lg:hidden" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
-          <button onClick={() => setCartOpen(true)} className="flex w-full items-center justify-between rounded-2xl bg-emerald-400 px-5 py-4 text-lg font-bold text-black shadow-xl">
-            <span>View order · {count}</span><span>{money(total)}</span>
-          </button>
+    <main style={{ touchAction: 'manipulation' }}>
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.35em]" style={{ color: C.oliveHi }}>Escalón</p>
+          <h1 className="font-display text-4xl italic" style={{ color: C.cream }}>Bar</h1>
         </div>
-      )}
-      {cartOpen && (
-        <div className="fixed inset-0 z-50 flex items-end bg-black/70 lg:hidden" onClick={() => setCartOpen(false)}>
-          <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-3xl border border-white/20 bg-[#0d1b3d] p-4"
-            style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }} onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 flex items-center justify-between">
-              <b className="text-lg">Order</b>
-              <button onClick={() => setCartOpen(false)} className="rounded-full bg-white/10 px-4 py-2 text-sm">Close</button>
+        <div className="flex items-center gap-3 text-sm">
+          {testMode && <span className="rounded-full px-3 py-1 text-xs font-semibold" style={{ background: 'rgba(230,190,70,.16)', color: '#e8c872' }}>TEST MODE · not sent to Cloudbeds</span>}
+          <Link href="/pos/manage" className="no-underline" style={{ color: C.mute }}>Menu · Charges · Mode</Link>
+        </div>
+      </header>
+      {toast && <p className="mt-3 rounded-xl px-4 py-3 text-base" style={{ background: 'rgba(140,154,63,.2)', border: `1px solid ${C.olive}` }}>✓ {toast}</p>}
+      {guestError && <p className="mt-3 text-sm text-red-300">Could not load checked-in guests: {guestError} <button className="underline" onClick={loadGuests}>Retry</button></p>}
+
+      <Section title="Rooms" hint="Tap a room to add to its tab · drop a table here to move it over">
+        {SLOTS.map((n) => {
+          const t = tabOf('room', n); const g = guestOfRoom(n)
+          return (
+            <Tile key={n} data-room-slot={n} active={drag?.over === n} onClick={() => { setSel({ kind: 'room', slot: n }); setError(null) }}
+              label={`Room ${n}`} sub={g ? g.guestName : 'No guest checked in'} dim={!g && !t} total={t ? tabTotal(t) : null} count={tabCount(t)} />
+          )
+        })}
+      </Section>
+
+      <Section title="Tables" hint="Start a tab at a table, then slide it onto a room">
+        {SLOTS.map((n) => {
+          const t = tabOf('table', n)
+          return (
+            <div key={n} className="select-none" style={{ touchAction: t ? 'none' : 'auto', opacity: drag?.tabId === t?.id ? 0.35 : 1 }}
+              onPointerDown={t ? (e) => onDown(e, t) : undefined} onPointerMove={t ? onMove : undefined} onPointerUp={t ? onUp : undefined} onPointerCancel={() => { dragRef.current = null; setDrag(null) }}>
+              <Tile label={`Table ${n}`} sub={t ? 'Open tab · drag to a room' : 'Free'} dim={!t} total={t ? tabTotal(t) : null} count={tabCount(t)} table onClick={t ? undefined : () => { setSel({ kind: 'table', slot: n }); setError(null) }} />
             </div>
-            {cartPanel}
-          </div>
+          )
+        })}
+      </Section>
+
+      {drag && (
+        <div className="pointer-events-none fixed z-[90] rounded-2xl px-4 py-3 text-base font-semibold shadow-2xl" style={{ left: drag.x - 60, top: drag.y - 30, background: C.olive, color: C.ink }}>
+          Table {drag.slot}{drag.over ? ` → Room ${drag.over}` : ''}
         </div>
       )}
 
-      {picking && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-3 sm:items-center" onClick={() => setPicking(false)}>
-          <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/20 bg-[#0d1b3d] p-4" onClick={(e) => e.stopPropagation()}>
-            <input autoFocus value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search room or name"
-              className="w-full rounded-xl border border-white/25 bg-transparent px-4 py-3 text-base" />
-            {guests === null && <p className="mt-3 text-white/70">Loading guests…</p>}
-            {guestError && <p className="mt-3 text-red-300">{guestError} <button onClick={loadGuests} className="underline">Retry</button></p>}
-            {guests && !guestError && filtered.length === 0 && <p className="mt-3 text-white/70">No checked-in guests found.</p>}
-            <ul className="mt-2 divide-y divide-white/10">
-              {filtered.map((g) => (
-                <li key={g.reservationID}>
-                  <button onClick={() => { setGuest(g); setPicking(false) }} className="flex w-full items-center justify-between py-4 text-left text-base">
-                    <span>{g.guestName}</span><b>{g.room}</b>
-                  </button>
-                </li>
-              ))}
-            </ul>
+      {/* Tab screen */}
+      {sel && (
+        <div className="fixed inset-0 z-[80] overflow-y-auto" style={{ background: '#12150d' }}>
+          <div className="mx-auto max-w-[1400px] px-4 pb-28 pt-4 md:px-6 lg:pb-8" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
+            <div className="flex items-center justify-between">
+              <button onClick={() => { setSel(null); setSheet(false) }} className="rounded-full px-4 py-2 text-sm" style={{ background: C.card, border: `1px solid ${C.line}` }}>← Board</button>
+              <h2 className="font-display text-3xl italic">{title}{selGuest ? <span className="ml-3 text-lg not-italic" style={{ color: C.mute }}>{selGuest.guestName}</span> : null}</h2>
+              <span className="w-20" />
+            </div>
+            <div className="mt-4 grid gap-5 lg:grid-cols-[1fr_360px]">
+              <section>
+                {items.length === 0 ? <p style={{ color: C.mute }}>No menu yet. Add items in <Link href="/pos/manage" className="underline">Menu</Link>.</p> : (
+                  <>
+                    <div className="flex gap-2 overflow-x-auto pb-2">
+                      {categories.map((c) => (
+                        <button key={c} onClick={() => setCategory(c)} className="shrink-0 rounded-full px-5 py-3 text-base font-semibold"
+                          style={c === activeCat ? { background: C.olive, color: C.ink } : { background: C.card, border: `1px solid ${C.line}` }}>{c}</button>
+                      ))}
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+                      {shown.map((i) => (
+                        <button key={i.id} onClick={() => adjust(i, 1)} className="relative flex min-h-[100px] flex-col justify-between rounded-2xl p-3 text-left active:scale-[0.98]"
+                          style={{ background: C.card, border: `1px solid ${C.line}` }}>
+                          <span className="text-base font-semibold leading-tight">{i.name}</span>
+                          <span className="text-sm" style={{ color: C.oliveHi }}>{money(Number(i.price))}</span>
+                          {curQty(i.id) > 0 && <span className="absolute right-2 top-2 rounded-full px-2.5 py-0.5 text-sm font-bold" style={{ background: C.olive, color: C.ink }}>{curQty(i.id)}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </section>
+              <aside className="hidden h-fit rounded-3xl p-5 lg:sticky lg:top-4 lg:block" style={{ background: C.card, border: `1px solid ${C.line}` }}>{tabPanel}</aside>
+            </div>
           </div>
-        </div>
-      )}
-
-      {confirming && guest && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-3">
-          <div className="w-full max-w-md rounded-2xl border border-white/20 bg-[#0d1b3d] p-5">
-            <h2 className="text-xl font-semibold">Charge {money(total)}?</h2>
-            <p className="mt-1 text-base text-white/80">To <b>{guest.room}</b> · {guest.guestName}</p>
-            <ul className="mt-3 space-y-1 text-sm text-white/80">
-              {lines.map(({ item, qty }) => <li key={item.id}>{qty} × {item.name}</li>)}
-            </ul>
-            {testMode && <p className="mt-3 text-sm text-amber-200">Test mode: nothing is sent to Cloudbeds.</p>}
-            {error && <p className="mt-3 text-base text-red-300">{error}</p>}
-            <div className="mt-5 flex gap-3">
-              <button onClick={() => setConfirming(false)} disabled={busy} className="flex-1 rounded-xl bg-white/10 py-3 text-base">Back</button>
-              <button onClick={charge} disabled={busy} className="flex-1 rounded-xl bg-emerald-400 py-3 text-base font-bold text-black disabled:opacity-50">
-                {busy ? 'Sending…' : error ? 'Try again' : 'Confirm'}
+          {!sheet && (
+            <div className="fixed inset-x-0 bottom-0 p-3 lg:hidden" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
+              <button onClick={() => setSheet(true)} className="flex w-full items-center justify-between rounded-2xl px-5 py-4 text-lg font-bold shadow-xl" style={{ background: C.olive, color: C.ink }}>
+                <span>{title} · {count || 'empty'}</span><span>{money(total)}</span>
               </button>
+            </div>
+          )}
+          {sheet && (
+            <div className="fixed inset-0 z-[85] flex items-end bg-black/70 lg:hidden" onClick={() => setSheet(false)}>
+              <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-3xl p-4" style={{ background: '#1a1f12', border: `1px solid ${C.line}`, paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }} onClick={(e) => e.stopPropagation()}>
+                <div className="mb-3 flex items-center justify-between"><b className="text-lg">{title}</b><button onClick={() => setSheet(false)} className="rounded-full px-4 py-2 text-sm" style={{ background: C.card }}>Close</button></div>
+                {tabPanel}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Pickers */}
+      {picker && (
+        <div className="fixed inset-0 z-[95] flex items-end justify-center bg-black/75 p-3 sm:items-center" onClick={() => setPicker(null)}>
+          <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-3xl p-4" style={{ background: '#1a1f12', border: `1px solid ${C.line}` }} onClick={(e) => e.stopPropagation()}>
+            {picker.for === 'slide' ? (
+              <>
+                <h3 className="mb-3 text-lg font-semibold">Slide this tab to which room?</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {SLOTS.map((n) => { const g = guestOfRoom(n); const t = tabOf('room', n); return (
+                    <button key={n} onClick={() => sel && slide(picker.tabId, sel.slot, n)} className="rounded-xl p-3 text-left" style={{ background: C.card, border: `1px solid ${C.line}` }}>
+                      <b>Room {n}</b><br /><span className="text-sm" style={{ color: C.mute }}>{g ? g.guestName : 'no guest'}{t ? ` · tab ${money(tabTotal(t))}` : ''}</span>
+                    </button>) })}
+                </div>
+              </>
+            ) : (
+              <>
+                <input autoFocus value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search room or name" className="w-full rounded-xl bg-transparent px-4 py-3 text-base" style={{ border: `1px solid ${C.line}` }} />
+                {guests === null && <p className="mt-3" style={{ color: C.mute }}>Loading guests…</p>}
+                {guests && filtered.length === 0 && <p className="mt-3" style={{ color: C.mute }}>No checked-in guests found.</p>}
+                <ul className="mt-2">
+                  {filtered.map((g) => (
+                    <li key={g.reservationID}>
+                      <button onClick={() => { if (sel) setManual((m) => ({ ...m, [sel.slot]: g })); setPicker(null) }} className="flex w-full items-center justify-between py-4 text-left text-base" style={{ borderBottom: `1px solid ${C.line}` }}>
+                        <span>{g.guestName}</span><b>{g.room}</b>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {confirmCharge && sel && selGuest && (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/75 p-3">
+          <div className="w-full max-w-md rounded-3xl p-5" style={{ background: '#1a1f12', border: `1px solid ${C.line}` }}>
+            <h2 className="text-xl font-semibold">Charge {money(total)}?</h2>
+            <p className="mt-1 text-base" style={{ color: C.mute }}>To <b style={{ color: C.cream }}>Room {sel.slot}</b> · {selGuest.guestName}</p>
+            <ul className="mt-3 space-y-1 text-sm">{(cur?.items ?? []).map((i) => <li key={i.itemId}>{i.quantity} × {i.name}</li>)}</ul>
+            {testMode && <p className="mt-3 text-sm" style={{ color: '#e8c872' }}>Test mode: nothing is sent to Cloudbeds.</p>}
+            {error && <p className="mt-3 text-base text-red-300">{error}</p>}
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <Btn disabled={busy} onClick={() => setConfirmCharge(false)}>Back</Btn>
+              <Btn solid disabled={busy} onClick={chargeRoom}>{busy ? 'Sending…' : error ? 'Try again' : 'Confirm'}</Btn>
             </div>
           </div>
         </div>
       )}
     </main>
   )
+}
+
+function Section({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) {
+  return (
+    <section className="mt-7">
+      <div className="mb-3 flex flex-wrap items-baseline gap-3">
+        <h2 className="text-sm font-semibold uppercase tracking-[0.25em]" style={{ color: C.oliveHi }}>{title}</h2>
+        <span className="text-xs" style={{ color: C.mute }}>{hint}</span>
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{children}</div>
+    </section>
+  )
+}
+
+function Tile({ label, sub, total, count, dim, active, table, onClick, ...rest }: {
+  label: string; sub: string; total: number | null; count: number; dim?: boolean; active?: boolean; table?: boolean; onClick?: () => void
+} & Record<string, unknown>) {
+  const open = total !== null
+  return (
+    <button {...(rest as object)} onClick={onClick} className="relative flex min-h-[112px] w-full flex-col justify-between rounded-2xl p-4 text-left transition"
+      style={{
+        background: active ? 'rgba(179,194,95,.28)' : open ? 'rgba(140,154,63,.18)' : 'rgba(255,255,255,0.04)',
+        border: `1px solid ${active ? '#b3c25f' : open ? 'rgba(179,194,95,.55)' : 'rgba(210,220,160,.14)'}`,
+        opacity: dim ? 0.6 : 1,
+        transform: active ? 'scale(1.03)' : undefined,
+      }}>
+      <span className="flex items-center justify-between">
+        <span className="text-lg font-semibold" style={{ color: '#efeede' }}>{label}</span>
+        {open && <span className="rounded-full px-2 py-0.5 text-xs font-bold" style={{ background: '#8c9a3f', color: '#12150d' }}>{count}</span>}
+      </span>
+      <span>
+        <span className="block truncate text-sm" style={{ color: '#9aa085' }}>{sub}</span>
+        {open && <span className="mt-1 block text-lg font-semibold" style={{ color: '#b3c25f' }}>{money(total!)}</span>}
+      </span>
+    </button>
+  )
+}
+
+function Btn({ children, solid, disabled, onClick }: { children: React.ReactNode; solid?: boolean; disabled?: boolean; onClick?: () => void }) {
+  return (
+    <button disabled={disabled} onClick={onClick} className="rounded-xl py-4 text-lg font-bold disabled:opacity-30"
+      style={solid ? { background: C.olive, color: C.ink } : { background: C.card, border: `1px solid ${C.line}`, color: C.cream }}>
+      {children}
+    </button>
+  )
+}
+
+function RoundBtn({ label, onClick }: { label: string; onClick: () => void }) {
+  return <button onClick={onClick} className="h-10 w-10 rounded-full text-xl" style={{ background: C.card, border: `1px solid ${C.line}` }}>{label}</button>
 }

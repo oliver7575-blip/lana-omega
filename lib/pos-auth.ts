@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createClient } from './supabase/server'
 import { createServiceClient } from './supabase/service'
 
+export type PosCaller = { tenantId: string; email: string; db: ReturnType<typeof createServiceClient> }
+
 /** Signed-in staff member + their hotel, plus a service client for the POS tables. */
 export async function posCaller() {
   const supabase = await createClient()
@@ -9,7 +11,7 @@ export async function posCaller() {
   if (!user) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
   const { data: staff } = await supabase.from('staff_users').select('tenant_id').eq('auth_uid', user.id).single()
   if (!staff) return { error: NextResponse.json({ error: 'No tenant' }, { status: 404 }) }
-  return { tenantId: staff.tenant_id as string, email: user.email ?? '', db: createServiceClient() }
+  return { tenantId: staff.tenant_id as string, email: user.email ?? '', db: createServiceClient() } as PosCaller
 }
 
 /** POS test mode: while on (the default), charges are only logged and never sent to Cloudbeds. */

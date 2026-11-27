@@ -24,7 +24,7 @@ export default function PosManagePage() {
       </div>
       <div className="mt-3 flex gap-2">
         {(['menu', 'charges', 'mode'] as const).map((t) => (
-          <button key={t} onClick={() => setTab(t)} className={`rounded-full px-4 py-2 text-sm font-semibold capitalize ${tab === t ? 'bg-white text-black' : 'bg-white/10'}`}>{t}</button>
+          <button key={t} onClick={() => setTab(t)} className={`rounded-full px-4 py-2 text-sm font-semibold capitalize ${tab === t ? 'bg-[#8c9a3f] text-[#12150d]' : 'bg-white/10'}`}>{t}</button>
         ))}
       </div>
       <div className="mt-4">
@@ -70,7 +70,7 @@ function MenuTab() {
         <input className={`${input} w-36`} placeholder="Category" list="pos-cats" value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })} />
         <datalist id="pos-cats">{categories.map((c) => <option key={c} value={c} />)}</datalist>
         <input className={`${input} w-28`} placeholder="Price" inputMode="decimal" value={draft.price} onChange={(e) => setDraft({ ...draft, price: e.target.value })} />
-        <button className="rounded-lg bg-emerald-400 px-4 py-2 text-sm font-bold text-black">Add</button>
+        <button className="rounded-lg bg-[#8c9a3f] px-4 py-2 text-sm font-bold text-black">Add</button>
       </form>
 
       {categories.map((c) => (
@@ -124,7 +124,7 @@ function ChargesTab() {
   }
 
   const badge: Record<Charge['status'], string> = {
-    test: 'bg-amber-300/20 text-amber-200', posted: 'bg-emerald-300/20 text-emerald-200', failed: 'bg-red-300/20 text-red-200', voided: 'bg-white/10 text-white/60',
+    test: 'bg-amber-300/20 text-amber-200', posted: 'bg-emerald-300/20 text-[#b3c25f]', failed: 'bg-red-300/20 text-red-200', voided: 'bg-white/10 text-white/60',
   }
   return (
     <div>
@@ -166,7 +166,7 @@ function ModeTab() {
   if (testMode === null) return <p>Loading…</p>
   return (
     <div className="max-w-xl">
-      <p className="text-base">Mode: <b className={testMode ? 'text-amber-200' : 'text-emerald-200'}>{testMode ? 'TEST (nothing is sent to Cloudbeds)' : 'LIVE (charges go to the room bill)'}</b></p>
+      <p className="text-base">Mode: <b className={testMode ? 'text-amber-200' : 'text-[#b3c25f]'}>{testMode ? 'TEST (nothing is sent to Cloudbeds)' : 'LIVE (charges go to the room bill)'}</b></p>
       <p className="mt-2 text-sm text-white/70">
         Keep test mode on until one real charge has been posted to a test reservation and checked in Cloudbeds (item name, price, taxes, and that it appears on the bill).
       </p>
