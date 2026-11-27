@@ -11,6 +11,7 @@ interface Tab { id: string; kind: 'table' | 'room'; slot: number; items: TabItem
 type Sel = { kind: 'table' | 'room'; slot: number }
 
 const SLOTS = [1, 2, 3, 4, 5, 6, 7, 8]
+const TILE_H = 68
 const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
 const tabTotal = (t?: Tab) => (t?.items ?? []).reduce((s, i) => s + i.price * i.quantity, 0)
 const tabCount = (t?: Tab) => (t?.items ?? []).reduce((s, i) => s + i.quantity, 0)
@@ -86,11 +87,12 @@ export default function PosPage() {
     setTables(j.tables); setAdding(false); setNewName(''); setError(null)
   }
   // Floor plan: saved position, else an automatic 3-across grid.
+  const canvasH = Math.max(440, Math.ceil(tables.length / 4) * (TILE_H + 14) + 260)
   const posOf = (t: PosTable, i: number) => {
     if (pos[t.slot]) return pos[t.slot]
     if (typeof t.x === 'number' && typeof t.y === 'number') return { x: t.x, y: t.y }
-    const cols = 3, rows = Math.max(1, Math.ceil(tables.length / cols))
-    return { x: (i % cols) / (cols - 1), y: rows > 1 ? Math.floor(i / cols) / (rows - 1) : 0 }
+    const cols = 4
+    return { x: (i % cols) / (cols - 1), y: (Math.floor(i / cols) * (TILE_H + 14)) / Math.max(1, canvasH - TILE_H) }
   }
   function arrDown(e: React.PointerEvent, slot: number) {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
@@ -281,23 +283,23 @@ export default function PosPage() {
             <button onClick={() => { setAdding(true); setError(null) }} className="rounded-full px-4 py-2 text-sm font-semibold" style={{ background: C.card, border: `1px solid ${C.line}` }}>+ Add table</button>
           </span>
         </div>
-        <div ref={canvasRef} className="relative w-full rounded-3xl [--tw:30%] sm:[--tw:22%] lg:[--tw:15%]"
-          style={{ height: Math.max(360, Math.ceil(tables.length / 3) * 118 + 40), border: `1px ${arrange ? 'dashed' : 'solid'} ${arrange ? C.oliveHi : C.line}`, background: 'rgba(255,255,255,0.02)',
+        <div ref={canvasRef} className="relative w-full rounded-3xl [--tw:23%] sm:[--tw:15%] lg:[--tw:9%]"
+          style={{ height: canvasH, border: `1px ${arrange ? 'dashed' : 'solid'} ${arrange ? C.oliveHi : C.line}`, background: 'rgba(255,255,255,0.02)',
             backgroundImage: arrange ? 'radial-gradient(rgba(179,194,95,.25) 1px, transparent 1px)' : undefined, backgroundSize: '24px 24px' }}>
           {tables.map((tb, i) => {
             const n = tb.slot
             const t = tabOf('table', n)
             const p = posOf(tb, i)
-            const box: React.CSSProperties = { position: 'absolute', width: 'var(--tw)', height: 96, left: `calc((100% - var(--tw)) * ${p.x})`, top: `calc((100% - 96px) * ${p.y})` }
+            const box: React.CSSProperties = { position: 'absolute', width: 'var(--tw)', height: TILE_H, left: `calc((100% - var(--tw)) * ${p.x})`, top: `calc((100% - ${TILE_H}px) * ${p.y})` }
             return arrange ? (
               <div key={n} className="select-none" style={{ ...box, touchAction: 'none', cursor: 'grab', zIndex: arrRef.current?.slot === n ? 5 : 1 }}
                 onPointerDown={(e) => arrDown(e, n)} onPointerMove={arrMove} onPointerUp={arrUp} onPointerCancel={() => { arrRef.current = null }}>
-                <Tile compact label={tb.name} sub="Drag me" dim total={t ? tabTotal(t) : null} count={tabCount(t)} table />
+                <Tile small label={tb.name} sub="" total={t ? tabTotal(t) : null} count={tabCount(t)} table />
               </div>
             ) : (
               <div key={n} className="select-none" style={{ ...box, touchAction: t ? 'none' : 'auto', opacity: drag?.tabId === t?.id ? 0.35 : 1 }}
                 onPointerDown={t ? (e) => onDown(e, t) : undefined} onPointerMove={t ? onMove : undefined} onPointerUp={t ? onUp : undefined} onPointerCancel={() => { dragRef.current = null; setDrag(null) }}>
-                <Tile compact label={tb.name} sub={t ? 'Open · drag to a room' : 'Free'} dim={!t} total={t ? tabTotal(t) : null} count={tabCount(t)} table onClick={t ? undefined : () => { setSel({ kind: 'table', slot: n }); setError(null) }} />
+                <Tile small label={tb.name} sub="" total={t ? tabTotal(t) : null} count={tabCount(t)} table onClick={t ? undefined : () => { setSel({ kind: 'table', slot: n }); setError(null) }} />
               </div>
             )
           })}
@@ -464,25 +466,25 @@ function Section({ title, hint, children, cols = 'grid-cols-2 sm:grid-cols-4' }:
   )
 }
 
-function Tile({ label, sub, total, count, dim, active, table, compact, onClick, ...rest }: {
-  label: string; sub: string; total: number | null; count: number; dim?: boolean; active?: boolean; table?: boolean; compact?: boolean; onClick?: () => void
+function Tile({ label, sub, total, count, dim, active, table, compact, small, onClick, ...rest }: {
+  label: string; sub: string; total: number | null; count: number; dim?: boolean; active?: boolean; table?: boolean; compact?: boolean; small?: boolean; onClick?: () => void
 } & Record<string, unknown>) {
   const open = total !== null
   return (
-    <button {...(rest as object)} onClick={onClick} className={`relative flex w-full flex-col justify-between rounded-2xl text-left transition ${compact ? 'h-full p-3' : 'min-h-[112px] p-4'}`}
+    <button {...(rest as object)} onClick={onClick} className={`relative flex w-full flex-col justify-between text-left transition ${small ? 'h-full rounded-xl p-2' : compact ? 'h-full rounded-2xl p-3' : 'min-h-[112px] rounded-2xl p-4'}`}
       style={{
-        background: active ? 'rgba(179,194,95,.28)' : open ? 'rgba(140,154,63,.18)' : 'rgba(255,255,255,0.04)',
-        border: `1px solid ${active ? '#b3c25f' : open ? 'rgba(179,194,95,.55)' : 'rgba(210,220,160,.14)'}`,
-        opacity: dim ? 0.6 : 1,
+        background: active ? 'rgba(179,194,95,.28)' : open ? 'rgba(140,154,63,.28)' : small ? 'rgba(255,255,255,0.09)' : 'rgba(255,255,255,0.04)',
+        border: `1px solid ${active ? '#b3c25f' : open ? 'rgba(179,194,95,.7)' : small ? 'rgba(210,220,160,.38)' : 'rgba(210,220,160,.14)'}`,
+        opacity: dim && !small ? 0.6 : 1,
         transform: active ? 'scale(1.03)' : undefined,
       }}>
       <span className="flex items-center justify-between">
-        <span className={`truncate font-semibold ${compact ? 'text-base' : 'text-lg'}`} style={{ color: '#efeede' }}>{label}</span>
-        {open && <span className="rounded-full px-2 py-0.5 text-xs font-bold" style={{ background: '#8c9a3f', color: '#12150d' }}>{count}</span>}
+        <span className={`truncate font-semibold ${small ? 'text-sm' : compact ? 'text-base' : 'text-lg'}`} style={{ color: '#efeede' }}>{label}</span>
+        {open && <span className={`rounded-full font-bold ${small ? 'px-1.5 text-[10px]' : 'px-2 py-0.5 text-xs'}`} style={{ background: '#8c9a3f', color: '#12150d' }}>{count}</span>}
       </span>
       <span>
         <span className={`block truncate ${compact ? 'text-xs' : 'text-sm'}`} style={{ color: '#9aa085' }}>{sub}</span>
-        {open && <span className={`block font-semibold ${compact ? 'text-base' : 'mt-1 text-lg'}`} style={{ color: '#b3c25f' }}>{money(total!)}</span>}
+        {open && <span className={`block font-semibold ${small ? 'text-sm' : compact ? 'text-base' : 'mt-1 text-lg'}`} style={{ color: '#b3c25f' }}>{money(total!)}</span>}
       </span>
     </button>
   )
