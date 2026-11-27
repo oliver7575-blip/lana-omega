@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 interface Item { id: string; name: string; category: string; price: number | string; active: boolean }
 interface Guest { reservationID: string; guestName: string; room: string }
 interface TabItem { itemId: string; name: string; category: string; price: number; quantity: number }
+interface PosTable { slot: number; name: string }
 interface Tab { id: string; kind: 'table' | 'room'; slot: number; items: TabItem[]; opened_at: string }
 type Sel = { kind: 'table' | 'room'; slot: number }
 
@@ -26,6 +27,9 @@ export default function PosPage() {
   const [guests, setGuests] = useState<Guest[] | null>(null)
   const [guestError, setGuestError] = useState<string | null>(null)
   const [tabs, setTabs] = useState<Tab[]>([])
+  const [tables, setTables] = useState<PosTable[]>([])
+  const [adding, setAdding] = useState(false)
+  const [newName, setNewName] = useState('')
   const [testMode, setTestMode] = useState(true)
   const [sel, setSel] = useState<Sel | null>(null)
   const [category, setCategory] = useState<string | null>(null)
@@ -62,11 +66,21 @@ export default function PosPage() {
   useEffect(() => {
     fetch('/api/pos/menu').then((r) => r.json()).then((j) => setItems((j.items ?? []).filter((i: Item) => i.active)))
     fetch('/api/pos/settings').then((r) => r.json()).then((j) => setTestMode(j.testMode !== false))
+    fetch('/api/pos/tables').then((r) => r.json()).then((j) => setTables(j.tables ?? []))
     loadTabs(); loadGuests()
     const t = setInterval(loadTabs, 8000) // other devices' changes show up
     return () => clearInterval(t)
   }, [loadTabs, loadGuests])
 
+  const tableName = (slot: number) => tables.find((t) => t.slot === slot)?.name ?? `Table ${slot}`
+  async function addTable() {
+    const name = newName.trim()
+    if (!name) return
+    const res = await fetch('/api/pos/tables', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })
+    const j = await res.json().catch(() => ({}))
+    if (!res.ok) return setError(j.error ?? 'Could not add the table')
+    setTables(j.tables); setAdding(false); setNewName(''); setError(null)
+  }
   const tabOf = (kind: 'table' | 'room', slot: number) => tabs.find((t) => t.kind === kind && t.slot === slot)
   const guestOfRoom = (slot: number): Guest | null =>
     manual[slot] ?? (guests ?? []).find((g) => new RegExp(`(^|\\D)${slot}(\\D|$)`).test(g.room)) ?? null
@@ -113,7 +127,7 @@ export default function PosPage() {
 
   async function slide(tabId: string, fromSlot: number, toSlot: number) {
     if (await act(tabId, { action: 'move', toSlot })) {
-      flash(`Table ${fromSlot} → Room ${toSlot}`)
+      flash(`${tableName(fromSlot)} → Room ${toSlot}`)
       setPicker(null); setSel(null); setSheet(false)
     }
   }
@@ -152,7 +166,7 @@ export default function PosPage() {
   }
 
   const filtered = (guests ?? []).filter((g) => `${g.room} ${g.guestName}`.toLowerCase().includes(search.trim().toLowerCase()))
-  const title = sel ? (sel.kind === 'table' ? `Table ${sel.slot}` : `Room ${sel.slot}`) : ''
+  const title = sel ? (sel.kind === 'table' ? tableName(sel.slot) : `Room ${sel.slot}`) : ''
   const selGuest = sel?.kind === 'room' ? guestOfRoom(sel.slot) : null
   const total = tabTotal(cur)
   const count = tabCount(cur)
@@ -184,7 +198,7 @@ export default function PosPage() {
       {sel.kind === 'table' ? (
         <div className="grid grid-cols-2 gap-2">
           <Btn solid disabled={!cur || busy} onClick={() => cur && setPicker({ for: 'slide', tabId: cur.id })}>Slide to room →</Btn>
-          <Btn disabled={!cur || busy} onClick={async () => { if (cur && await act(cur.id, { action: 'paid' })) { flash(`Table ${sel.slot} paid · ${money(total)}`); setSel(null); setSheet(false) } }}>Paid</Btn>
+          <Btn disabled={!cur || busy} onClick={async () => { if (cur && await act(cur.id, { action: 'paid' })) { flash(`${tableName(sel.slot)} paid · ${money(total)}`); setSel(null); setSheet(false) } }}>Paid</Btn>
         </div>
       ) : (
         <Btn solid disabled={!cur || busy || !selGuest} onClick={() => { setError(null); setConfirmCharge(true) }}>Charge to room</Btn>
@@ -222,21 +236,41 @@ export default function PosPage() {
         })}
       </Section>
 
-      <Section title="Tables" hint="Start a tab at a table, then slide it onto a room">
-        {SLOTS.map((n) => {
+      <Section title="Tables" hint="Start a tab at a table, then slide it onto a room · use + to add more (pool, patio…)">
+        {tables.map(({ slot: n, name }) => {
           const t = tabOf('table', n)
           return (
             <div key={n} className="select-none" style={{ touchAction: t ? 'none' : 'auto', opacity: drag?.tabId === t?.id ? 0.35 : 1 }}
               onPointerDown={t ? (e) => onDown(e, t) : undefined} onPointerMove={t ? onMove : undefined} onPointerUp={t ? onUp : undefined} onPointerCancel={() => { dragRef.current = null; setDrag(null) }}>
-              <Tile label={`Table ${n}`} sub={t ? 'Open tab · drag to a room' : 'Free'} dim={!t} total={t ? tabTotal(t) : null} count={tabCount(t)} table onClick={t ? undefined : () => { setSel({ kind: 'table', slot: n }); setError(null) }} />
+              <Tile label={name} sub={t ? 'Open tab · drag to a room' : 'Free'} dim={!t} total={t ? tabTotal(t) : null} count={tabCount(t)} table onClick={t ? undefined : () => { setSel({ kind: 'table', slot: n }); setError(null) }} />
             </div>
           )
         })}
+        <button onClick={() => { setAdding(true); setError(null) }} className="flex min-h-[112px] w-full flex-col items-center justify-center rounded-2xl text-base"
+          style={{ border: `1px dashed ${C.line}`, color: C.mute }}>
+          <span className="text-3xl leading-none">+</span>Add table
+        </button>
       </Section>
+
+      {adding && (
+        <div className="fixed inset-0 z-[95] flex items-end justify-center bg-black/75 p-3 sm:items-center" onClick={() => setAdding(false)}>
+          <div className="w-full max-w-md rounded-3xl p-5" style={{ background: '#1a1f12', border: `1px solid ${C.line}` }} onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold">New table</h3>
+            <p className="mt-1 text-sm" style={{ color: C.mute }}>For example "Pool 1", "Lounge" or "Patio 2".</p>
+            <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addTable()} placeholder="Name"
+              className="mt-3 w-full rounded-xl bg-transparent px-4 py-3 text-base" style={{ border: `1px solid ${C.line}` }} />
+            {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <Btn onClick={() => setAdding(false)}>Cancel</Btn>
+              <Btn solid disabled={!newName.trim()} onClick={addTable}>Add</Btn>
+            </div>
+          </div>
+        </div>
+      )}
 
       {drag && (
         <div className="pointer-events-none fixed z-[90] rounded-2xl px-4 py-3 text-base font-semibold shadow-2xl" style={{ left: drag.x - 60, top: drag.y - 30, background: C.olive, color: C.ink }}>
-          Table {drag.slot}{drag.over ? ` → Room ${drag.over}` : ''}
+          {tableName(drag.slot)}{drag.over ? ` → Room ${drag.over}` : ''}
         </div>
       )}
 

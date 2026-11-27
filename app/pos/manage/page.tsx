@@ -15,7 +15,7 @@ const input = 'rounded-lg border border-white/25 bg-transparent px-3 py-2 text-b
 const when = (iso: string) => new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'America/Mexico_City' })
 
 export default function PosManagePage() {
-  const [tab, setTab] = useState<'menu' | 'charges' | 'mode'>('menu')
+  const [tab, setTab] = useState<'menu' | 'tables' | 'charges' | 'mode'>('menu')
   return (
     <main>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -23,12 +23,13 @@ export default function PosManagePage() {
         <Link href="/pos" className="text-sm text-white/70 underline">← Back to the order screen</Link>
       </div>
       <div className="mt-3 flex gap-2">
-        {(['menu', 'charges', 'mode'] as const).map((t) => (
+        {(['menu', 'tables', 'charges', 'mode'] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)} className={`rounded-full px-4 py-2 text-sm font-semibold capitalize ${tab === t ? 'bg-[#8c9a3f] text-[#12150d]' : 'bg-white/10'}`}>{t}</button>
         ))}
       </div>
       <div className="mt-4">
         {tab === 'menu' && <MenuTab />}
+        {tab === 'tables' && <TablesTab />}
         {tab === 'charges' && <ChargesTab />}
         {tab === 'mode' && <ModeTab />}
       </div>
@@ -198,5 +199,44 @@ function ModeTab() {
         {lock && <p className="mt-2 text-sm text-[#b3c25f]">Locked to {locked ? `${locked.room} · ${locked.guestName}` : `reservation ${lock}`}.</p>}
       </div>
     </div>
+  )
+}
+
+function TablesTab() {
+  const [tables, setTables] = useState<{ slot: number; name: string }[]>([])
+  const [name, setName] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  useEffect(() => { fetch('/api/pos/tables').then((r) => r.json()).then((j) => setTables(j.tables ?? [])) }, [])
+
+  async function call(method: string, body?: unknown, qs = '') {
+    setError(null)
+    const res = await fetch(`/api/pos/tables${qs}`, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined })
+    const j = await res.json().catch(() => ({}))
+    if (!res.ok) return setError(j.error ?? 'Could not save')
+    setTables(j.tables)
+  }
+  return (
+    <div className="max-w-xl">
+      <p className="text-sm text-white/70">The tables shown on the bar board. Add places around the pool, rename them, or remove ones you don't use. A table can only be removed when it has no open tab.</p>
+      {error && <p className="mt-2 text-red-300">{error}</p>}
+      <form className="mt-3 flex gap-2" onSubmit={async (e) => { e.preventDefault(); if (name.trim()) { await call('POST', { name }); setName('') } }}>
+        <input className={`${input} flex-1`} placeholder="New table name (e.g. Pool 1)" value={name} onChange={(e) => setName(e.target.value)} />
+        <button className="rounded-lg bg-[#8c9a3f] px-4 py-2 text-sm font-bold text-[#12150d]">Add</button>
+      </form>
+      <ul className="mt-4 space-y-2">
+        {tables.map((t) => <TableRow key={t.slot} table={t} onRename={(n) => call('POST', { slot: t.slot, name: n })} onDelete={() => { if (confirm(`Remove ${t.name}?`)) call('DELETE', undefined, `?slot=${t.slot}`) }} />)}
+      </ul>
+    </div>
+  )
+}
+
+function TableRow({ table, onRename, onDelete }: { table: { slot: number; name: string }; onRename: (n: string) => void; onDelete: () => void }) {
+  const [name, setName] = useState(table.name)
+  return (
+    <li className="flex items-center gap-2">
+      <input className={`${input} flex-1`} value={name} onChange={(e) => setName(e.target.value)} />
+      {name.trim() !== table.name && name.trim() && <button onClick={() => onRename(name)} className="rounded-lg bg-[#8c9a3f] px-3 py-2 text-sm font-semibold text-[#12150d]">Save</button>}
+      <button onClick={onDelete} className="rounded-lg px-2 py-2 text-sm text-red-300">Remove</button>
+    </li>
   )
 }

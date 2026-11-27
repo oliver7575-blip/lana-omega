@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   const b = (await req.json().catch(() => ({}))) as { kind?: string; slot?: number; itemId?: string; delta?: number }
   const slot = Number(b.slot)
   const delta = b.delta === -1 ? -1 : 1
-  if ((b.kind !== 'table' && b.kind !== 'room') || !(slot >= 1 && slot <= 8) || !b.itemId) {
+  if ((b.kind !== 'table' && b.kind !== 'room') || !(slot >= 1 && slot <= (b.kind === 'table' ? 99 : 8)) || !b.itemId) {
     return NextResponse.json({ error: 'Bad request' }, { status: 400 })
   }
 
