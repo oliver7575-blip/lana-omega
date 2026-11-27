@@ -258,12 +258,14 @@ export default function PosPage() {
       {toast && <p className="mt-3 rounded-xl px-4 py-3 text-base" style={{ background: 'rgba(140,154,63,.2)', border: `1px solid ${C.olive}` }}>✓ {toast}</p>}
       {guestError && <p className="mt-3 text-sm text-red-300">Could not load checked-in guests: {guestError} <button className="underline" onClick={loadGuests}>Retry</button></p>}
 
-      <Section title="Rooms" hint="Tap a room to add to its tab · drop a table here to move it over">
+      <Section title="Rooms" hint="Tap a room to add to its tab · drag a table onto a room to move it over" cols="grid-cols-4">
         {SLOTS.map((n) => {
           const t = tabOf('room', n); const g = guestOfRoom(n)
           return (
-            <Tile key={n} data-room-slot={n} active={drag?.over === n} onClick={() => { setSel({ kind: 'room', slot: n }); setError(null) }}
-              label={`Room ${n}`} sub={g ? g.guestName : 'No guest checked in'} dim={!g && !t} total={t ? tabTotal(t) : null} count={tabCount(t)} />
+            <div key={n} className="h-24 sm:h-28">
+              <Tile compact data-room-slot={n} active={drag?.over === n} onClick={() => { setSel({ kind: 'room', slot: n }); setError(null) }}
+                label={`Room ${n}`} sub={g ? g.guestName : 'No guest'} dim={!g && !t} total={t ? tabTotal(t) : null} count={tabCount(t)} />
+            </div>
           )
         })}
       </Section>
@@ -318,6 +320,20 @@ export default function PosPage() {
       )}
 
       {drag && (
+        <div className="fixed inset-x-0 top-0 z-[89] p-2" style={{ background: 'rgba(18,21,13,.96)', borderBottom: `1px solid ${C.line}`, paddingTop: 'max(0.5rem, env(safe-area-inset-top))' }}>
+          <p className="mb-1 text-center text-xs" style={{ color: C.mute }}>Drop on a room</p>
+          <div className="grid grid-cols-4 gap-2">
+            {SLOTS.map((n) => (
+              <div key={n} data-room-slot={n} className="flex h-14 flex-col items-center justify-center rounded-xl text-sm font-semibold"
+                style={{ background: drag.over === n ? C.olive : C.card, color: drag.over === n ? C.ink : C.cream, border: `1px solid ${drag.over === n ? C.oliveHi : C.line}` }}>
+                Room {n}<span className="max-w-full truncate px-1 text-[10px] font-normal" style={{ opacity: .7 }}>{guestOfRoom(n)?.guestName ?? ''}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {drag && (
         <div className="pointer-events-none fixed z-[90] rounded-2xl px-4 py-3 text-base font-semibold shadow-2xl" style={{ left: drag.x - 60, top: drag.y - 30, background: C.olive, color: C.ink }}>
           {tableName(drag.slot)}{drag.over ? ` → Room ${drag.over}` : ''}
         </div>
@@ -332,6 +348,12 @@ export default function PosPage() {
               <h2 className="font-display text-3xl italic">{title}{selGuest ? <span className="ml-3 text-lg not-italic" style={{ color: C.mute }}>{selGuest.guestName}</span> : null}</h2>
               <span className="w-20" />
             </div>
+            {sel.kind === 'table' && cur && (
+              <div className="mt-3 grid grid-cols-2 gap-2 lg:hidden">
+                <Btn solid disabled={busy} onClick={() => setPicker({ for: 'slide', tabId: cur.id })}>Slide to room →</Btn>
+                <Btn disabled={busy} onClick={async () => { if (await act(cur.id, { action: 'paid' })) { flash(`${tableName(sel.slot)} paid · ${money(total)}`); setSel(null); setSheet(false) } }}>Paid</Btn>
+              </div>
+            )}
             <div className="mt-4 grid gap-5 lg:grid-cols-[1fr_360px]">
               <section>
                 {items.length === 0 ? <p style={{ color: C.mute }}>No menu yet. Add items in <Link href="/pos/manage" className="underline">Menu</Link>.</p> : (
@@ -429,14 +451,14 @@ export default function PosPage() {
   )
 }
 
-function Section({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) {
+function Section({ title, hint, children, cols = 'grid-cols-2 sm:grid-cols-4' }: { title: string; hint: string; children: React.ReactNode; cols?: string }) {
   return (
     <section className="mt-7">
       <div className="mb-3 flex flex-wrap items-baseline gap-3">
         <h2 className="text-sm font-semibold uppercase tracking-[0.25em]" style={{ color: C.oliveHi }}>{title}</h2>
         <span className="text-xs" style={{ color: C.mute }}>{hint}</span>
       </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{children}</div>
+      <div className={`grid gap-3 ${cols}`}>{children}</div>
     </section>
   )
 }
