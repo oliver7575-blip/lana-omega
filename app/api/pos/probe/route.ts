@@ -26,14 +26,29 @@ export async function GET() {
 
   const form = (o: Record<string, string>) => ({ method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ propertyID: propertyId, ...o }) })
 
-  const [readReservations, readItems, postCustomItem, postVoidItem] = await Promise.all([
+  // postCustomItem: keep adding whatever field Cloudbeds says is missing, on a reservation that does not exist,
+  // until it gets as far as "reservation not found". That shows the exact field names to send.
+  const fields: Record<string, string> = { reservationID: '999999999999', referenceID: 'probe-no-charge', 'items[0][appItemID]': 'probe-item', 'items[0][name]': 'PROBE', 'items[0][itemQuantity]': '1' }
+  const discovered: { param: string; where: string }[] = []
+  let postCustomItem: { http: number; success: unknown; message: string | null } = { http: 0, success: null, message: null }
+  for (let n = 0; n < 10; n++) {
+    postCustomItem = await call('postCustomItem', form(fields))
+    const m = /Parameter (\w+) is required/i.exec(postCustomItem.message ?? '')
+    if (!m) break
+    const param = m[1]
+    const value = /quantity/i.test(param) ? '1' : /price|amount|total/i.test(param) ? '1.00' : /id$/i.test(param) ? 'probe-item' : 'PROBE'
+    const inItem = `items[0][${param}]`
+    if (!(inItem in fields)) { fields[inItem] = value; discovered.push({ param, where: 'inside each item' }) }
+    else if (!(param in fields)) { fields[param] = value; discovered.push({ param, where: 'top level' }) }
+    else break
+  }
+  const [readReservations, readItems, postVoidItem] = await Promise.all([
     call('getReservations', { method: 'GET' }, `?propertyID=${propertyId}&pageSize=1`),
     call('getItems', { method: 'GET' }, `?propertyID=${propertyId}&pageSize=1`),
-    call('postCustomItem', form({ reservationID: '999999999999', referenceID: 'probe-no-charge', 'items[0][appItemID]': 'probe-item', 'items[0][name]': 'PROBE', 'items[0][price]': '1.00', 'items[0][quantity]': '1', 'items[0][itemCategoryName]': 'Probe' })),
     call('postVoidItem', form({ reservationID: '999999999999', soldProductID: '999999999999' })),
   ])
   return NextResponse.json({
     note: 'Nothing was posted. Look at each message: a "not found / invalid reservation" style answer means the key reached validation (allowed); a permission / scope / unauthorized answer means it is blocked.',
-    propertyId, readReservations, readItems, postCustomItem, postVoidItem,
+    propertyId, readReservations, readItems, postCustomItem, postVoidItem, fieldsSentToCloudbeds: Object.keys(fields), addedWhileDiscovering: discovered,
   })
 }
