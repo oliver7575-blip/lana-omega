@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 interface Item { id: string; name: string; category: string; price: number | string; active: boolean }
 interface Guest { reservationID: string; guestName: string; room: string }
 interface TabItem { itemId: string; name: string; category: string; price: number; quantity: number }
-interface PosTable { slot: number; name: string }
+interface PosTable { slot: number; name: string; x?: number; y?: number }
 interface Tab { id: string; kind: 'table' | 'room'; slot: number; items: TabItem[]; opened_at: string }
 type Sel = { kind: 'table' | 'room'; slot: number }
 
@@ -29,6 +29,10 @@ export default function PosPage() {
   const [tabs, setTabs] = useState<Tab[]>([])
   const [tables, setTables] = useState<PosTable[]>([])
   const [adding, setAdding] = useState(false)
+  const [arrange, setArrange] = useState(false)
+  const [pos, setPos] = useState<Record<number, { x: number; y: number }>>({})
+  const canvasRef = useRef<HTMLDivElement>(null)
+  const arrRef = useRef<{ slot: number; offX: number; offY: number; tw: number; th: number } | null>(null)
   const [newName, setNewName] = useState('')
   const [testMode, setTestMode] = useState(true)
   const [sel, setSel] = useState<Sel | null>(null)
@@ -80,6 +84,34 @@ export default function PosPage() {
     const j = await res.json().catch(() => ({}))
     if (!res.ok) return setError(j.error ?? 'Could not add the table')
     setTables(j.tables); setAdding(false); setNewName(''); setError(null)
+  }
+  // Floor plan: saved position, else an automatic 3-across grid.
+  const posOf = (t: PosTable, i: number) => {
+    if (pos[t.slot]) return pos[t.slot]
+    if (typeof t.x === 'number' && typeof t.y === 'number') return { x: t.x, y: t.y }
+    const cols = 3, rows = Math.max(1, Math.ceil(tables.length / cols))
+    return { x: (i % cols) / (cols - 1), y: rows > 1 ? Math.floor(i / cols) / (rows - 1) : 0 }
+  }
+  function arrDown(e: React.PointerEvent, slot: number) {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    arrRef.current = { slot, offX: e.clientX - r.left, offY: e.clientY - r.top, tw: r.width, th: r.height }
+    ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
+  }
+  function arrMove(e: React.PointerEvent) {
+    const a = arrRef.current, cv = canvasRef.current
+    if (!a || !cv) return
+    const cr = cv.getBoundingClientRect()
+    const x = Math.min(1, Math.max(0, (e.clientX - cr.left - a.offX) / Math.max(1, cr.width - a.tw)))
+    const y = Math.min(1, Math.max(0, (e.clientY - cr.top - a.offY) / Math.max(1, cr.height - a.th)))
+    setPos((p) => ({ ...p, [a.slot]: { x, y } }))
+  }
+  async function arrUp() {
+    const a = arrRef.current
+    arrRef.current = null
+    if (!a || !pos[a.slot]) return
+    const { x, y } = pos[a.slot]
+    setTables((ts) => ts.map((t) => (t.slot === a.slot ? { ...t, x, y } : t)))
+    fetch('/api/pos/tables', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slot: a.slot, x, y }) })
   }
   const tabOf = (kind: 'table' | 'room', slot: number) => tabs.find((t) => t.kind === kind && t.slot === slot)
   const guestOfRoom = (slot: number): Guest | null =>
@@ -236,21 +268,38 @@ export default function PosPage() {
         })}
       </Section>
 
-      <Section title="Tables" hint="Start a tab at a table, then slide it onto a room · use + to add more (pool, patio…)">
-        {tables.map(({ slot: n, name }) => {
-          const t = tabOf('table', n)
-          return (
-            <div key={n} className="select-none" style={{ touchAction: t ? 'none' : 'auto', opacity: drag?.tabId === t?.id ? 0.35 : 1 }}
-              onPointerDown={t ? (e) => onDown(e, t) : undefined} onPointerMove={t ? onMove : undefined} onPointerUp={t ? onUp : undefined} onPointerCancel={() => { dragRef.current = null; setDrag(null) }}>
-              <Tile label={name} sub={t ? 'Open tab · drag to a room' : 'Free'} dim={!t} total={t ? tabTotal(t) : null} count={tabCount(t)} table onClick={t ? undefined : () => { setSel({ kind: 'table', slot: n }); setError(null) }} />
-            </div>
-          )
-        })}
-        <button onClick={() => { setAdding(true); setError(null) }} className="flex min-h-[112px] w-full flex-col items-center justify-center rounded-2xl text-base"
-          style={{ border: `1px dashed ${C.line}`, color: C.mute }}>
-          <span className="text-3xl leading-none">+</span>Add table
-        </button>
-      </Section>
+      <section className="mt-7">
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.25em]" style={{ color: C.oliveHi }}>Tables</h2>
+          <span className="text-xs" style={{ color: C.mute }}>{arrange ? 'Drag a table to where it sits, then tap Done' : 'Start a tab at a table, then slide it onto a room'}</span>
+          <span className="ml-auto flex gap-2">
+            <button onClick={() => setArrange((v) => !v)} className="rounded-full px-4 py-2 text-sm font-semibold"
+              style={arrange ? { background: C.olive, color: C.ink } : { background: C.card, border: `1px solid ${C.line}` }}>{arrange ? 'Done' : 'Arrange'}</button>
+            <button onClick={() => { setAdding(true); setError(null) }} className="rounded-full px-4 py-2 text-sm font-semibold" style={{ background: C.card, border: `1px solid ${C.line}` }}>+ Add table</button>
+          </span>
+        </div>
+        <div ref={canvasRef} className="relative w-full rounded-3xl [--tw:30%] sm:[--tw:22%] lg:[--tw:15%]"
+          style={{ height: Math.max(360, Math.ceil(tables.length / 3) * 118 + 40), border: `1px ${arrange ? 'dashed' : 'solid'} ${arrange ? C.oliveHi : C.line}`, background: 'rgba(255,255,255,0.02)',
+            backgroundImage: arrange ? 'radial-gradient(rgba(179,194,95,.25) 1px, transparent 1px)' : undefined, backgroundSize: '24px 24px' }}>
+          {tables.map((tb, i) => {
+            const n = tb.slot
+            const t = tabOf('table', n)
+            const p = posOf(tb, i)
+            const box: React.CSSProperties = { position: 'absolute', width: 'var(--tw)', height: 96, left: `calc((100% - var(--tw)) * ${p.x})`, top: `calc((100% - 96px) * ${p.y})` }
+            return arrange ? (
+              <div key={n} className="select-none" style={{ ...box, touchAction: 'none', cursor: 'grab', zIndex: arrRef.current?.slot === n ? 5 : 1 }}
+                onPointerDown={(e) => arrDown(e, n)} onPointerMove={arrMove} onPointerUp={arrUp} onPointerCancel={() => { arrRef.current = null }}>
+                <Tile compact label={tb.name} sub="Drag me" dim total={t ? tabTotal(t) : null} count={tabCount(t)} table />
+              </div>
+            ) : (
+              <div key={n} className="select-none" style={{ ...box, touchAction: t ? 'none' : 'auto', opacity: drag?.tabId === t?.id ? 0.35 : 1 }}
+                onPointerDown={t ? (e) => onDown(e, t) : undefined} onPointerMove={t ? onMove : undefined} onPointerUp={t ? onUp : undefined} onPointerCancel={() => { dragRef.current = null; setDrag(null) }}>
+                <Tile compact label={tb.name} sub={t ? 'Open · drag to a room' : 'Free'} dim={!t} total={t ? tabTotal(t) : null} count={tabCount(t)} table onClick={t ? undefined : () => { setSel({ kind: 'table', slot: n }); setError(null) }} />
+              </div>
+            )
+          })}
+        </div>
+      </section>
 
       {adding && (
         <div className="fixed inset-0 z-[95] flex items-end justify-center bg-black/75 p-3 sm:items-center" onClick={() => setAdding(false)}>
@@ -392,12 +441,12 @@ function Section({ title, hint, children }: { title: string; hint: string; child
   )
 }
 
-function Tile({ label, sub, total, count, dim, active, table, onClick, ...rest }: {
-  label: string; sub: string; total: number | null; count: number; dim?: boolean; active?: boolean; table?: boolean; onClick?: () => void
+function Tile({ label, sub, total, count, dim, active, table, compact, onClick, ...rest }: {
+  label: string; sub: string; total: number | null; count: number; dim?: boolean; active?: boolean; table?: boolean; compact?: boolean; onClick?: () => void
 } & Record<string, unknown>) {
   const open = total !== null
   return (
-    <button {...(rest as object)} onClick={onClick} className="relative flex min-h-[112px] w-full flex-col justify-between rounded-2xl p-4 text-left transition"
+    <button {...(rest as object)} onClick={onClick} className={`relative flex w-full flex-col justify-between rounded-2xl text-left transition ${compact ? 'h-full p-3' : 'min-h-[112px] p-4'}`}
       style={{
         background: active ? 'rgba(179,194,95,.28)' : open ? 'rgba(140,154,63,.18)' : 'rgba(255,255,255,0.04)',
         border: `1px solid ${active ? '#b3c25f' : open ? 'rgba(179,194,95,.55)' : 'rgba(210,220,160,.14)'}`,
@@ -405,12 +454,12 @@ function Tile({ label, sub, total, count, dim, active, table, onClick, ...rest }
         transform: active ? 'scale(1.03)' : undefined,
       }}>
       <span className="flex items-center justify-between">
-        <span className="text-lg font-semibold" style={{ color: '#efeede' }}>{label}</span>
+        <span className={`truncate font-semibold ${compact ? 'text-base' : 'text-lg'}`} style={{ color: '#efeede' }}>{label}</span>
         {open && <span className="rounded-full px-2 py-0.5 text-xs font-bold" style={{ background: '#8c9a3f', color: '#12150d' }}>{count}</span>}
       </span>
       <span>
-        <span className="block truncate text-sm" style={{ color: '#9aa085' }}>{sub}</span>
-        {open && <span className="mt-1 block text-lg font-semibold" style={{ color: '#b3c25f' }}>{money(total!)}</span>}
+        <span className={`block truncate ${compact ? 'text-xs' : 'text-sm'}`} style={{ color: '#9aa085' }}>{sub}</span>
+        {open && <span className={`block font-semibold ${compact ? 'text-base' : 'mt-1 text-lg'}`} style={{ color: '#b3c25f' }}>{money(total!)}</span>}
       </span>
     </button>
   )

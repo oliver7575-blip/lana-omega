@@ -15,15 +15,18 @@ export async function GET() {
 export async function POST(req: Request) {
   const c = await posCaller()
   if ('error' in c) return c.error
-  const b = (await req.json().catch(() => ({}))) as { slot?: number; name?: string }
+  const b = (await req.json().catch(() => ({}))) as { slot?: number; name?: string; x?: number; y?: number }
   const name = cleanName(b.name)
-  if (!name) return NextResponse.json({ error: 'Give the table a name.' }, { status: 400 })
   const tables = await getTables(c.db, c.tenantId)
   let next: typeof tables
   if (b.slot) {
     if (!tables.some((t) => t.slot === b.slot)) return NextResponse.json({ error: 'Table not found' }, { status: 404 })
-    next = tables.map((t) => (t.slot === b.slot ? { ...t, name } : t))
+    const moved = typeof b.x === 'number' && typeof b.y === 'number'
+    if (!name && !moved) return NextResponse.json({ error: 'Nothing to change.' }, { status: 400 })
+    const clamp = (v: number) => Math.round(Math.min(1, Math.max(0, v)) * 1000) / 1000
+    next = tables.map((t) => (t.slot === b.slot ? { ...t, ...(name ? { name } : {}), ...(moved ? { x: clamp(b.x!), y: clamp(b.y!) } : {}) } : t))
   } else {
+    if (!name) return NextResponse.json({ error: 'Give the table a name.' }, { status: 400 })
     if (tables.length >= MAX_TABLES) return NextResponse.json({ error: `Up to ${MAX_TABLES} tables.` }, { status: 400 })
     if (tables.some((t) => t.name.toLowerCase() === name.toLowerCase())) return NextResponse.json({ error: 'A table with that name already exists.' }, { status: 400 })
     const slot = Math.max(0, ...tables.map((t) => t.slot)) + 1

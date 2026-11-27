@@ -1,6 +1,7 @@
 import type { createServiceClient } from './supabase/service'
 
-export interface PosTable { slot: number; name: string }
+/** x and y are 0–1 positions on the floor plan (left→right, top→bottom); missing = automatic. */
+export interface PosTable { slot: number; name: string; x?: number; y?: number }
 type Db = ReturnType<typeof createServiceClient>
 
 const DEFAULT_TABLES: PosTable[] = Array.from({ length: 8 }, (_, i) => ({ slot: i + 1, name: `Table ${i + 1}` }))
