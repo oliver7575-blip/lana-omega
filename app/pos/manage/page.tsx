@@ -11,7 +11,7 @@ interface Charge {
 }
 
 const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-const input = 'rounded-lg border border-white/25 bg-transparent px-3 py-2 text-sm'
+const input = 'rounded-lg border border-white/25 bg-transparent px-3 py-2 text-base'
 const when = (iso: string) => new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'America/Mexico_City' })
 
 export default function PosManagePage() {

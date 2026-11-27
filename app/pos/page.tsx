@@ -21,6 +21,7 @@ export default function PosPage() {
   const [picking, setPicking] = useState(false)
   const [search, setSearch] = useState('')
   const [confirming, setConfirming] = useState(false)
+  const [cartOpen, setCartOpen] = useState(false)
   const [requestId, setRequestId] = useState(newRequestId)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -83,6 +84,7 @@ export default function PosPage() {
       setCart({})
       setGuest(null)
       setConfirming(false)
+      setCartOpen(false)
       setRequestId(newRequestId())
       setTimeout(() => setDone(null), 6000)
     } catch (e) {
@@ -93,8 +95,40 @@ export default function PosPage() {
     }
   }
 
+  const cartPanel = (
+    <>
+            <button onClick={() => { setPicking(true); setSearch('') }}
+              className="w-full rounded-xl border border-white/25 px-4 py-3 text-left text-base">
+              {guest ? <><b>{guest.room}</b> · {guest.guestName}</> : <span className="text-white/70">Choose room / guest…</span>}
+            </button>
+  
+            <ul className="mt-3 space-y-2">
+              {lines.length === 0 && <li className="text-sm text-white/60">Tap items to add them.</li>}
+              {lines.map(({ item, qty }) => (
+                <li key={item.id} className="flex items-center justify-between gap-2">
+                  <span className="min-w-0 flex-1 truncate text-base">{item.name}</span>
+                  <span className="flex items-center gap-2">
+                    <button onClick={() => add(item.id, -1)} className="h-10 w-10 rounded-full bg-white/10 text-xl" aria-label="Remove one">−</button>
+                    <span className="w-5 text-center text-base">{qty}</span>
+                    <button onClick={() => add(item.id, 1)} className="h-10 w-10 rounded-full bg-white/10 text-xl" aria-label="Add one">+</button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+  
+            <div className="mt-4 flex items-center justify-between border-t border-white/15 pt-3 text-lg font-semibold">
+              <span>Total ({count})</span><span>{money(total)}</span>
+            </div>
+            <button disabled={!guest || !lines.length} onClick={() => { setError(null); setConfirming(true) }}
+              className="mt-3 w-full rounded-xl bg-emerald-400 py-4 text-lg font-bold text-black disabled:opacity-30">
+              Charge to room
+            </button>
+            {lines.length > 0 && <button onClick={() => setCart({})} className="mt-2 w-full py-2 text-sm text-white/60">Clear order</button>}
+    </>
+  )
+
   return (
-    <main>
+    <main className="pb-28 lg:pb-0" style={{ touchAction: 'manipulation' }}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1>Bar</h1>
         <Link href="/pos/manage" className="text-sm text-white/70 underline">Menu · Charges · Mode</Link>
@@ -134,36 +168,30 @@ export default function PosPage() {
           )}
         </section>
 
-        <aside className="h-fit rounded-2xl border border-white/15 bg-black/20 p-4 lg:sticky lg:top-4">
-          <button onClick={() => { setPicking(true); setSearch('') }}
-            className="w-full rounded-xl border border-white/25 px-4 py-3 text-left text-base">
-            {guest ? <><b>{guest.room}</b> · {guest.guestName}</> : <span className="text-white/70">Choose room / guest…</span>}
-          </button>
-
-          <ul className="mt-3 space-y-2">
-            {lines.length === 0 && <li className="text-sm text-white/60">Tap items to add them.</li>}
-            {lines.map(({ item, qty }) => (
-              <li key={item.id} className="flex items-center justify-between gap-2">
-                <span className="min-w-0 flex-1 truncate text-base">{item.name}</span>
-                <span className="flex items-center gap-2">
-                  <button onClick={() => add(item.id, -1)} className="h-10 w-10 rounded-full bg-white/10 text-xl" aria-label="Remove one">−</button>
-                  <span className="w-5 text-center text-base">{qty}</span>
-                  <button onClick={() => add(item.id, 1)} className="h-10 w-10 rounded-full bg-white/10 text-xl" aria-label="Add one">+</button>
-                </span>
-              </li>
-            ))}
-          </ul>
-
-          <div className="mt-4 flex items-center justify-between border-t border-white/15 pt-3 text-lg font-semibold">
-            <span>Total ({count})</span><span>{money(total)}</span>
-          </div>
-          <button disabled={!guest || !lines.length} onClick={() => { setError(null); setConfirming(true) }}
-            className="mt-3 w-full rounded-xl bg-emerald-400 py-4 text-lg font-bold text-black disabled:opacity-30">
-            Charge to room
-          </button>
-          {lines.length > 0 && <button onClick={() => setCart({})} className="mt-2 w-full py-2 text-sm text-white/60">Clear order</button>}
+        <aside className="hidden h-fit rounded-2xl border border-white/15 bg-black/20 p-4 lg:sticky lg:top-4 lg:block">
+          {cartPanel}
         </aside>
       </div>
+      {/* Phone / iPad portrait: a bottom bar opens the order as a sheet. */}
+      {count > 0 && !cartOpen && (
+        <div className="fixed inset-x-0 bottom-0 z-40 p-3 lg:hidden" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
+          <button onClick={() => setCartOpen(true)} className="flex w-full items-center justify-between rounded-2xl bg-emerald-400 px-5 py-4 text-lg font-bold text-black shadow-xl">
+            <span>View order · {count}</span><span>{money(total)}</span>
+          </button>
+        </div>
+      )}
+      {cartOpen && (
+        <div className="fixed inset-0 z-50 flex items-end bg-black/70 lg:hidden" onClick={() => setCartOpen(false)}>
+          <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-3xl border border-white/20 bg-[#0d1b3d] p-4"
+            style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }} onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <b className="text-lg">Order</b>
+              <button onClick={() => setCartOpen(false)} className="rounded-full bg-white/10 px-4 py-2 text-sm">Close</button>
+            </div>
+            {cartPanel}
+          </div>
+        </div>
+      )}
 
       {picking && (
         <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-3 sm:items-center" onClick={() => setPicking(false)}>
