@@ -5,7 +5,7 @@ export const maxDuration = 30
 
 /**
  * Checks, without posting anything, whether this hotel's Cloudbeds key is allowed to do what the bar POS needs.
- * The write check posts to a reservation id that does not exist: Cloudbeds either refuses the key (a permission
+ * The write check posts to a reservation id that does not exist (a long number, because "0" is treated as empty): Cloudbeds either refuses the key (a permission
  * message) or reaches validation and says the reservation was not found (so the key is allowed to post).
  */
 export async function GET() {
@@ -29,8 +29,8 @@ export async function GET() {
   const [readReservations, readItems, postCustomItem, postVoidItem] = await Promise.all([
     call('getReservations', { method: 'GET' }, `?propertyID=${propertyId}&pageSize=1`),
     call('getItems', { method: 'GET' }, `?propertyID=${propertyId}&pageSize=1`),
-    call('postCustomItem', form({ reservationID: '0', referenceID: 'probe-no-charge', 'items[0][name]': 'PROBE', 'items[0][price]': '1.00', 'items[0][quantity]': '1', 'items[0][itemCategoryName]': 'Probe' })),
-    call('postVoidItem', form({ reservationID: '0', soldProductID: '0' })),
+    call('postCustomItem', form({ reservationID: '999999999999', referenceID: 'probe-no-charge', 'items[0][name]': 'PROBE', 'items[0][price]': '1.00', 'items[0][quantity]': '1', 'items[0][itemCategoryName]': 'Probe' })),
+    call('postVoidItem', form({ reservationID: '999999999999', soldProductID: '999999999999' })),
   ])
   return NextResponse.json({
     note: 'Nothing was posted. Look at each message: a "not found / invalid reservation" style answer means the key reached validation (allowed); a permission / scope / unauthorized answer means it is blocked.',
