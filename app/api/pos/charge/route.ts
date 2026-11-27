@@ -43,7 +43,7 @@ export async function POST(req: Request) {
     const item = byId.get(l.itemId)
     const qty = Math.floor(Number(l.quantity))
     if (!item || !(qty >= 1 && qty <= 50)) return NextResponse.json({ error: 'An item in the order is no longer on the menu.' }, { status: 400 })
-    lines.push({ name: item.name as string, category: item.category as string, price: Number(item.price), quantity: qty })
+    lines.push({ itemId: item.id as string, name: item.name as string, category: item.category as string, price: Number(item.price), quantity: qty })
   }
   return createCharge(c, { reservationId: b.reservationId, guestName: b.guestName, room: b.room, requestId: b.requestId, lines })
 }

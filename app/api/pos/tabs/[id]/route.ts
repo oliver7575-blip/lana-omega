@@ -64,7 +64,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       guestName: b.guestName,
       room: b.room ?? `Room ${tab.slot}`,
       requestId: `tab-${id}`,
-      lines: items.map((i) => ({ name: i.name, category: i.category, price: i.price, quantity: i.quantity })),
+      lines: items.map((i) => ({ itemId: i.itemId, name: i.name, category: i.category, price: i.price, quantity: i.quantity })),
     })
     if (!resp.ok) return resp
     await close('charged')

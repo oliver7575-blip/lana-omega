@@ -29,7 +29,7 @@ export async function GET() {
   const [readReservations, readItems, postCustomItem, postVoidItem] = await Promise.all([
     call('getReservations', { method: 'GET' }, `?propertyID=${propertyId}&pageSize=1`),
     call('getItems', { method: 'GET' }, `?propertyID=${propertyId}&pageSize=1`),
-    call('postCustomItem', form({ reservationID: '999999999999', referenceID: 'probe-no-charge', 'items[0][name]': 'PROBE', 'items[0][price]': '1.00', 'items[0][quantity]': '1', 'items[0][itemCategoryName]': 'Probe' })),
+    call('postCustomItem', form({ reservationID: '999999999999', referenceID: 'probe-no-charge', 'items[0][appItemID]': 'probe-item', 'items[0][name]': 'PROBE', 'items[0][price]': '1.00', 'items[0][quantity]': '1', 'items[0][itemCategoryName]': 'Probe' })),
     call('postVoidItem', form({ reservationID: '999999999999', soldProductID: '999999999999' })),
   ])
   return NextResponse.json({

@@ -22,6 +22,8 @@ export interface InHouseGuest {
 }
 
 export interface PosLine {
+  /** Our menu item id: Cloudbeds needs a stable id per product (appItemID). */
+  itemId: string
   name: string
   category: string
   price: number
@@ -62,6 +64,7 @@ export async function postRoomCharge(
   }
   if (a.guestName) fields.guestName = a.guestName
   a.lines.forEach((l, i) => {
+    fields[`items[${i}][appItemID]`] = l.itemId
     fields[`items[${i}][name]`] = l.name
     fields[`items[${i}][itemCategoryName]`] = l.category
     fields[`items[${i}][price]`] = l.price.toFixed(2)
