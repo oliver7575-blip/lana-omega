@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { cloudbedsForCaller } from './cloudbeds-caller'
 import { postRoomCharge, type PosLine } from './cloudbeds-pos'
-import { posLockedReservation, posTestMode, type PosCaller } from './pos-auth'
+import { posLockedReservation, posTestMode, posTaxRate, type PosCaller } from './pos-auth'
 
 /**
  * Records a sale against a guest's room: in test mode it is only logged, live it is posted to the
@@ -16,6 +16,10 @@ export async function createCharge(
   if (existing) return NextResponse.json({ id: existing.id, status: existing.status, total: existing.total, duplicate: true })
 
   const total = Math.round(a.lines.reduce((s, l) => s + l.price * l.quantity, 0) * 100) / 100
+  // Menu prices are final (tax included). Cloudbeds only taxes room rates, so the full price is posted and the IVA portion is kept here.
+  const taxRate = await posTaxRate(c.db, c.tenantId)
+  const net = Math.round((total / (1 + taxRate / 100)) * 100) / 100
+  const taxAmount = Math.round((total - net) * 100) / 100
   const record = {
     tenant_id: c.tenantId,
     reservation_id: a.reservationId,
@@ -23,6 +27,9 @@ export async function createCharge(
     room: a.room?.slice(0, 60) ?? null,
     items: a.lines,
     total,
+    tax_rate: taxRate,
+    tax_amount: taxAmount,
+    net_amount: net,
     staff_email: c.email,
     reference_id: referenceId,
   }
@@ -41,7 +48,7 @@ export async function createCharge(
   const cbc = await cloudbedsForCaller()
   if ('error' in cbc) return cbc.error
   try {
-    const resp = await postRoomCharge(cbc.cb, { reservationID: a.reservationId, referenceID: referenceId, lines: a.lines, guestName: a.guestName })
+    const resp = await postRoomCharge(cbc.cb, { reservationID: a.reservationId, referenceID: referenceId, lines: a.lines, guestName: a.guestName, taxRate })
     const { data, error } = await c.db.from('pos_charges').insert({ ...record, status: 'posted', cloudbeds_response: resp }).select('id').single()
     if (error) return NextResponse.json({ error: `Posted to Cloudbeds but could not be logged: ${error.message}` }, { status: 500 })
     return NextResponse.json({ id: data.id, status: 'posted', total })

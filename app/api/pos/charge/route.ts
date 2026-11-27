@@ -10,7 +10,7 @@ export async function GET() {
   if ('error' in c) return c.error
   const { data, error } = await c.db
     .from('pos_charges')
-    .select('id, reservation_id, guest_name, room, items, total, currency, status, staff_email, error, created_at, voided_at, voided_lines')
+    .select('id, reservation_id, guest_name, room, items, total, tax_rate, tax_amount, net_amount, currency, status, staff_email, error, created_at, voided_at, voided_lines')
     .eq('tenant_id', c.tenantId)
     .order('created_at', { ascending: false })
     .limit(60)

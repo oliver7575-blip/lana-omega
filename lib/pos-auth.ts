@@ -20,6 +20,13 @@ export async function posTestMode(db: ReturnType<typeof createServiceClient>, te
   return (data?.channel_settings as { pos_live?: boolean } | null)?.pos_live !== true
 }
 
+/** IVA rate (%) that is already inside the bar menu prices. Default 16; can be changed in channel_settings.pos_tax_rate. */
+export async function posTaxRate(db: ReturnType<typeof createServiceClient>, tenantId: string): Promise<number> {
+  const { data } = await db.from('tenants').select('channel_settings').eq('id', tenantId).single()
+  const v = Number((data?.channel_settings as { pos_tax_rate?: number } | null)?.pos_tax_rate)
+  return Number.isFinite(v) && v >= 0 && v < 100 ? v : 16
+}
+
 /** While set, live mode only accepts charges for this one reservation (used for the first real test). */
 export async function posLockedReservation(db: ReturnType<typeof createServiceClient>, tenantId: string): Promise<string | null> {
   const { data } = await db.from('tenants').select('channel_settings').eq('id', tenantId).single()

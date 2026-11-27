@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from 'react'
 interface Item { id: string; name: string; category: string; price: number | string; active: boolean }
 interface Charge {
   id: string; reservation_id: string; guest_name: string | null; room: string | null
-  items: { name: string; quantity: number; price: number }[]; total: number | string
+  items: { name: string; quantity: number; price: number }[]; total: number | string; tax_rate?: number | null; tax_amount?: number | string | null; net_amount?: number | string | null
   status: 'test' | 'posted' | 'failed' | 'voided'; staff_email: string | null; error: string | null; created_at: string; voided_lines: number[]
 }
 
@@ -149,6 +149,7 @@ function ChargesTab() {
                 <b className={c.status === 'voided' ? 'line-through opacity-60' : ''}>{money(c.status === 'voided' ? Number(c.total) : left)}</b>
               </span>
             </div>
+            {c.tax_amount != null && <p className="mt-1 text-xs text-white/55">Net {money(Number(c.net_amount))} · IVA {c.tax_rate}% {money(Number(c.tax_amount))} included</p>}
             <ul className="mt-2 space-y-1">
               {c.items.map((l, i) => (
                 <li key={i} className="flex items-center justify-between gap-2 text-sm">

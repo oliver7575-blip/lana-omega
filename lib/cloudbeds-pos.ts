@@ -59,7 +59,7 @@ async function cbForm(cb: CB, method: string, fields: Record<string, string>): P
  */
 export async function postRoomCharge(
   cb: CB,
-  a: { reservationID: string; referenceID: string; lines: PosLine[]; guestName?: string | null }
+  a: { reservationID: string; referenceID: string; lines: PosLine[]; guestName?: string | null; taxRate?: number }
 ): Promise<Record<string, unknown>> {
   const posted: { soldProductID: string | null }[] = []
   try {
@@ -74,7 +74,9 @@ export async function postRoomCharge(
       fields['items[0][itemCategoryName]'] = l.category
       fields['items[0][itemPrice]'] = l.price.toFixed(2)
       fields['items[0][itemQuantity]'] = String(l.quantity)
-      fields['items[0][itemNote]'] = `Bar POS ${a.referenceID}`
+      const lineTotal = l.price * l.quantity
+      const iva = a.taxRate ? Math.round((lineTotal - lineTotal / (1 + a.taxRate / 100)) * 100) / 100 : 0
+      fields['items[0][itemNote]'] = `Bar POS ${a.referenceID}${iva ? ` · incl. IVA ${a.taxRate}% $${iva.toFixed(2)}` : ''}`
       const resp = await cbForm(cb, 'postCustomItem', fields)
       posted.push({ soldProductID: soldProductIds(resp)[0] ?? null })
     }
