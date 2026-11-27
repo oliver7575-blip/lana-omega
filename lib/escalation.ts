@@ -82,6 +82,8 @@ export interface DispatchArgs {
   guestName?: string | null
   conversationId: string | null
   guestId: string | null
+  /** Set when the guest wrote by email: where Lana sends the team's answer back to them. */
+  emailReply?: { to: string; messageId: string; references: string | null; subject: string; snippet: string } | null
 }
 
 /**
@@ -108,6 +110,7 @@ export async function dispatchEscalation(a: DispatchArgs): Promise<EscalationRes
     room: a.input.roomNumber ?? null,
     delivered: held ? false : result.success,
     held,
+    ...(a.emailReply ? { email_reply: a.emailReply } : {}),
   })
   if (!held) return result
   return {

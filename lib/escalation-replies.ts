@@ -7,6 +7,7 @@ import { buildKnowledgeBaseSection } from './knowledge-base'
 import { addPermanentFact, buildLiveNotesSection } from './live-notes'
 import { sendWhatsAppMessage } from './whatsapp-send'
 import type { EncryptedPayload } from './crypto'
+import { sendEmailFollowUp, type EmailReplyContext } from './email-reply'
 
 export interface WhatsAppLine {
   phoneNumberId: string
@@ -146,7 +147,7 @@ export async function processEscalationReply(
 
   const { data: escs } = await db
     .from('escalations')
-    .select('id, conversation_id, guest_id, room, summary, created_at, staff_reply, category')
+    .select('id, conversation_id, guest_id, room, summary, created_at, staff_reply, category, email_reply')
     .eq('tenant_id', tenantId)
     .in('category', keys)
     .gte('created_at', new Date(Date.now() - 48 * 3600_000).toISOString())
@@ -193,7 +194,7 @@ export async function processEscalationReply(
 
   const conv = esc?.conversation_id ? convById.get(esc.conversation_id as string) : undefined
   const done = await applyOutcome(db, tenantId, wa, tenant, {
-    who, text, escalationId: (esc?.id as string) ?? null, conv, guest: guestOf(conv),
+    who, text, escalationId: (esc?.id as string) ?? null, conv, guest: guestOf(conv), emailReply: (esc?.email_reply as EmailReplyContext | null) ?? null,
     fact: r.fact, subject: r.subject, permanent: r.permanent, daysValid: r.daysValid, tellGuest: r.tellGuest,
   })
   const fallback = done.informed
@@ -214,6 +215,7 @@ interface Outcome {
   escalationId: string | null
   conv?: ConvRow
   guest: GuestRow
+  emailReply?: EmailReplyContext | null
   fact: string | null
   subject: string | null
   permanent: boolean
@@ -270,6 +272,11 @@ async function applyOutcome(
         }
       }
     }
+    if (o.escalationId && informed) await db.from('escalations').update({ guest_informed: true }).eq('id', o.escalationId)
+  }
+  // The guest wrote by email (Airbnb / Booking.com): answer by email in the same thread.
+  if (!conv && o.emailReply && o.tellGuest) {
+    informed = await sendEmailFollowUp(db, tenantId, o.emailReply, o.tellGuest)
     if (o.escalationId && informed) await db.from('escalations').update({ guest_informed: true }).eq('id', o.escalationId)
   }
   return { knowledge, informed }
@@ -378,8 +385,10 @@ ${text.slice(0, 1000)}
   const subject = str(r.subject, 80)
   let conv: ConvRow | undefined
   let guest: GuestRow = null
+  let emailReply: EmailReplyContext | null = null
   if (pending.escalation_id) {
-    const { data: esc } = await db.from('escalations').select('conversation_id').eq('id', pending.escalation_id).single()
+    const { data: esc } = await db.from('escalations').select('conversation_id, email_reply').eq('id', pending.escalation_id).single()
+    emailReply = (esc?.email_reply as EmailReplyContext | null) ?? null
     if (esc?.conversation_id) {
       const { data: c } = await db.from('conversations').select('id, channel, status, notes, guests(name, phone)').eq('id', esc.conversation_id).single()
       if (c) {
@@ -391,7 +400,7 @@ ${text.slice(0, 1000)}
   }
   const { data: tenant } = await db.from('tenants').select('ai_persona_prompt, knowledge_base').eq('id', tenantId).single()
   const done = await applyOutcome(db, tenantId, wa, { ai_persona_prompt: tenant?.ai_persona_prompt ?? null, knowledge_base: tenant?.knowledge_base ?? null }, {
-    who: 'team', text: `${pending.original_text} / ${text}`, escalationId: pending.escalation_id as string | null, conv, guest,
+    who: 'team', text: `${pending.original_text} / ${text}`, escalationId: pending.escalation_id as string | null, conv, guest, emailReply,
     fact, subject, permanent: r.permanent === true, daysValid: Math.min(14, Math.max(1, Number(r.days_valid) || 3)),
     tellGuest: str(r.tell_guest, 500),
   })
