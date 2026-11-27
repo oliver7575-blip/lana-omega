@@ -28,12 +28,14 @@ export async function GET() {
 
   // postCustomItem: keep adding whatever field Cloudbeds says is missing, on a reservation that does not exist,
   // until it gets as far as "reservation not found". That shows the exact field names to send.
-  const fields: Record<string, string> = { reservationID: '999999999999', referenceID: 'probe-no-charge', 'items[0][appItemID]': 'probe-item', 'items[0][name]': 'PROBE', 'items[0][itemQuantity]': '1' }
+  const fields: Record<string, string> = { reservationID: '999999999999', referenceID: 'probe-no-charge', 'items[0][appItemID]': 'probe-item', 'items[0][itemName]': 'PROBE', 'items[0][itemQuantity]': '1' }
   const discovered: { param: string; where: string }[] = []
   let postCustomItem: { http: number; success: unknown; message: string | null } = { http: 0, success: null, message: null }
   for (let n = 0; n < 10; n++) {
     postCustomItem = await call('postCustomItem', form(fields))
-    const m = /Parameter (\w+) is required/i.exec(postCustomItem.message ?? '')
+    const msg = postCustomItem.message ?? ''
+    // "Parameter x is required", or "At least one of the following parameter(s): [ a, b ]" (then the first one is added).
+    const m = /Parameter (\w+) is required/i.exec(msg) ?? /At least one of the following parameter\(s\):\s*\[\s*(\w+)/i.exec(msg)
     if (!m) break
     const param = m[1]
     const value = /quantity/i.test(param) ? '1' : /price|amount|total/i.test(param) ? '1.00' : /id$/i.test(param) ? 'probe-item' : 'PROBE'

@@ -65,10 +65,11 @@ export async function postRoomCharge(
   if (a.guestName) fields.guestName = a.guestName
   a.lines.forEach((l, i) => {
     fields[`items[${i}][appItemID]`] = l.itemId
-    fields[`items[${i}][name]`] = l.name
+    // Field names as Cloudbeds' postCustomItem asks for them (found with the /api/pos/probe check).
+    fields[`items[${i}][itemName]`] = l.name
     fields[`items[${i}][itemCategoryName]`] = l.category
-    fields[`items[${i}][price]`] = l.price.toFixed(2)
-    fields[`items[${i}][quantity]`] = String(l.quantity)
+    fields[`items[${i}][itemPrice]`] = l.price.toFixed(2)
+    fields[`items[${i}][itemQuantity]`] = String(l.quantity)
     fields[`items[${i}][itemNote]`] = `Bar POS ${a.referenceID}`
   })
   return cbForm(cb, 'postCustomItem', fields)
