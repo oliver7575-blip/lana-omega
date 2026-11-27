@@ -52,7 +52,7 @@ async function cbForm(cb: CB, method: string, fields: Record<string, string>): P
   return json
 }
 
-/** Posts one sale to the room's folio. Left unpaid so reception collects it at check-out. */
+/** Posts one sale to the room folio. itemPaid is left out on purpose: sending the text "false" is read as true and records a cash payment, so unpaid is the default and reception collects it at check-out. */
 export async function postRoomCharge(
   cb: CB,
   a: { reservationID: string; referenceID: string; lines: PosLine[]; guestName?: string | null }
@@ -60,7 +60,6 @@ export async function postRoomCharge(
   const fields: Record<string, string> = {
     reservationID: a.reservationID,
     referenceID: a.referenceID,
-    itemPaid: 'false',
   }
   if (a.guestName) fields.guestName = a.guestName
   a.lines.forEach((l, i) => {
