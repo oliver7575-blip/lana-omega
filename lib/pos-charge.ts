@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { cloudbedsForCaller } from './cloudbeds-caller'
 import { postRoomCharge, soldProductIds, type PosLine } from './cloudbeds-pos'
-import { posTestMode, type PosCaller } from './pos-auth'
+import { posLockedReservation, posTestMode, type PosCaller } from './pos-auth'
 
 /**
  * Records a sale against a guest's room: in test mode it is only logged, live it is posted to the
@@ -31,6 +31,11 @@ export async function createCharge(
     const { data, error } = await c.db.from('pos_charges').insert({ ...record, status: 'test' }).select('id').single()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ id: data.id, status: 'test', total })
+  }
+
+  const lock = await posLockedReservation(c.db, c.tenantId)
+  if (lock && lock !== a.reservationId) {
+    return NextResponse.json({ error: 'Live test lock is on: real charges are only allowed to the test reservation. Change this in Manage → Mode.' }, { status: 403 })
   }
 
   const cbc = await cloudbedsForCaller()

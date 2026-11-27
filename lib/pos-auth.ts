@@ -19,3 +19,10 @@ export async function posTestMode(db: ReturnType<typeof createServiceClient>, te
   const { data } = await db.from('tenants').select('channel_settings').eq('id', tenantId).single()
   return (data?.channel_settings as { pos_live?: boolean } | null)?.pos_live !== true
 }
+
+/** While set, live mode only accepts charges for this one reservation (used for the first real test). */
+export async function posLockedReservation(db: ReturnType<typeof createServiceClient>, tenantId: string): Promise<string | null> {
+  const { data } = await db.from('tenants').select('channel_settings').eq('id', tenantId).single()
+  const v = (data?.channel_settings as { pos_lock_reservation?: string } | null)?.pos_lock_reservation
+  return typeof v === 'string' && v ? v : null
+}

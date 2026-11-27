@@ -153,26 +153,50 @@ function ChargesTab() {
 
 function ModeTab() {
   const [testMode, setTestMode] = useState<boolean | null>(null)
-  useEffect(() => { fetch('/api/pos/settings').then((r) => r.json()).then((j) => setTestMode(j.testMode !== false)) }, [])
-  async function set(live: boolean) {
-    const msg = live
-      ? 'Go LIVE? Every charge will be posted to the guest\'s room bill in Cloudbeds.'
-      : 'Switch back to TEST mode? Charges will no longer be sent to Cloudbeds.'
-    if (!confirm(msg)) return
-    const res = await fetch('/api/pos/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ live }) })
+  const [lock, setLock] = useState<string | null>(null)
+  const [guests, setGuests] = useState<{ reservationID: string; guestName: string; room: string }[]>([])
+  const [error, setError] = useState<string | null>(null)
+  useEffect(() => {
+    fetch('/api/pos/settings').then((r) => r.json()).then((j) => { setTestMode(j.testMode !== false); setLock(j.lockReservationId ?? null) })
+    fetch('/api/pos/guests').then((r) => r.json()).then((j) => setGuests(j.guests ?? []))
+  }, [])
+
+  async function put(body: Record<string, unknown>) {
+    setError(null)
+    const res = await fetch('/api/pos/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const j = await res.json()
-    if (res.ok) setTestMode(j.testMode)
+    if (!res.ok) return setError(j.error ?? 'Could not save')
+    setTestMode(j.testMode); setLock(j.lockReservationId ?? null)
+  }
+  async function setLive(live: boolean) {
+    const msg = live
+      ? lock
+        ? 'Go LIVE? Real charges will be posted to Cloudbeds, but ONLY for the locked test reservation.'
+        : "Go LIVE with NO lock? Every charge will be posted to the guest's room bill in Cloudbeds."
+      : 'Switch back to TEST mode? Charges will no longer be sent to Cloudbeds.'
+    if (confirm(msg)) put({ live })
   }
   if (testMode === null) return <p>Loading…</p>
+  const locked = guests.find((g) => g.reservationID === lock)
   return (
-    <div className="max-w-xl">
-      <p className="text-base">Mode: <b className={testMode ? 'text-amber-200' : 'text-[#b3c25f]'}>{testMode ? 'TEST (nothing is sent to Cloudbeds)' : 'LIVE (charges go to the room bill)'}</b></p>
-      <p className="mt-2 text-sm text-white/70">
-        Keep test mode on until one real charge has been posted to a test reservation and checked in Cloudbeds (item name, price, taxes, and that it appears on the bill).
-      </p>
-      <button onClick={() => set(testMode)} className="mt-4 rounded-xl bg-white px-4 py-3 text-sm font-bold text-black">
-        {testMode ? 'Go live' : 'Back to test mode'}
-      </button>
+    <div className="max-w-xl space-y-6">
+      {error && <p className="text-red-300">{error}</p>}
+      <div>
+        <p className="text-base">Mode: <b className={testMode ? 'text-amber-200' : 'text-[#b3c25f]'}>{testMode ? 'TEST (nothing is sent to Cloudbeds)' : 'LIVE (charges go to the room bill)'}</b></p>
+        <button onClick={() => setLive(testMode)} className="mt-3 rounded-xl bg-[#8c9a3f] px-4 py-3 text-sm font-bold text-[#12150d]">{testMode ? 'Go live' : 'Back to test mode'}</button>
+      </div>
+      <div>
+        <p className="text-base font-semibold">Live test lock</p>
+        <p className="mt-1 text-sm text-white/70">
+          While a reservation is chosen here, live mode only accepts charges for that one reservation, so a wrong tap can never reach a real guest. Choose your test reservation (it must be checked in), then go live. Remove the lock only when testing is finished.
+        </p>
+        <select value={lock ?? ''} onChange={(e) => put({ lockReservationId: e.target.value || null })} className={`${input} mt-3 w-full bg-[#12150d]`}>
+          <option value="">No lock — all checked-in guests</option>
+          {lock && !locked && <option value={lock}>Reservation {lock} (not checked in now)</option>}
+          {guests.map((g) => <option key={g.reservationID} value={g.reservationID}>{g.room} · {g.guestName}</option>)}
+        </select>
+        {lock && <p className="mt-2 text-sm text-[#b3c25f]">Locked to {locked ? `${locked.room} · ${locked.guestName}` : `reservation ${lock}`}.</p>}
+      </div>
     </div>
   )
 }
