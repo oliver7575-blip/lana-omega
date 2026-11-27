@@ -252,7 +252,8 @@ export default function PosPage() {
         </div>
         <div className="flex items-center gap-3 text-sm">
           {testMode && <span className="rounded-full px-3 py-1 text-xs font-semibold" style={{ background: 'rgba(230,190,70,.16)', color: '#e8c872' }}>TEST MODE · not sent to Cloudbeds</span>}
-          <Link href="/pos/manage" className="no-underline" style={{ color: C.mute }}>Menu · Charges · Mode</Link>
+          <Link href="/pos/manage?tab=charges" className="rounded-full px-3 py-1 text-xs font-semibold no-underline" style={{ background: C.card, border: `1px solid ${C.line}`, color: C.cream }}>Refund</Link>
+          <Link href="/pos/manage" className="no-underline" style={{ color: C.mute }}>Menu · Tables · Mode</Link>
         </div>
       </header>
       {toast && <p className="mt-3 rounded-xl px-4 py-3 text-base" style={{ background: 'rgba(140,154,63,.2)', border: `1px solid ${C.olive}` }}>✓ {toast}</p>}

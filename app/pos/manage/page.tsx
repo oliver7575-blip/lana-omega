@@ -7,7 +7,7 @@ interface Item { id: string; name: string; category: string; price: number | str
 interface Charge {
   id: string; reservation_id: string; guest_name: string | null; room: string | null
   items: { name: string; quantity: number; price: number }[]; total: number | string
-  status: 'test' | 'posted' | 'failed' | 'voided'; staff_email: string | null; error: string | null; created_at: string
+  status: 'test' | 'posted' | 'failed' | 'voided'; staff_email: string | null; error: string | null; created_at: string; voided_lines: number[]
 }
 
 const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -16,6 +16,10 @@ const when = (iso: string) => new Date(iso).toLocaleString('en-GB', { day: 'nume
 
 export default function PosManagePage() {
   const [tab, setTab] = useState<'menu' | 'tables' | 'charges' | 'mode'>('menu')
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get('tab')
+    if (t === 'menu' || t === 'tables' || t === 'charges' || t === 'mode') setTab(t)
+  }, [])
   return (
     <main>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -116,11 +120,11 @@ function ChargesTab() {
   }, [])
   useEffect(() => { load() }, [load])
 
-  async function voidIt(id: string) {
-    if (!confirm('Void this charge?')) return
+  async function refund(id: string, line?: number, label?: string) {
+    if (!confirm(`Refund ${label ?? 'this whole charge'}? It is removed from the guest's room bill.`)) return
     setError(null)
-    const res = await fetch(`/api/pos/charge/${id}/void`, { method: 'POST' })
-    if (!res.ok) setError((await res.json().catch(() => ({}))).error ?? 'Could not void')
+    const res = await fetch(`/api/pos/charge/${id}/void`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(line === undefined ? {} : { line }) })
+    if (!res.ok) setError((await res.json().catch(() => ({}))).error ?? 'Could not refund')
     load()
   }
 
@@ -132,21 +136,34 @@ function ChargesTab() {
       {error && <p className="mb-2 text-red-300">{error}</p>}
       {charges.length === 0 && <p className="text-white/70">No charges yet.</p>}
       <ul className="space-y-2">
-        {charges.map((c) => (
+        {charges.map((c) => {
+          const gone = new Set(c.voided_lines ?? [])
+          const left = c.items.reduce((sum, l, i) => sum + (gone.has(i) ? 0 : l.price * l.quantity), 0)
+          const canRefund = c.status === 'test' || c.status === 'posted'
+          return (
           <li key={c.id} className="rounded-xl border border-white/15 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-base"><b>{c.room ?? '—'}</b> · {c.guest_name}</span>
               <span className="flex items-center gap-2">
-                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold uppercase ${badge[c.status]}`}>{c.status}</span>
-                <b className={c.status === 'voided' ? 'line-through opacity-60' : ''}>{money(Number(c.total))}</b>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold uppercase ${badge[c.status]}`}>{c.status === 'voided' ? 'refunded' : c.status}</span>
+                <b className={c.status === 'voided' ? 'line-through opacity-60' : ''}>{money(c.status === 'voided' ? Number(c.total) : left)}</b>
               </span>
             </div>
-            <p className="mt-1 text-sm text-white/70">{c.items.map((l) => `${l.quantity} × ${l.name}`).join(', ')}</p>
-            <p className="mt-1 text-xs text-white/50">{when(c.created_at)}{c.staff_email ? ` · ${c.staff_email}` : ''}</p>
+            <ul className="mt-2 space-y-1">
+              {c.items.map((l, i) => (
+                <li key={i} className="flex items-center justify-between gap-2 text-sm">
+                  <span className={gone.has(i) ? 'text-white/40 line-through' : 'text-white/80'}>{l.quantity} × {l.name} · {money(l.price * l.quantity)}</span>
+                  {canRefund && !gone.has(i) && <button onClick={() => refund(c.id, i, `${l.quantity} × ${l.name}`)} className="rounded-lg bg-white/10 px-3 py-1.5 text-xs">Refund</button>}
+                  {gone.has(i) && <span className="text-xs text-white/40">refunded</span>}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-xs text-white/50">{when(c.created_at)}{c.staff_email ? ` · ${c.staff_email}` : ''}</p>
             {c.error && <p className="mt-1 text-sm text-red-300">{c.error}</p>}
-            {(c.status === 'test' || c.status === 'posted') && <button onClick={() => voidIt(c.id)} className="mt-2 rounded-lg bg-white/10 px-3 py-1.5 text-sm">Void</button>}
+            {canRefund && c.items.length - gone.size > 1 && <button onClick={() => refund(c.id)} className="mt-2 rounded-lg bg-[#8c9a3f] px-3 py-1.5 text-sm font-semibold text-[#12150d]">Refund all</button>}
           </li>
-        ))}
+          )
+        })}
       </ul>
     </div>
   )

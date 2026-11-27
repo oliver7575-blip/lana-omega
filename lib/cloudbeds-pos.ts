@@ -52,26 +52,37 @@ async function cbForm(cb: CB, method: string, fields: Record<string, string>): P
   return json
 }
 
-/** Posts one sale to the room folio. itemPaid is left out on purpose: sending the text "false" is read as true and records a cash payment, so unpaid is the default and reception collects it at check-out. */
+/**
+ * Posts one sale to the room folio, one Cloudbeds item per menu line (so a single line can be refunded on its own).
+ * itemPaid is left out on purpose: sending the text "false" is read as true and records a cash payment, so the charge
+ * stays unpaid and reception collects it at check-out. If a later line fails, the lines already posted are voided again.
+ */
 export async function postRoomCharge(
   cb: CB,
   a: { reservationID: string; referenceID: string; lines: PosLine[]; guestName?: string | null }
 ): Promise<Record<string, unknown>> {
-  const fields: Record<string, string> = {
-    reservationID: a.reservationID,
-    referenceID: a.referenceID,
+  const posted: { soldProductID: string | null }[] = []
+  try {
+    for (let i = 0; i < a.lines.length; i++) {
+      const l = a.lines[i]
+      const ref = `${a.referenceID}-${i + 1}`
+      const fields: Record<string, string> = { reservationID: a.reservationID, referenceID: ref }
+      if (a.guestName) fields.guestName = a.guestName
+      // Field names as Cloudbeds' postCustomItem asks for them (found with the /api/pos/probe check).
+      fields['items[0][appItemID]'] = l.itemId
+      fields['items[0][itemName]'] = l.name
+      fields['items[0][itemCategoryName]'] = l.category
+      fields['items[0][itemPrice]'] = l.price.toFixed(2)
+      fields['items[0][itemQuantity]'] = String(l.quantity)
+      fields['items[0][itemNote]'] = `Bar POS ${a.referenceID}`
+      const resp = await cbForm(cb, 'postCustomItem', fields)
+      posted.push({ soldProductID: soldProductIds(resp)[0] ?? null })
+    }
+  } catch (err) {
+    for (const p of posted) if (p.soldProductID) await voidSoldProduct(cb, a.reservationID, p.soldProductID).catch(() => {})
+    throw err
   }
-  if (a.guestName) fields.guestName = a.guestName
-  a.lines.forEach((l, i) => {
-    fields[`items[${i}][appItemID]`] = l.itemId
-    // Field names as Cloudbeds' postCustomItem asks for them (found with the /api/pos/probe check).
-    fields[`items[${i}][itemName]`] = l.name
-    fields[`items[${i}][itemCategoryName]`] = l.category
-    fields[`items[${i}][itemPrice]`] = l.price.toFixed(2)
-    fields[`items[${i}][itemQuantity]`] = String(l.quantity)
-    fields[`items[${i}][itemNote]`] = `Bar POS ${a.referenceID}`
-  })
-  return cbForm(cb, 'postCustomItem', fields)
+  return { lines: posted }
 }
 
 /** Voids one posted folio item by its Cloudbeds id. */

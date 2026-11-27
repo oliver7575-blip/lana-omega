@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { cloudbedsForCaller } from './cloudbeds-caller'
-import { postRoomCharge, soldProductIds, type PosLine } from './cloudbeds-pos'
+import { postRoomCharge, type PosLine } from './cloudbeds-pos'
 import { posLockedReservation, posTestMode, type PosCaller } from './pos-auth'
 
 /**
@@ -42,7 +42,7 @@ export async function createCharge(
   if ('error' in cbc) return cbc.error
   try {
     const resp = await postRoomCharge(cbc.cb, { reservationID: a.reservationId, referenceID: referenceId, lines: a.lines, guestName: a.guestName })
-    const { data, error } = await c.db.from('pos_charges').insert({ ...record, status: 'posted', cloudbeds_response: { ...resp, soldProductIDs: soldProductIds(resp) } }).select('id').single()
+    const { data, error } = await c.db.from('pos_charges').insert({ ...record, status: 'posted', cloudbeds_response: resp }).select('id').single()
     if (error) return NextResponse.json({ error: `Posted to Cloudbeds but could not be logged: ${error.message}` }, { status: 500 })
     return NextResponse.json({ id: data.id, status: 'posted', total })
   } catch (err) {
